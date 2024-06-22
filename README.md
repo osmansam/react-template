@@ -2,3 +2,4 @@
 2. For the App.tsx file i need something like RouteContainer it may change project to project so i did not create it
 3. Try to solve TextInput Input problem in the datePicker part
 # react-template
+# react-template
