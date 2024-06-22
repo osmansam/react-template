@@ -1,0 +1,53 @@
+{
+  "name": "react-template",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "build": "tsc && vite build",
+    "serve": "vite preview",
+    "lint": "eslint . --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "@headlessui/react": "^1.7.16",
+    "@heroicons/react": "^2.0.13",
+    "@material-tailwind/react": "2.1.9",
+    "@tanstack/react-query": "^4.22.0",
+    "autoprefixer": "^10.4.19",
+    "axios": "^1.7.2",
+    "date-fns": "^3.6.0",
+    "i18next": "^23.11.5",
+    "i18next-browser-languagedetector": "^8.0.0",
+    "js-cookie": "^3.0.5",
+    "postcss": "^8.4.38",
+    "react": "^18.2.0",
+    "react-color": "^2.19.3",
+    "react-day-picker": "^8.10.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^14.1.2",
+    "react-icons": "^5.2.1",
+    "react-router-dom": "6.3",
+    "react-select": "^5.8.0",
+    "react-toastify": "^10.0.5",
+    "tailwindcss": "^3.4.4",
+    "v": "^0.3.0",
+    "vite-plugin-svgr": "^4.2.0",
+    "vite-tsconfig-paths": "^4.3.2",
+    "web-vitals": "^2.1.0"
+  },
+  "devDependencies": {
+    "@types/js-cookie": "^3.0.6",
+    "@types/react": "^18.3.3",
+    "@types/react-color": "^3.0.12",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.13.1",
+    "@typescript-eslint/parser": "^7.13.1",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "typescript": "^5.2.2",
+    "vite": "^5.3.1"
+  }
+}
