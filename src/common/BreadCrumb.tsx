@@ -1,7 +1,7 @@
 import { BsDot } from "react-icons/bs";
 import { useNavigate } from "react-router-dom";
-import { H3, P2 } from "../Typography";
-import { BreadCrumbItem } from "../shared/types";
+import { H3, P2 } from "../components/panelComponents/Typography";
+import { BreadCrumbItem } from "../components/panelComponents/shared/types";
 type Props = {
   items?: BreadCrumbItem[];
   title: string;

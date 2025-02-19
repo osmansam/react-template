@@ -80,6 +80,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         return { previousItems };
       },
       // If the mutation fails, use the context returned from onMutate to roll back
+      //eslint-disable-next-line @typescript-eslint/no-explicit-any
       onError: (_err: any, _newTable, context) => {
         const previousItemContext = context as {
           previousItems: T[];
@@ -125,6 +126,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         return { previousItems };
       },
       // If the mutation fails, use the context returned from onMutate to roll back
+      //eslint-disable-next-line @typescript-eslint/no-explicit-any
       onError: (_err: any, _newTable, context) => {
         const previousItemContext = context as {
           previousItems: T[];
@@ -176,6 +178,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         return { previousItems };
       },
       // If the mutation fails, use the context returned from onMutate to roll back
+      //eslint-disable-next-line @typescript-eslint/no-explicit-any
       onError: (_err: any, _newTable, context) => {
         const previousItemContext = context as {
           previousItems: T[];

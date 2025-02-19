@@ -26,6 +26,7 @@ type Props<T> = {
   handleUpdate?: () => void;
   submitFunction?: () => void;
   additionalSubmitFunction?: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constantValues?: { [key: string]: any };
   isEditMode?: boolean;
   showRequired?: boolean;
@@ -39,6 +40,7 @@ type Props<T> = {
 type OptionType = { value: string; label: string };
 
 type FormElementsState = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any; // this is the type of the form elements it can be string, number, boolean, etc.
 };
 

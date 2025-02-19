@@ -55,12 +55,14 @@ const SelectInput = ({
   requiredField = false,
 }: SelectInputProps) => {
   const customStyles = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     control: (base: any) => ({
       ...base,
       border: "1px solid #E2E8F0",
       borderRadius: "4px",
       fontSize: "14px",
     }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     option: (base: any, state: any) => ({
       ...base,
       borderRadius: "6px",
@@ -74,6 +76,7 @@ const SelectInput = ({
         color: "#0057FF",
       },
     }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     placeholder: (base: any) => ({
       ...base,
       color: "#b0b5ba",

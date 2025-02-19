@@ -6,7 +6,6 @@ import { ActionMeta, MultiValue, SingleValue } from "react-select";
 import { NO_IMAGE_URL } from "../../../types";
 import { toast } from "react-toastify";
 import { UpdatePayload, postWithHeader } from "../../../utils/api";
-import { ConfirmationDialog } from "../../common/ConfirmationDialog";
 import { H6 } from "../Typography";
 import {
   FormKeyType,
@@ -16,6 +15,7 @@ import {
 } from "../shared/types";
 import SelectInput from "./SelectInput";
 import TextInput from "./TextInput";
+import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 
 type Props<T> = {
   isOpen: boolean;
@@ -31,6 +31,7 @@ type Props<T> = {
   additionalSubmitFunction?: () => void;
   additionalCancelFunction?: () => void;
   isBlurFieldClickCloseEnabled?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constantValues?: { [key: string]: any };
   isCancelConfirmationDialogExist?: boolean;
   isEditMode?: boolean;
@@ -44,6 +45,7 @@ type Props<T> = {
 type OptionType = { value: string; label: string };
 
 type FormElementsState = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any; // this is the type of the form elements it can be string, number, boolean, etc.
 };
 
