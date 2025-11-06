@@ -4,7 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionMeta, MultiValue, SingleValue } from "react-select";
 import { toast } from "react-toastify";
-import { UpdatePayload, postWithHeader } from "../../../utils/api";
+import {
+  FormElementsState,
+  FormElementValue,
+  NO_IMAGE_URL,
+  OptionType,
+} from "../../../types";
+import { postWithHeader, UpdatePayload } from "../../../utils/api";
+import { GenericButton } from "../FormElements/GenericButton";
 import { H4, H6 } from "../Typography";
 import {
   FormKeyType,
@@ -12,9 +19,9 @@ import {
   GenericInputType,
   InputTypes,
 } from "../shared/types";
+import DateInput from "./DateInput";
 import SelectInput from "./SelectInput";
 import TextInput from "./TextInput";
-import { NO_IMAGE_URL } from "../../../types";
 
 type Props<T> = {
   inputs: GenericInputType[];
@@ -26,8 +33,7 @@ type Props<T> = {
   handleUpdate?: () => void;
   submitFunction?: () => void;
   additionalSubmitFunction?: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constantValues?: { [key: string]: any };
+  constantValues?: { [key: string]: FormElementValue };
   isEditMode?: boolean;
   showRequired?: boolean;
   folderName?: string;
@@ -36,12 +42,6 @@ type Props<T> = {
     id: number | string;
     updates: T;
   };
-};
-type OptionType = { value: string; label: string };
-
-type FormElementsState = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any; // this is the type of the form elements it can be string, number, boolean, etc.
 };
 
 const GenericAddComponent = <T,>({
@@ -104,8 +104,14 @@ const GenericAddComponent = <T,>({
     return mergedInitialState;
   });
 
-  const uploadImageMutation = useMutation(
-    async ({ file, filename }: { file: File; filename: string }) => {
+  const uploadImageMutation = useMutation({
+    mutationFn: async ({
+      file,
+      filename,
+    }: {
+      file: File;
+      filename: string;
+    }) => {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("filename", filename);
@@ -120,20 +126,27 @@ const GenericAddComponent = <T,>({
       });
       return res;
     },
+    onSuccess: (data: { url: string }) => {
+      setFormElements((prev) => ({ ...prev, [imageFormKey]: data.url }));
+    },
+    onError: (error: Error) => {
+      console.error("Error uploading file:", error);
+    },
+  });
 
-    {
-      onSuccess: (data) => {
-        setFormElements((prev) => ({ ...prev, [imageFormKey]: data.url }));
-      },
-      onError: (error) => {
-        console.error("Error uploading file:", error);
-      },
-    }
-  );
+  const areRequiredFieldsFilled = useCallback(() => {
+    return inputs.every((input) => {
+      if (!input.required) return true;
+      const value = formElements[input.formKey];
+      if (Array.isArray(value)) return value.length > 0;
+      return value !== undefined && value !== null && value !== "";
+    });
+  }, [inputs, formElements]);
+
   useEffect(() => {
     setForm && setForm(formElements as T);
     setAllRequiredFilled(areRequiredFieldsFilled());
-  }, [formElements, inputs]);
+  }, [formElements, inputs, areRequiredFieldsFilled, setForm]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -182,15 +195,6 @@ const GenericAddComponent = <T,>({
       console.error("Failed to execute submit item:", error);
     }
   };
-
-  const areRequiredFieldsFilled = () => {
-    return inputs.every((input) => {
-      if (!input.required) return true;
-      const value = formElements[input.formKey];
-      if (Array.isArray(value)) return value.length > 0;
-      return value !== undefined && value !== null && value !== "";
-    });
-  };
   const handleInputClear = (input: GenericInputType) => {
     setFormElements((prev) => ({
       ...prev,
@@ -222,8 +226,9 @@ const GenericAddComponent = <T,>({
               <div className="flex flex-col gap-2" key={input.formKey}>
                 <img
                   src={
-                    formElements[input.formKey]
-                      ? formElements[input.formKey]
+                    formElements[input.formKey] &&
+                    typeof formElements[input.formKey] === "string"
+                      ? (formElements[input.formKey] as string)
                       : NO_IMAGE_URL
                   }
                   alt="image"
@@ -250,20 +255,21 @@ const GenericAddComponent = <T,>({
             {/* nonimage inputs */}
             {nonImageInputs.map((input) => {
               const value = formElements[input.formKey];
-              const handleChange = (key: string) => (value: string) => {
-                const changedInput = inputs.find(
-                  (input) => input.formKey === key
-                );
-                if (changedInput?.invalidateKeys) {
-                  changedInput.invalidateKeys.forEach((key) => {
-                    setFormElements((prev) => ({
-                      ...prev,
-                      [key.key]: key.defaultValue,
-                    }));
-                  });
-                }
-                setFormElements((prev) => ({ ...prev, [key]: value }));
-              };
+              const handleChange =
+                (key: string) => (value: FormElementValue) => {
+                  const changedInput = inputs.find(
+                    (input) => input.formKey === key
+                  );
+                  if (changedInput?.invalidateKeys) {
+                    changedInput.invalidateKeys.forEach((key) => {
+                      setFormElements((prev) => ({
+                        ...prev,
+                        [key.key]: key.defaultValue,
+                      }));
+                    });
+                  }
+                  setFormElements((prev) => ({ ...prev, [key]: value }));
+                };
 
               const handleChangeForSelect =
                 (key: string) =>
@@ -310,9 +316,9 @@ const GenericAddComponent = <T,>({
                   <div key={input.formKey} className="flex flex-col gap-2">
                     {(input.type === InputTypes.TEXT ||
                       input.type === InputTypes.NUMBER ||
-                      input.type === InputTypes.DATE ||
                       input.type === InputTypes.TIME ||
                       input.type === InputTypes.COLOR ||
+                      input.type === InputTypes.CHECKBOX ||
                       input.type === InputTypes.PASSWORD) && (
                       <TextInput
                         key={input.formKey + String(textInputKey)}
@@ -327,7 +333,30 @@ const GenericAddComponent = <T,>({
                         }}
                       />
                     )}
-
+                    {input.type === InputTypes.DATE && (
+                      <DateInput
+                        key={input.formKey}
+                        value={typeof value === "string" ? value : ""}
+                        label={
+                          input.required && input.label
+                            ? input.label
+                            : input.label ?? ""
+                        }
+                        placeholder={input.placeholder ?? ""}
+                        onChange={(val) =>
+                          handleChange(input.formKey)(val ?? "")
+                        }
+                        isArrowsEnabled={input.isArrowsEnabled ?? false}
+                        requiredField={input.required}
+                        isOnClearActive={input?.isOnClearActive ?? true}
+                        isDateInitiallyOpen={input.isDateInitiallyOpen ?? false}
+                        isTopFlexRow={input.isTopFlexRow ?? false}
+                        isReadOnly={input.isReadOnly ?? false}
+                        onClear={() => {
+                          handleInputClear(input);
+                        }}
+                      />
+                    )}
                     {input.type === InputTypes.SELECT && (
                       <SelectInput
                         key={
@@ -337,20 +366,25 @@ const GenericAddComponent = <T,>({
                         }
                         value={
                           input.isMultiple
-                            ? input.options?.filter((option) =>
-                                formElements[input.formKey]?.includes(
-                                  option.value
-                                )
-                              )
+                            ? input.options?.filter((option) => {
+                                const fieldValue = formElements[input.formKey];
+                                return (
+                                  Array.isArray(fieldValue) &&
+                                  (fieldValue as (string | number)[]).includes(
+                                    option.value
+                                  )
+                                );
+                              }) || []
                             : input.options?.find(
                                 (option) =>
                                   option.value === formElements[input.formKey]
-                              )
+                              ) || null
                         }
                         label={input.label ?? ""}
                         options={input.options ?? []}
                         placeholder={input.placeholder ?? ""}
                         requiredField={input.required && showRequired}
+                        isAutoFill={input.isAutoFill ?? true}
                         isMultiple={input.isMultiple ?? false}
                         onChange={handleChangeForSelect(input.formKey)}
                         onClear={() => {
@@ -372,12 +406,12 @@ const GenericAddComponent = <T,>({
                           )}
                         </div>
                         <textarea
-                          value={value}
+                          value={typeof value === "string" ? value : ""}
                           onChange={(e) => {
                             handleChange(input.formKey)(e.target.value);
                           }}
                           placeholder={input.placeholder ?? ""}
-                          className="border text-sm border-gray-300 rounded-md p-2"
+                          className="border text-sm border-gray-300 rounded-md p-2 min-h-40"
                         />
                       </div>
                     )}
@@ -388,7 +422,7 @@ const GenericAddComponent = <T,>({
           </div>
         </div>
 
-        <button
+        <GenericButton
           onClick={() => {
             if (!allRequiredFilled) {
               toast.error(t("Please fill all required fields"));
@@ -397,7 +431,10 @@ const GenericAddComponent = <T,>({
                 .filter((input) => input.additionalType === "phone")
                 .some((input) => {
                   const inputValue = formElements[input.formKey];
-                  if (!inputValue.match(/^[0-9]{11}$/)) {
+                  if (
+                    typeof inputValue !== "string" ||
+                    !inputValue.match(/^[0-9]{11}$/)
+                  ) {
                     toast.error(t("Check phone number."));
                     return true; // Validation failed for phone number
                   }
@@ -409,12 +446,12 @@ const GenericAddComponent = <T,>({
               }
             }
           }}
-          className={`inline-block ${
-            !allRequiredFilled ? "bg-gray-500" : "bg-blue-500 hover:bg-blue-600"
-          } text-white text-sm py-2 px-3 rounded-md cursor-pointer my-auto w-fit ml-auto`}
+          variant={!allRequiredFilled ? "secondary" : "primary"}
+          size="sm"
+          className="ml-auto"
         >
           {buttonName ? buttonName : isEditMode ? t("Update") : t("Create")}
-        </button>
+        </GenericButton>
       </div>
     </div>
   );

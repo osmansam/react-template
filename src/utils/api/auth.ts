@@ -41,9 +41,10 @@ export function useLogin(
     LoginResponse,
     LoginError,
     LoginCredentials
-  >(loginMethod, {
+  >({
+    mutationFn: loginMethod,
     // We are updating tables query data with new item
-    onSuccess: async (response) => {
+    onSuccess: async (response: LoginResponse) => {
       const { token } = response;
       Cookies.set("jwt", token);
       toast.success(t("Logged in successfully"));

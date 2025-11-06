@@ -12,3 +12,27 @@ export enum RowPerPageEnum {
 }
 export const NO_IMAGE_URL =
   "https://res.cloudinary.com/dvbg/image/upload/ar_4:4,c_crop/c_fit,h_100/davinci/no-image_pyet1d.jpg";
+
+// Type for form element values - covers all possible form input types
+export type FormElementValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | number[]
+  | Date
+  | null
+  | undefined;
+
+export type FormElementsState = {
+  [key: string]: FormElementValue;
+};
+
+export interface OptionType {
+  value: string | number;
+  label: string;
+  imageUrl?: string;
+  bgColor?: string;
+  textColor?: string;
+  [key: string]: string | number | boolean | undefined;
+}

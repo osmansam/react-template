@@ -22,7 +22,10 @@ interface Props<T> {
 export function useGet<T>(path: string, queryKey?: QueryKey) {
   // We are using path as a query key if queryKey is not provided
   const fetchQueryKey = queryKey || [path];
-  const { data } = useQuery(fetchQueryKey, () => get<T>({ path }));
+  const { data } = useQuery({
+    queryKey: fetchQueryKey,
+    queryFn: () => get<T>({ path }),
+  });
   return data;
 }
 
@@ -58,11 +61,12 @@ export function useMutationApi<T extends { _id: number | string }>({
   const { t } = useTranslation();
   function useCreateItemMutation() {
     const queryClient = useQueryClient();
-    return useMutation(createRequest, {
+    return useMutation({
+      mutationFn: createRequest,
       // We are updating tables query data with new item
-      onMutate: async (itemDetails) => {
+      onMutate: async (itemDetails: Partial<T>) => {
         // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-        await queryClient.cancelQueries(queryKey);
+        await queryClient.cancelQueries({ queryKey });
 
         // Snapshot the previous value
         const previousItems = queryClient.getQueryData<T[]>(queryKey);
@@ -81,7 +85,7 @@ export function useMutationApi<T extends { _id: number | string }>({
       },
       // If the mutation fails, use the context returned from onMutate to roll back
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onError: (_err: any, _newTable, context) => {
+      onError: (_err: any, _newTable: Partial<T>, context: any) => {
         const previousItemContext = context as {
           previousItems: T[];
         };
@@ -96,20 +100,21 @@ export function useMutationApi<T extends { _id: number | string }>({
       // Always refetch after error or success:
       onSettled: async () => {
         additionalInvalidates?.forEach((key) => {
-          queryClient.invalidateQueries(key);
+          queryClient.invalidateQueries({ queryKey: key });
         });
-        queryClient.invalidateQueries(queryKey);
+        queryClient.invalidateQueries({ queryKey });
       },
     });
   }
   function useDeleteItemMutation() {
     const queryClient = useQueryClient();
 
-    return useMutation(deleteRequest, {
+    return useMutation({
+      mutationFn: deleteRequest,
       // We are updating tables query data with new item
-      onMutate: async (id) => {
+      onMutate: async (id: number | string) => {
         // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-        await queryClient.cancelQueries(queryKey);
+        await queryClient.cancelQueries({ queryKey });
 
         // Snapshot the previous value
         const previousItems = queryClient.getQueryData<T[]>(queryKey) || [];
@@ -127,7 +132,7 @@ export function useMutationApi<T extends { _id: number | string }>({
       },
       // If the mutation fails, use the context returned from onMutate to roll back
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onError: (_err: any, _newTable, context) => {
+      onError: (_err: any, _newTable: number | string, context: any) => {
         const previousItemContext = context as {
           previousItems: T[];
         };
@@ -141,20 +146,21 @@ export function useMutationApi<T extends { _id: number | string }>({
       },
       // Always refetch after error or success:
       onSettled: async () => {
-        queryClient.invalidateQueries(queryKey);
+        queryClient.invalidateQueries({ queryKey });
         additionalInvalidates?.forEach((key) => {
-          queryClient.invalidateQueries(key);
+          queryClient.invalidateQueries({ queryKey: key });
         });
       },
     });
   }
   function useUpdateItemMutation() {
     const queryClient = useQueryClient();
-    return useMutation(updateRequest, {
+    return useMutation({
+      mutationFn: updateRequest,
       // We are updating tables query data with new item
       onMutate: async ({ id, updates }: UpdatePayload<T>) => {
         // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-        await queryClient.cancelQueries(queryKey);
+        await queryClient.cancelQueries({ queryKey });
 
         // Snapshot the previous value
         const previousItems = queryClient.getQueryData<T[]>(queryKey) || [];
@@ -179,7 +185,7 @@ export function useMutationApi<T extends { _id: number | string }>({
       },
       // If the mutation fails, use the context returned from onMutate to roll back
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onError: (_err: any, _newTable, context) => {
+      onError: (_err: any, _newTable: UpdatePayload<T>, context: any) => {
         const previousItemContext = context as {
           previousItems: T[];
         };
@@ -193,9 +199,9 @@ export function useMutationApi<T extends { _id: number | string }>({
       },
       // Always refetch after error or success:
       onSettled: async () => {
-        queryClient.invalidateQueries(queryKey);
+        queryClient.invalidateQueries({ queryKey });
         additionalInvalidates?.forEach((key) => {
-          queryClient.invalidateQueries(key);
+          queryClient.invalidateQueries({ queryKey: key });
         });
       },
     });
