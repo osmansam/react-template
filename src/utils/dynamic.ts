@@ -45,8 +45,3 @@ export function useGetDynamicItems<T>(schemaName: string) {
   const queryKey = listKey(schemaName);
   return useGet<T[]>(path, queryKey);
 }
-
-export function useGetDynamicItemsArray<T>(schemaName: string): T[] {
-  const res = useGetDynamicItems<T>(schemaName);
-  return res || [];
-}
