@@ -8,7 +8,6 @@ import {
   MdOutlineCheckBox,
   MdOutlineCheckBoxOutlineBlank,
 } from "react-icons/md";
-import { FormElementValue } from "../../../types";
 import { H6 } from "../Typography";
 import { GenericButton } from "./GenericButton";
 
@@ -16,8 +15,10 @@ type TextInputProps = {
   label?: string;
   placeholder?: string;
   type: string;
-  value: FormElementValue;
-  onChange: (value: FormElementValue) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  value: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onChange: (value: any) => void;
   className?: string;
   disabled?: boolean;
   onClear?: () => void;
@@ -56,8 +57,9 @@ const TextInput = ({
 }: TextInputProps) => {
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [debounceTimer, setDebounceTimer] = useState<number | null>(null);
-
+  const [debounceTimer, setDebounceTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
@@ -72,7 +74,9 @@ const TextInput = ({
   const handleChange = (e: { target: { value: string | number } }) => {
     const newValue =
       type === "number" && +e.target.value < minNumber && isMinNumber
-        ? minNumber.toString()
+        ? Number(minNumber)
+        : type === "number"
+        ? Number(e.target.value)
         : e.target.value;
     setLocalValue(newValue);
     if (isDebounce) {
@@ -90,26 +94,19 @@ const TextInput = ({
 
   const handleIncrement = () => {
     if (type === "number") {
-      const currentValue =
-        typeof localValue === "number"
-          ? localValue
-          : typeof localValue === "string"
-          ? parseFloat(localValue) || 0
-          : 0;
-      const newValue = Math.max(minNumber, currentValue + 1);
-      const newValueStr = newValue.toString();
-      setLocalValue(newValueStr);
+      const newValue = Math.max(minNumber, +localValue + 1);
+      setLocalValue(newValue);
 
       if (isDebounce) {
         if (debounceTimer) {
           clearTimeout(debounceTimer);
         }
         const timer = setTimeout(() => {
-          onChange(newValueStr);
+          onChange(newValue);
         }, 1000);
         setDebounceTimer(timer);
       } else {
-        onChange(newValueStr);
+        onChange(newValue);
       }
 
       if (inputRef.current) {
@@ -121,36 +118,27 @@ const TextInput = ({
     }
   };
   const handleDecrement = () => {
-    if (type === "number") {
-      const currentValue =
-        typeof localValue === "number"
-          ? localValue
-          : typeof localValue === "string"
-          ? parseFloat(localValue) || 0
-          : 0;
-      if (currentValue > minNumber) {
-        const newValue = Math.max(minNumber, currentValue - 1);
-        const newValueStr = newValue.toString();
-        setLocalValue(newValueStr);
+    if (type === "number" && +localValue > minNumber) {
+      const newValue = Math.max(minNumber, +localValue - 1);
+      setLocalValue(newValue);
 
-        if (isDebounce) {
-          if (debounceTimer) {
-            clearTimeout(debounceTimer);
-          }
-          const timer = setTimeout(() => {
-            onChange(newValueStr);
-          }, 1000);
-          setDebounceTimer(timer);
-        } else {
-          onChange(newValueStr);
+      if (isDebounce) {
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
         }
+        const timer = setTimeout(() => {
+          onChange(newValue);
+        }, 1000);
+        setDebounceTimer(timer);
+      } else {
+        onChange(newValue);
+      }
 
-        if (inputRef.current) {
-          inputRef.current.readOnly = true;
-          setTimeout(() => {
-            if (inputRef.current) inputRef.current.readOnly = false;
-          }, 0);
-        }
+      if (inputRef.current) {
+        inputRef.current.readOnly = true;
+        setTimeout(() => {
+          if (inputRef.current) inputRef.current.readOnly = false;
+        }, 0);
       }
     }
   };
@@ -184,7 +172,7 @@ const TextInput = ({
         </H6>
         <div className=" flex flex-row gap-2 ">
           <SketchPicker
-            color={typeof value === "string" ? value : ""}
+            color={value}
             onChange={(color) => {
               onChange(color.hex);
             }}
@@ -261,11 +249,7 @@ const TextInput = ({
           }}
           placeholder={placeholder}
           disabled={disabled || isReadOnly}
-          value={
-            typeof localValue === "string" || typeof localValue === "number"
-              ? localValue
-              : ""
-          }
+          value={localValue}
           onChange={handleChange}
           className={inputClassName}
           {...(isMinNumber && (type === "number" ? { min: minNumber } : {}))}

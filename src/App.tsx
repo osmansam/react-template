@@ -7,9 +7,12 @@ import { Slide, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { GeneralContextProvider } from "./context/General.context";
 import { UserContextProvider } from "./context/User.context";
+import { useWebSocket } from "./hooks/useWebSocket";
 import RouterContainer from "./navigation/routes";
+
 function App() {
   const isMutating = useIsMutating();
+  useWebSocket();
 
   return (
     <div className="App">

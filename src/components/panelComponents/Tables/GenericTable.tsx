@@ -42,19 +42,6 @@ import FilterPanel from "./FilterPanel";
 import CustomTooltip from "./Tooltip";
 import "./table.css";
 
-// Base interface for table row data
-interface BaseTableRow extends Record<string, unknown> {
-  isSortable?: boolean;
-  isActionsDisabled?: boolean;
-  collapsible?: {
-    collapsibleHeader?: string;
-    collapsibleColumns: ColumnType[];
-    collapsibleRows: BaseTableRow[];
-    collapsibleRowKeys?: RowKeyType<BaseTableRow>[];
-    className?: (row: BaseTableRow) => string;
-  };
-}
-
 type PaginationProps = {
   totalPages: number;
   totalRows: number;
@@ -65,7 +52,8 @@ type OutsideSortProps = {
 };
 
 type Props<T> = {
-  rows: T[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rows: any[];
   isDraggable?: boolean;
   onDragEnter?: (DraggedRow: T, TargetRow: T) => void;
   isActionsActive: boolean;
@@ -99,12 +87,10 @@ type Props<T> = {
   selectionActions?: ActionType<T>[];
   isToolTipEnabled?: boolean;
   isEmtpyExcel?: boolean;
-  // Toggle, GenericTable sayfalarında search yanında gözükmeli
-  // Eğer prop verilmezse, UnifiedTabPanel context'inden alınır
   showOrientationToggle?: boolean;
 };
 
-const GenericTable = <T extends BaseTableRow>({
+const GenericTable = <T,>({
   rows,
   columns,
   rowKeys,
@@ -229,8 +215,9 @@ const GenericTable = <T extends BaseTableRow>({
       )
     : rowKeys;
 
+  const baseRows = rows ?? [];
+
   const filteredRows = useMemo(() => {
-    const baseRows = rows ?? [];
     if (!isSearch) return baseRows;
     const keys = searchRowKeys ?? usedRowKeys;
     const q = searchQuery.trimStart().toLocaleLowerCase("tr-TR");
@@ -246,7 +233,7 @@ const GenericTable = <T extends BaseTableRow>({
         return false;
       })
     );
-  }, [rows, isSearch, searchQuery, searchRowKeys, usedRowKeys]);
+  }, [baseRows, isSearch, searchQuery, searchRowKeys, usedRowKeys]);
 
   const sortedRows = useMemo(() => {
     if (!sortConfig) return filteredRows;
@@ -265,7 +252,7 @@ const GenericTable = <T extends BaseTableRow>({
     });
   }, [filteredRows, sortConfig]);
 
-  const usedTotalRows = pagination ? pagination.totalRows : sortedRows.length;
+  const usedTotalRows = pagination ? pagination.totalRows : sortedRows?.length;
   const totalPages = Math.ceil(usedTotalRows / rowsPerPage);
   const usedTotalPages = pagination ? pagination.totalPages : totalPages;
 
@@ -273,7 +260,7 @@ const GenericTable = <T extends BaseTableRow>({
     if (!isRowsPerPage || pagination) return sortedRows;
     const start = (currentPage - 1) * rowsPerPage;
     const end = currentPage * rowsPerPage;
-    return sortedRows.slice(start, end);
+    return sortedRows?.slice(start, end);
   }, [sortedRows, isRowsPerPage, pagination, currentPage, rowsPerPage]);
 
   const sortRows = (key: string, direction: "ascending" | "descending") => {
@@ -327,15 +314,10 @@ const GenericTable = <T extends BaseTableRow>({
   };
 
   const generatePDF = () => {
-    const pdfMake = (
-      window as unknown as {
-        pdfMake: {
-          fonts: Record<string, unknown>;
-          createPdf: (def: unknown) => { open: () => void };
-        };
-      }
-    ).pdfMake;
-    const data: (string | { text: string; style: string })[][] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfMake = (window as any).pdfMake;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any[] = [];
     data.push(
       usedColumns
         .filter((column) => column.correspondingKey)
@@ -344,13 +326,12 @@ const GenericTable = <T extends BaseTableRow>({
           style: "tableHeader",
         }))
     );
-    filteredRows.forEach((row) => {
-      const rowData: string[] = [];
+    sortedRows?.forEach((row) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rowData: any[] = [];
       usedColumns?.forEach((column) => {
         if (column.correspondingKey) {
-          const value = String(
-            row[column.correspondingKey as keyof BaseTableRow]
-          );
+          const value = String(row[column.correspondingKey]);
           rowData.push(value);
         }
       });
@@ -392,17 +373,18 @@ const GenericTable = <T extends BaseTableRow>({
 
   const generateExcel = () => {
     const workbook = XLSX.utils.book_new();
-    const excelRows: (string | number)[][] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const excelRows: any[] = [];
     const headers = usedColumns
       .filter((column) => column.correspondingKey)
       .map((column) => column.key);
     excelRows.push(headers);
-    const excelAllRows = !isEmtpyExcel ? filteredRows : [];
+    const excelAllRows = !isEmtpyExcel ? sortedRows : [];
     excelAllRows.forEach((row) => {
       const rowData = usedColumns
         .filter((column) => column.correspondingKey)
         .map((column) => {
-          const value = row[column.correspondingKey as keyof BaseTableRow];
+          const value = row[column.correspondingKey as keyof T];
           return value === undefined || value === null ? "" : String(value);
         });
       excelRows.push(rowData);
@@ -479,7 +461,7 @@ const GenericTable = <T extends BaseTableRow>({
           )}
           {(!isCollapsibleCheckActive ||
             (isCollapsible &&
-              (row?.collapsible?.collapsibleRows?.length ?? 0) > 0)) && (
+              row?.collapsible?.collapsibleRows?.length > 0)) && (
             <td onClick={() => toggleRowExpansion(rowId)}>
               {isRowExpanded ? (
                 <FaChevronUp className="w-6 h-6 mx-auto p-1 cursor-pointer text-gray-500 hover:bg-gray-50 hover:rounded-full   " />
@@ -489,7 +471,7 @@ const GenericTable = <T extends BaseTableRow>({
             </td>
           )}
           {isCollapsibleCheckActive &&
-            (row?.collapsible?.collapsibleRows?.length ?? 0) === 0 && (
+            row?.collapsible?.collapsibleRows?.length === 0 && (
               <td className="w-6 h-6 mx-auto p-1 "></td>
             )}
           {actions && isActionsAtFront && isActionsActive && (
@@ -642,7 +624,7 @@ const GenericTable = <T extends BaseTableRow>({
               <table className="w-[96%] mx-auto">
                 <thead className="w-full">
                   <tr>
-                    {(row?.collapsible?.collapsibleColumns?.length ?? 0) > 0 &&
+                    {row?.collapsible?.collapsibleColumns.length > 0 &&
                       row?.collapsible?.collapsibleColumns?.map(
                         (column: ColumnType, index: number) => (
                           <th
@@ -658,9 +640,9 @@ const GenericTable = <T extends BaseTableRow>({
                   </tr>
                 </thead>
                 <tbody>
-                  {(row?.collapsible?.collapsibleRows?.length ?? 0) > 0 &&
+                  {row?.collapsible?.collapsibleRows.length > 0 &&
                     row?.collapsible?.collapsibleRows?.map(
-                      (collapsibleRow: BaseTableRow, rowIndex: number) => (
+                      (collapsibleRow: T, rowIndex: number) => (
                         <tr
                           key={rowIndex}
                           className={`${row?.collapsible?.className?.(
@@ -668,14 +650,9 @@ const GenericTable = <T extends BaseTableRow>({
                           )} `}
                         >
                           {row?.collapsible?.collapsibleRowKeys?.map(
-                            (
-                              rowKey: RowKeyType<BaseTableRow>,
-                              keyIndex: number
-                            ) => {
+                            (rowKey: RowKeyType<T>, keyIndex: number) => {
                               const cellValue = `${
-                                collapsibleRow[
-                                  rowKey?.key as keyof BaseTableRow
-                                ]
+                                collapsibleRow[rowKey?.key as keyof T]
                               }`;
                               if (rowKey.node) {
                                 return (
@@ -687,7 +664,7 @@ const GenericTable = <T extends BaseTableRow>({
                                       rowKey?.className
                                     } border-b`}
                                   >
-                                    {rowKey.node(collapsibleRow as T)}
+                                    {rowKey.node(collapsibleRow)}
                                   </td>
                                 );
                               }
@@ -696,8 +673,7 @@ const GenericTable = <T extends BaseTableRow>({
                                   key={keyIndex}
                                   className={`py-2 px-4 text-sm  ${
                                     rowIndex !==
-                                      (row?.collapsible?.collapsibleRows
-                                        ?.length ?? 0) -
+                                      row?.collapsible?.collapsibleRows.length -
                                         1 && "border-b"
                                   }`}
                                 >
@@ -710,8 +686,7 @@ const GenericTable = <T extends BaseTableRow>({
                             <td
                               className={`py-2 px-4  ${
                                 rowIndex !==
-                                  (row?.collapsible?.collapsibleRows?.length ??
-                                    0) -
+                                  row?.collapsible?.collapsibleRows.length -
                                     1 && "border-b"
                               }`}
                             >

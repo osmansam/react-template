@@ -11,14 +11,16 @@ import Select, {
   SingleValue,
   components,
 } from "react-select";
-import { OptionType } from "../shared/types";
+import { OptionType } from "../../../types";
 import { H6 } from "../Typography";
 import { GenericButton } from "./GenericButton";
 
 const CustomOption = (
   props: OptionProps<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     { value: any; label: string },
     boolean,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     GroupBase<{ value: any; label: string }>
   >
 ) => (
@@ -33,7 +35,7 @@ const CustomOption = (
 interface SelectInputProps {
   label?: string;
   options: OptionType[];
-  value: PropsValue<OptionType>;
+  value: PropsValue<OptionType> | null;
   onChange: (
     value: SingleValue<OptionType> | MultiValue<OptionType>,
     actionMeta: ActionMeta<OptionType>
@@ -68,6 +70,7 @@ const normalizeText = (text: string) => {
 };
 
 const customFilterOption = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   option: { value: any; label: string },
 
   searchInput: string
@@ -119,6 +122,7 @@ const SelectInput = ({
   const selectRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile(768);
   const customStyles = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     control: (base: any) => ({
       ...base,
       border: "1px solid #E2E8F0",
@@ -129,10 +133,12 @@ const SelectInput = ({
         backgroundColor: customControlBackgroundColor,
       }),
     }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     menu: (base: any) => ({
       ...base,
       overflowY: "auto",
     }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     option: (base: any, state: any) => ({
       ...base,
       borderRadius: "6px",
@@ -147,12 +153,14 @@ const SelectInput = ({
       },
       fontSize: "16px",
     }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     placeholder: (base: any) => ({
       ...base,
       color: "#b0b5ba",
       fontSize: "16px",
       fontWeight: 400,
     }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     singleValue: (base: any) => ({
       ...base,
       fontSize: "16px",
@@ -185,7 +193,7 @@ const SelectInput = ({
     },
     []
   );
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const DropdownIndicator = (props: any) => {
     return (
       <components.DropdownIndicator {...props}>

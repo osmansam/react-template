@@ -8,22 +8,17 @@ import { ActionMeta, MultiValue, SingleValue } from "react-select";
 import { toast } from "react-toastify";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { useGeneralContext } from "../../../context/General.context";
-import {
-  FormElementsState,
-  FormElementValue,
-  NO_IMAGE_URL,
-} from "../../../types";
-import { postWithHeader, UpdatePayload } from "../../../utils/api";
-import { GenericButton } from "../FormElements/GenericButton";
+import { FormElementsState, NO_IMAGE_URL, OptionType } from "../../../types";
+import { UpdatePayload, postWithHeader } from "../../../utils/api";
 import { H6 } from "../Typography";
 import {
   FormKeyType,
   FormKeyTypeEnum,
   GenericInputType,
   InputTypes,
-  OptionType,
 } from "../shared/types";
 import DateInput from "./DateInput";
+import { GenericButton } from "./GenericButton";
 import HourInput from "./HourInput";
 import MonthYearInput from "./MonthYearInput";
 import SelectInput from "./SelectInput";
@@ -46,7 +41,8 @@ type Props<T> = {
   submitFunction?: () => void;
   additionalSubmitFunction?: () => void;
   additionalCancelFunction?: () => void;
-  constantValues?: { [key: string]: FormElementValue };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constantValues?: { [key: string]: any };
   isCancelConfirmationDialogExist?: boolean;
   isCreateConfirmationDialogExist?: boolean;
   isCreateCloseActive?: boolean;
@@ -118,8 +114,7 @@ const GenericAddEditPanel = <T,>({
   const { t } = useTranslation();
   const [allRequiredFilled, setAllRequiredFilled] = useState(false);
   const [imageFormKey, setImageFormKey] = useState<string>("");
-  const { isTabInputScreenOpen, tabInputScreenOptions, setIsExtraModalOpen } =
-    useGeneralContext();
+  const { isTabInputScreenOpen, tabInputScreenOptions } = useGeneralContext();
   const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] =
     useState(false);
   const [resetTextInput, setResetTextInput] = useState(false);
@@ -129,6 +124,7 @@ const GenericAddEditPanel = <T,>({
   const [confirmationDialogFunction, setConfirmationDialogFunction] = useState<
     (() => void) | null
   >(null);
+  const { setIsExtraModalOpen } = useGeneralContext();
   const [isCreateConfirmationDialogOpen, setIsCreateConfirmationDialogOpen] =
     useState(false);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
@@ -171,10 +167,22 @@ const GenericAddEditPanel = <T,>({
     }
     return mergedInitialState;
   });
-  const handleClose = useCallback(() => {
+  const handleClose = () => {
     setIsExtraModalOpen?.(false);
     close?.();
-  }, [setIsExtraModalOpen, close]);
+  };
+  const isValueEmpty = useCallback((value: unknown) => {
+    if (Array.isArray(value)) return value.length === 0;
+    return value === undefined || value === null || value === "";
+  }, []);
+
+  const areRequiredFieldsFilled = useCallback(() => {
+    return inputs.every((input) => {
+      if (!input.required) return true;
+      return !isValueEmpty(formElements[input.formKey]);
+    });
+  }, [inputs, formElements, isValueEmpty]);
+
   const uploadImageMutation = useMutation({
     mutationFn: async ({
       file,
@@ -205,18 +213,6 @@ const GenericAddEditPanel = <T,>({
     },
   });
 
-  const isValueEmpty = (value: unknown) => {
-    if (Array.isArray(value)) return value.length === 0;
-    return value === undefined || value === null || value === "";
-  };
-
-  const areRequiredFieldsFilled = useCallback(() => {
-    return inputs.every((input) => {
-      if (!input.required) return true;
-      return !isValueEmpty(formElements[input.formKey]);
-    });
-  }, [inputs, formElements]);
-
   useEffect(() => {
     if (setForm) {
       setForm(formElements as T);
@@ -232,10 +228,11 @@ const GenericAddEditPanel = <T,>({
       }
     }
     document.addEventListener("keydown", handleKeyDown);
+    // triggerOnTriggerTabInput();
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isEditMode, additionalCancelFunction, handleClose]);
+  }, []);
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>, input: GenericInputType) => {
       setImageFormKey(input.formKey);
@@ -280,6 +277,7 @@ const GenericAddEditPanel = <T,>({
       finalSubmitFunction();
     }
   };
+
   const handleInputClear = (input: GenericInputType) => {
     setFormElements((prev) => ({
       ...prev,
@@ -308,10 +306,7 @@ const GenericAddEditPanel = <T,>({
         .filter((input) => input.additionalType === "phone")
         .some((input) => {
           const inputValue = formElements[input.formKey];
-          if (
-            typeof inputValue === "string" &&
-            !inputValue.match(/^[0-9]{11}$/)
-          ) {
+          if (!inputValue.match(/^[0-9]{11}$/)) {
             toast.error(t("Check phone number."));
             return true; // Validation failed for phone number
           }
@@ -351,9 +346,8 @@ const GenericAddEditPanel = <T,>({
           formElements={formElements}
           setFormElements={setFormElements}
           inputs={inputs}
-          setForm={
-            setForm as React.Dispatch<React.SetStateAction<FormElementsState>>
-          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setForm={setForm as any}
         />
       );
     }
@@ -388,8 +382,8 @@ const GenericAddEditPanel = <T,>({
                 <div className="flex flex-col gap-2" key={input.formKey}>
                   <img
                     src={
-                      typeof formElements[input.formKey] === "string"
-                        ? (formElements[input.formKey] as string)
+                      formElements[input.formKey]
+                        ? formElements[input.formKey]
                         : NO_IMAGE_URL
                     }
                     alt="image"
@@ -422,21 +416,20 @@ const GenericAddEditPanel = <T,>({
               {/* nonimage inputs */}
               {nonImageInputs.map((input) => {
                 const value = formElements[input.formKey];
-                const handleChange =
-                  (key: string) => (value: FormElementValue) => {
-                    const changedInput = inputs.find(
-                      (input) => input.formKey === key
-                    );
-                    setFormElements((prev) => ({ ...prev, [key]: value }));
-                    if (changedInput?.invalidateKeys) {
-                      changedInput.invalidateKeys.forEach((key) => {
-                        setFormElements((prev) => ({
-                          ...prev,
-                          [key.key]: key.defaultValue,
-                        }));
-                      });
-                    }
-                  };
+                const handleChange = (key: string) => (value: string) => {
+                  const changedInput = inputs.find(
+                    (input) => input.formKey === key
+                  );
+                  setFormElements((prev) => ({ ...prev, [key]: value }));
+                  if (changedInput?.invalidateKeys) {
+                    changedInput.invalidateKeys.forEach((key) => {
+                      setFormElements((prev) => ({
+                        ...prev,
+                        [key.key]: key.defaultValue,
+                      }));
+                    });
+                  }
+                };
                 const handleChangeForSelect =
                   (key: string) =>
                   (
@@ -497,7 +490,7 @@ const GenericAddEditPanel = <T,>({
                       {input.type === InputTypes.DATE && (
                         <DateInput
                           key={input.formKey + resetTextInput}
-                          value={typeof value === "string" ? value : ""}
+                          value={value}
                           label={
                             input.required && input.label
                               ? input.label
@@ -558,7 +551,7 @@ const GenericAddEditPanel = <T,>({
                       {input.type === InputTypes.HOUR && (
                         <HourInput
                           key={input.formKey}
-                          value={typeof value === "string" ? value : ""}
+                          value={value}
                           label={
                             input.required && input.label
                               ? input.label
@@ -572,7 +565,7 @@ const GenericAddEditPanel = <T,>({
                       {input.type === InputTypes.MONTHYEAR && (
                         <MonthYearInput
                           key={input.formKey}
-                          value={typeof value === "string" ? value : ""}
+                          value={value}
                           label={
                             input.required && input.label
                               ? input.label
@@ -591,21 +584,17 @@ const GenericAddEditPanel = <T,>({
                               : input.formKey + formElements[input.formKey]
                           }
                           value={
-                            input.isMultiple
-                              ? input.options?.filter((option) => {
-                                  const formValue = formElements[input.formKey];
-                                  return (
-                                    Array.isArray(formValue) &&
-                                    (formValue as (string | number)[]).includes(
-                                      option.value
-                                    )
-                                  );
-                                }) || []
+                            (input.isMultiple
+                              ? input.options?.filter((option) =>
+                                  formElements[input.formKey]?.includes(
+                                    option.value
+                                  )
+                                )
                               : input?.options?.find(
                                   (option) =>
                                     option?.value ===
                                     formElements[input.formKey]
-                                ) || null
+                                )) ?? null
                           }
                           label={
                             input.required && input.label
@@ -621,6 +610,23 @@ const GenericAddEditPanel = <T,>({
                           requiredField={input.required}
                           onChange={handleChangeForSelect(input.formKey)}
                           isTopFlexRow={input.isTopFlexRow ?? false}
+                          onChangeTrigger={
+                            input?.onChangeTrigger
+                              ? (value) => {
+                                  if (Array.isArray(value)) {
+                                    input.onChangeTrigger?.(
+                                      value.map((v) => v.value)
+                                    );
+                                  } else if (value && !Array.isArray(value)) {
+                                    input.onChangeTrigger?.(
+                                      (value as OptionType).value
+                                    );
+                                  } else {
+                                    input.onChangeTrigger?.(null);
+                                  }
+                                }
+                              : undefined
+                          }
                           isOnClearActive={input?.isOnClearActive ?? true}
                           isReadOnly={input.isReadOnly ?? false}
                           onClear={() => {
@@ -649,11 +655,8 @@ const GenericAddEditPanel = <T,>({
                           invalidateKeys={input.invalidateKeys}
                           requiredField={input.required}
                           setFormElements={setFormElements}
-                          setForm={
-                            setForm as React.Dispatch<
-                              React.SetStateAction<FormElementsState>
-                            >
-                          }
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          setForm={setForm as any}
                           formElements={formElements}
                           isTopFlexRow={input.isTopFlexRow ?? false}
                           isReadOnly={input.isReadOnly ?? false}
@@ -718,7 +721,7 @@ const GenericAddEditPanel = <T,>({
                                     key={opt.value}
                                     onMouseDown={() => {
                                       handleChange(input.formKey)(
-                                        String(opt.value)
+                                        opt.value as string
                                       );
                                       setOpenFor(null);
                                     }}
@@ -733,11 +736,7 @@ const GenericAddEditPanel = <T,>({
 
                           <div className="relative">
                             <textarea
-                              value={
-                                typeof formElements[input.formKey] === "string"
-                                  ? (formElements[input.formKey] as string)
-                                  : ""
-                              }
+                              value={formElements[input.formKey]}
                               onChange={(e) =>
                                 handleChange(input.formKey)(e.target.value)
                               }

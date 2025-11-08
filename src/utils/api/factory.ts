@@ -8,34 +8,47 @@ import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import { UpdatePayload, get, patch, post, remove } from ".";
 
-export const Paths = {
-  Login: "/login",
-};
-
 interface Props<T> {
   baseQuery: string;
   queryKey?: QueryKey;
+  isInvalidate?: boolean;
+  isAdditionalInvalidate?: boolean;
   sortFunction?: (a: Partial<T>, b: Partial<T>) => number;
   additionalInvalidates?: QueryKey[];
 }
 
-export function useGet<T>(path: string, queryKey?: QueryKey) {
+export function useGet<T>(
+  path: string,
+  queryKey?: QueryKey,
+  isStaleTimeZero?: boolean
+) {
   // We are using path as a query key if queryKey is not provided
   const fetchQueryKey = queryKey || [path];
   const { data } = useQuery({
     queryKey: fetchQueryKey,
     queryFn: () => get<T>({ path }),
+    staleTime: Infinity, // never becomes stale on its own
+    gcTime: Infinity, // never garbage-collected
+    refetchOnWindowFocus: false, // no auto-refetch
+    refetchOnReconnect: false, // no auto-refetch
+    refetchOnMount: false, // no auto-refetch
   });
   return data;
 }
 
-export function useGetList<T>(path: string, queryKey?: QueryKey) {
-  return useGet<T[]>(path, queryKey) || [];
+export function useGetList<T>(
+  path: string,
+  queryKey?: QueryKey,
+  isStaleTimeZero?: boolean
+) {
+  return useGet<T[]>(path, queryKey, isStaleTimeZero) || [];
 }
 
 export function useMutationApi<T extends { _id: number | string }>({
   baseQuery,
   queryKey = [baseQuery],
+  isInvalidate = false,
+  isAdditionalInvalidate = false,
   sortFunction,
   additionalInvalidates,
 }: Props<T>) {
@@ -67,25 +80,20 @@ export function useMutationApi<T extends { _id: number | string }>({
       onMutate: async (itemDetails: Partial<T>) => {
         // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
         await queryClient.cancelQueries({ queryKey });
-
         // Snapshot the previous value
         const previousItems = queryClient.getQueryData<T[]>(queryKey);
         if (!previousItems) return;
-
         const updatedItems = [...(previousItems as T[]), itemDetails];
         if (sortFunction) {
           updatedItems.sort(sortFunction);
         }
-
         // Optimistically update to the new value
         queryClient.setQueryData(queryKey, updatedItems);
-
         // Return a context object with the snapshotted value
         return { previousItems };
       },
       // If the mutation fails, use the context returned from onMutate to roll back
-      //eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onError: (_err: any, _newTable: Partial<T>, context: any) => {
+      onError: (_err: any, _newTable, context) => {
         const previousItemContext = context as {
           previousItems: T[];
         };
@@ -99,10 +107,14 @@ export function useMutationApi<T extends { _id: number | string }>({
       },
       // Always refetch after error or success:
       onSettled: async () => {
-        additionalInvalidates?.forEach((key) => {
-          queryClient.invalidateQueries({ queryKey: key });
-        });
-        queryClient.invalidateQueries({ queryKey });
+        if (isInvalidate) {
+          queryClient.invalidateQueries({ queryKey });
+        }
+        if (isAdditionalInvalidate) {
+          additionalInvalidates?.forEach((key) => {
+            queryClient.invalidateQueries({ queryKey: key });
+          });
+        }
       },
     });
   }
@@ -131,8 +143,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         return { previousItems };
       },
       // If the mutation fails, use the context returned from onMutate to roll back
-      //eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onError: (_err: any, _newTable: number | string, context: any) => {
+      onError: (_err: any, _newTable, context) => {
         const previousItemContext = context as {
           previousItems: T[];
         };
@@ -146,10 +157,14 @@ export function useMutationApi<T extends { _id: number | string }>({
       },
       // Always refetch after error or success:
       onSettled: async () => {
-        queryClient.invalidateQueries({ queryKey });
-        additionalInvalidates?.forEach((key) => {
-          queryClient.invalidateQueries({ queryKey: key });
-        });
+        if (isInvalidate) {
+          queryClient.invalidateQueries({ queryKey });
+        }
+        if (isAdditionalInvalidate) {
+          additionalInvalidates?.forEach((key) => {
+            queryClient.invalidateQueries({ queryKey: key });
+          });
+        }
       },
     });
   }
@@ -165,6 +180,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         // Snapshot the previous value
         const previousItems = queryClient.getQueryData<T[]>(queryKey) || [];
 
+        console.log("previousItems", previousItems);
         const updatedItems = [...previousItems];
 
         for (let i = 0; i < updatedItems.length; i++) {
@@ -179,13 +195,13 @@ export function useMutationApi<T extends { _id: number | string }>({
 
         // Optimistically update to the new value
         queryClient.setQueryData(queryKey, updatedItems);
+        console.log("updatedItems", updatedItems);
 
         // Return a context object with the snapshotted value
         return { previousItems };
       },
       // If the mutation fails, use the context returned from onMutate to roll back
-      //eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onError: (_err: any, _newTable: UpdatePayload<T>, context: any) => {
+      onError: (_err: any, _newTable, context) => {
         const previousItemContext = context as {
           previousItems: T[];
         };
@@ -199,21 +215,28 @@ export function useMutationApi<T extends { _id: number | string }>({
       },
       // Always refetch after error or success:
       onSettled: async () => {
-        queryClient.invalidateQueries({ queryKey });
-        additionalInvalidates?.forEach((key) => {
-          queryClient.invalidateQueries({ queryKey: key });
-        });
+        if (isInvalidate) {
+          queryClient.invalidateQueries({ queryKey });
+        }
+        if (isAdditionalInvalidate || additionalInvalidates) {
+          additionalInvalidates?.forEach((key) => {
+            queryClient.invalidateQueries({ queryKey: key });
+          });
+        }
       },
     });
   }
 
-  const { mutate: deleteItem } = useDeleteItemMutation();
-  const { mutate: updateItem } = useUpdateItemMutation();
-  const { mutate: createItem } = useCreateItemMutation();
+  const createMutation = useCreateItemMutation();
+  const deleteMutation = useDeleteItemMutation();
+  const updateMutation = useUpdateItemMutation();
 
   return {
-    deleteItem,
-    updateItem,
-    createItem,
+    createItem: createMutation.mutate,
+    deleteItem: deleteMutation.mutate,
+    updateItem: updateMutation.mutate,
+    createMutation,
+    deleteMutation,
+    updateMutation,
   };
 }
