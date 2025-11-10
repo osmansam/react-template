@@ -1,4 +1,11 @@
+import { FormElementsState } from "../types";
 import { useGet, useMutationApi } from "../utils/api/factory";
+export interface DynamicPayload<T> {
+  items: T[];
+  totalItems: number;
+  totalPages: number;
+  currentPage: number;
+}
 
 const BASE = "/dynamic";
 const qs = (params: Record<string, unknown>) =>
@@ -44,4 +51,31 @@ export function useGetDynamicItems<T>(schemaName: string) {
   const path = `${BASE}?${qs({ schemaName })}`;
   const queryKey = listKey(schemaName);
   return useGet<T[]>(path, queryKey);
+}
+
+export function useGetPaginatedItems<T>(
+  page: number,
+  limit: number,
+  schemaName: string,
+  filters: FormElementsState
+) {
+  const baseQueryUrl = `${BASE}/page`;
+  const queryKey = [
+    "dynamic",
+    schemaName,
+    "page",
+    { page, limit, filters },
+  ] as const;
+  const parts = [
+    `schemaName=${schemaName}`,
+    `page=${page}`,
+    `limit=${limit}`,
+    filters.sort && `sort=${filters.sort}`,
+    filters.asc !== undefined && `asc=${filters.asc}`,
+    filters.search && `search=${filters.search}`,
+  ];
+  const queryString = parts.filter(Boolean).join("&");
+  const url = `${baseQueryUrl}?${queryString}`;
+
+  return useGet<DynamicPayload<T>>(url, queryKey, true);
 }

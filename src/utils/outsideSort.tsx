@@ -15,7 +15,7 @@ export const outsideSort = (
     >
       <div className=" items-center cursor-pointer ">
         {filterPanelFormElements.sort === key &&
-        filterPanelFormElements.asc === -1 ? (
+        filterPanelFormElements.asc === 0 ? (
           <p className="font-bold">↑</p>
         ) : (
           <p className="font-bold">↓</p>
@@ -33,12 +33,12 @@ function handleSort(
   if (filterPanelFormElements.sort === value) {
     setFilterPanelFormElements({
       ...filterPanelFormElements,
-      asc: filterPanelFormElements.asc === 1 ? -1 : 1,
+      asc: filterPanelFormElements.asc === 1 ? 0 : 1,
     });
   } else {
     setFilterPanelFormElements({
       ...filterPanelFormElements,
-      asc: -1,
+      asc: 0,
       sort: value,
     });
   }

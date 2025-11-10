@@ -42,8 +42,9 @@ export function useWebSocket() {
           if (msg?.type !== "invalidate" || !msg?.schema) return;
           console.log("WS invalidating queries for schema:", msg.schema);
           await queryClient.invalidateQueries({
-            queryKey: ["dynamic", msg.schema, "all"],
-            type: "active",
+            queryKey: ["dynamic", msg.schema],
+            type: "all",
+            exact: false,
           });
 
           // (Optional) be extra-safe: directly hit array keys you know exist
