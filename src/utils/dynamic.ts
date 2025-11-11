@@ -1,5 +1,10 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { toast } from "react-toastify";
 import { FormElementsState } from "../types";
 import { useGet, useMutationApi } from "../utils/api/factory";
+import { axiosClient } from "./api/axiosClient";
+
 export interface DynamicPayload<T> {
   items: T[];
   totalItems: number;
@@ -40,10 +45,120 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   const deleteDynamicItem = (id: string | number) =>
     deleteItem(`${id}?${qs({ schemaName })}`);
 
+  // Delete multiple items functionality
+  const qc = useQueryClient();
+  const { t } = useTranslation();
+
+  async function deleteManyRequest(payload: Array<{ _id: string | number }>) {
+    const { data } = await axiosClient.delete(
+      `${BASE}/multiple?${qs({ schemaName })}`,
+      {
+        data: payload,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    return data;
+  }
+
+  const deleteManyMutation = useMutation({
+    mutationFn: deleteManyRequest,
+    onMutate: async (payload: Array<{ _id: string | number }>) => {
+      await qc.cancelQueries({ queryKey });
+
+      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
+      const idsToDelete = new Set(payload.map((p) => String(p._id)));
+
+      const updatedItems = previousItems.filter(
+        (item) => !idsToDelete.has(String(item._id))
+      );
+
+      qc.setQueryData<T[]>(queryKey, updatedItems);
+
+      return { previousItems };
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onError: (err: any, _vars, context) => {
+      if (context?.previousItems) {
+        qc.setQueryData<T[]>(queryKey, context.previousItems);
+      }
+      const errorMessage =
+        err?.response?.data?.message || "An unexpected error occurred";
+      setTimeout(() => toast.error(t(errorMessage)), 200);
+    },
+    onSettled: async () => {
+      // keep your pattern consistent with the rest of your hook
+      qc.invalidateQueries({ queryKey });
+    },
+  });
+
+  const deleteMultipleDynamicItem = (docs: Array<{ _id: string | number }>) =>
+    deleteManyMutation.mutate(docs);
+
+  // Update multiple items functionality
+  async function updateManyRequest(
+    payload: Array<{ _id: string | number; updates: Partial<T> }>
+  ) {
+    // Flatten the payload: merge _id with updates into a single object
+    const flattenedPayload = payload.map(({ _id, updates }) => ({
+      _id,
+      ...updates,
+    }));
+
+    const { data } = await axiosClient.patch(
+      `${BASE}/multiple?${qs({ schemaName })}`,
+      flattenedPayload,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    return data;
+  }
+
+  const updateManyMutation = useMutation({
+    mutationFn: updateManyRequest,
+    onMutate: async (
+      payload: Array<{ _id: string | number; updates: Partial<T> }>
+    ) => {
+      await qc.cancelQueries({ queryKey });
+
+      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
+      const updateMap = new Map(payload.map((p) => [String(p._id), p.updates]));
+
+      const updatedItems = previousItems.map((item) => {
+        const updates = updateMap.get(String(item._id));
+        return updates ? { ...item, ...updates } : item;
+      });
+
+      qc.setQueryData<T[]>(queryKey, updatedItems);
+
+      return { previousItems };
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onError: (err: any, _vars, context) => {
+      if (context?.previousItems) {
+        qc.setQueryData<T[]>(queryKey, context.previousItems);
+      }
+      const errorMessage =
+        err?.response?.data?.message || "An unexpected error occurred";
+      setTimeout(() => toast.error(t(errorMessage)), 200);
+    },
+    onSettled: async () => {
+      qc.invalidateQueries({ queryKey });
+    },
+  });
+
+  const updateMultipleDynamicItem = (
+    docs: Array<{ _id: string | number; updates: Partial<T> }>
+  ) => updateManyMutation.mutate(docs);
+
   return {
     createDynamicItem,
     updateDynamicItem,
     deleteDynamicItem,
+    deleteMultipleDynamicItem,
+    deleteManyMutation,
+    updateMultipleDynamicItem,
+    updateManyMutation,
   };
 }
 

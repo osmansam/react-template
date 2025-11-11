@@ -796,7 +796,7 @@ const GenericTable = <T,>({
           )}
         </div>
         <div className="flex flex-col bg-white border border-gray-100 shadow-sm rounded-lg   ">
-          <div className="flex flex-col sm:flex-row flex-wrap justify-between items-start sm:items-center gap-2 sm:gap-4 px-3 sm:px-6 border-b border-gray-200 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row flex-wrap sm:flex-nowrap justify-between items-start sm:items-center gap-2 sm:gap-4 px-3 sm:px-6 border-b border-gray-200 py-3 sm:py-4">
             <div className="flex flex-row gap-1 items-center w-full sm:w-auto">
               {selectionActions && (
                 <Tooltip

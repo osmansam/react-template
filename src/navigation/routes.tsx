@@ -1,20 +1,29 @@
 import { Route, Routes } from "react-router-dom";
 import GenericPaginatedPage from "../pages/GenericPaginatedPage";
-import { allRoutes, PublicRoutes } from "./constants";
+import { PublicRoutes } from "./constants";
 
 const RouterContainer = () => {
   return (
     <Routes>
-      {allRoutes?.map((route) => (
-        <Route key={route.name} path={route.path} element={<route.element />} />
-      ))}
+      {/* {allRoutes.map((route) => (
+        <Route key={route.name} element={<PrivateRoutes />}>
+          {allRoutes?.map((route) => (
+            <Route
+              key={route.name}
+              path={route.path}
+              element={route.element && <route.element />}
+            />
+          ))}
+        </Route>
+      ))} */}
+
       <Route
         path={PublicRoutes.Login}
-        element={<GenericPaginatedPage schemaName="hilmi" />}
+        element={<GenericPaginatedPage schemaName="can" />}
       />
       <Route
         path={PublicRoutes.NotFound}
-        element={<GenericPaginatedPage schemaName="hilmi" />}
+        element={<GenericPaginatedPage schemaName="can" />}
       />
     </Routes>
   );

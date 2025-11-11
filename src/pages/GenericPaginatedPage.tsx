@@ -167,9 +167,22 @@ export default function GenericPaginatedPage({
   actionsEnabled = true,
 }: Props) {
   const { t } = useTranslation();
-  const { createDynamicItem, updateDynamicItem, deleteDynamicItem } =
-    useDynamicCrud<GenericItem>(schemaName);
-  const { rowsPerPage, currentPage, setCurrentPage } = useGeneralContext();
+  const {
+    rowsPerPage,
+    currentPage,
+    setCurrentPage,
+    selectedRows,
+    setSelectedRows,
+    setIsSelectionActive,
+  } = useGeneralContext();
+
+  const {
+    createDynamicItem,
+    updateDynamicItem,
+    deleteDynamicItem,
+    deleteMultipleDynamicItem,
+    updateMultipleDynamicItem,
+  } = useDynamicCrud<GenericItem>(schemaName);
 
   const [filterPanelFormElements, setFilterPanelFormElements] =
     useState<FormElementsState>({
@@ -196,18 +209,15 @@ export default function GenericPaginatedPage({
     let fields = container.fields
       .map(normalizeField)
       .filter(isDisplayablePrimitive);
-
     if (includeFields?.length) {
       fields = includeFields
         .map((name) => fields.find((f) => f.name === name))
         .filter((f): f is Field => Boolean(f));
     }
-
     if (excludeFields?.length) {
       const ex = new Set(excludeFields);
       fields = fields.filter((f) => !ex.has(f.name));
     }
-
     const uniq = new Set<string>();
     fields = fields.filter(
       (f) =>
@@ -264,10 +274,7 @@ export default function GenericPaginatedPage({
   const rows = useMemo(() => itemsPayload?.items || [], [itemsPayload?.items]);
 
   const outsideSort = useMemo(
-    () => ({
-      filterPanelFormElements,
-      setFilterPanelFormElements,
-    }),
+    () => ({ filterPanelFormElements, setFilterPanelFormElements }),
     [filterPanelFormElements]
   );
 
@@ -283,11 +290,7 @@ export default function GenericPaginatedPage({
   );
 
   const outsideSearchProps = useMemo(
-    () => ({
-      t,
-      filterPanelFormElements,
-      setFilterPanelFormElements,
-    }),
+    () => ({ t, filterPanelFormElements, setFilterPanelFormElements }),
     [t, filterPanelFormElements]
   );
 
@@ -402,6 +405,216 @@ export default function GenericPaginatedPage({
     actionsEnabled,
   ]);
 
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+  const [isBulkStepTwo, setIsBulkStepTwo] = useState(false);
+  const [bulkSelectedKeys, setBulkSelectedKeys] = useState<string[]>([]);
+  const [bulkForm, setBulkForm] = useState<Record<string, unknown>>({});
+  const bulkFieldOptions = useMemo(
+    () =>
+      displayFields.map((f) => ({
+        value: f.name,
+        label: t(humanize(f.name)),
+      })),
+    [displayFields, t]
+  );
+
+  const bulkFormKeys = useMemo(() => {
+    if (isBulkStepTwo) {
+      // Step 2: only the selected fields
+      return displayFields
+        .filter((f) => bulkSelectedKeys.includes(f.name))
+        .map((f) => {
+          const m = fieldToInput(f);
+          return { key: f.name, type: m.formKeyType };
+        });
+    } else {
+      // Step 1: only the selector
+      return [{ key: "bulkSelectedKeys", type: FormKeyTypeEnum.STRING }];
+    }
+  }, [displayFields, bulkSelectedKeys, isBulkStepTwo]);
+
+  // Generate bulk edit inputs
+  const bulkEditInputs = useMemo(() => {
+    const selectInput = {
+      type: InputTypes.SELECT,
+      formKey: "bulkSelectedKeys",
+      label: t("Edit Option Selection"),
+      options: bulkFieldOptions,
+      placeholder: t("Select fields to edit"),
+      isMultiple: true,
+      required: true,
+      isDisabled: isBulkStepTwo,
+    };
+
+    const chosen = new Set(bulkSelectedKeys);
+    const valueInputs = displayFields
+      .filter((f) => chosen.has(f.name))
+      .map((f) => {
+        const m = fieldToInput(f);
+        const label = t(humanize(f.name));
+        return {
+          type: m.inputType,
+          formKey: f.name,
+          label,
+          placeholder: label,
+          required: false,
+          isDisabled: !isBulkStepTwo,
+        };
+      });
+
+    return [selectInput, ...valueInputs];
+  }, [t, bulkFieldOptions, isBulkStepTwo, displayFields, bulkSelectedKeys]);
+
+  // Memoize handlers to prevent recreating selection actions
+  const handleBulkEditSubmit = useCallback(() => {
+    // Only submit when in step 2
+    if (!isBulkStepTwo) return;
+
+    const chosen = new Set(bulkSelectedKeys);
+    const updates: Partial<GenericItem> = {};
+    for (const k of Object.keys(bulkForm)) {
+      if (chosen.has(k)) updates[k] = bulkForm[k];
+    }
+    const items = (selectedRows as GenericItem[]).map((r) => ({
+      _id: r._id,
+      updates,
+    }));
+    updateMultipleDynamicItem(items);
+    setSelectedRows([]);
+    setIsSelectionActive(false);
+    setIsBulkStepTwo(false);
+    setBulkSelectedKeys([]);
+    setBulkForm({});
+    setIsBulkEditOpen(false);
+  }, [
+    isBulkStepTwo,
+    bulkForm,
+    bulkSelectedKeys,
+    selectedRows,
+    updateMultipleDynamicItem,
+    setSelectedRows,
+    setIsSelectionActive,
+  ]);
+
+  const handleBulkEditClose = useCallback(() => {
+    setIsBulkEditOpen(false);
+    setIsBulkStepTwo(false);
+    setBulkSelectedKeys([]);
+    setBulkForm({});
+  }, []);
+
+  const handleBulkFormChange = useCallback((f: Record<string, unknown>) => {
+    setBulkForm((prev) => ({ ...prev, ...f }));
+  }, []);
+
+  const handleBulkEditBackOrForward = useCallback(() => {
+    if (isBulkStepTwo) {
+      // We're in step 2, go back to step 1
+      setIsBulkStepTwo(false);
+    } else {
+      // We're in step 1, move forward to step 2
+      const selectedKeys = Array.isArray(bulkForm.bulkSelectedKeys)
+        ? (bulkForm.bulkSelectedKeys as string[])
+        : [];
+      if (selectedKeys.length > 0) {
+        setBulkSelectedKeys(selectedKeys);
+        setIsBulkStepTwo(true);
+      }
+    }
+  }, [isBulkStepTwo, bulkForm]);
+
+  const handleBulkDeleteConfirm = useCallback(() => {
+    deleteMultipleDynamicItem(
+      selectedRows.map((r) => ({ _id: (r as GenericItem)._id }))
+    );
+    setSelectedRows([]);
+    setIsSelectionActive(false);
+    setIsBulkDeleteOpen(false);
+  }, [
+    selectedRows,
+    deleteMultipleDynamicItem,
+    setSelectedRows,
+    setIsSelectionActive,
+  ]);
+
+  const selectionActions = useMemo(
+    () => [
+      {
+        name: t("Delete Selected"),
+        isButton: true,
+        buttonClassName:
+          "px-2 ml-auto bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
+        isModal: true,
+        className: "cursor-pointer",
+        isDisabled: !actionsEnabled || !selectedRows?.length,
+        modal:
+          selectedRows?.length > 0 ? (
+            <ConfirmationDialog
+              isOpen={isBulkDeleteOpen}
+              close={() => setIsBulkDeleteOpen(false)}
+              confirm={handleBulkDeleteConfirm}
+              title={t("Delete Selected")}
+              text={t("Are you sure you want to delete the selected items?")}
+            />
+          ) : null,
+        isModalOpen: isBulkDeleteOpen,
+        setIsModal: setIsBulkDeleteOpen,
+        isPath: false,
+      },
+      {
+        name: t("Edit Selected"),
+        isButton: true,
+        buttonClassName:
+          "px-2 ml-auto bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
+        isModal: true,
+        className: "cursor-pointer",
+        modal: isBulkEditOpen ? (
+          <GenericAddEditPanel
+            isOpen={isBulkEditOpen}
+            close={handleBulkEditClose}
+            inputs={bulkEditInputs}
+            formKeys={bulkFormKeys}
+            setForm={handleBulkFormChange}
+            submitItem={() => {}}
+            isEditMode={false}
+            topClassName="flex flex-col gap-2"
+            generalClassName="overflow-visible"
+            buttonName={t("Edit")}
+            isSubmitButtonActive={isBulkStepTwo}
+            submitFunction={handleBulkEditSubmit}
+            additionalButtons={[
+              {
+                label: isBulkStepTwo ? t("Back") : t("Forward"),
+                onClick: handleBulkEditBackOrForward,
+              },
+            ]}
+          />
+        ) : null,
+        isModalOpen: isBulkEditOpen,
+        setIsModal: setIsBulkEditOpen,
+        isPath: false,
+        isDisabled: !actionsEnabled || !selectedRows?.length,
+      },
+    ],
+    [
+      t,
+      actionsEnabled,
+      selectedRows,
+      isBulkDeleteOpen,
+      handleBulkDeleteConfirm,
+      isBulkEditOpen,
+      handleBulkEditClose,
+      handleBulkFormChange,
+      bulkEditInputs,
+      bulkFormKeys,
+      isBulkStepTwo,
+      handleBulkEditSubmit,
+      handleBulkEditBackOrForward,
+    ]
+  );
+
   return (
     <div className="w-[95%] mx-auto">
       <GenericTable
@@ -417,6 +630,7 @@ export default function GenericPaginatedPage({
         outsideSortProps={outsideSort}
         {...(pagination && { pagination })}
         outsideSearchProps={outsideSearchProps}
+        selectionActions={selectionActions}
       />
     </div>
   );
