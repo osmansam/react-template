@@ -1,22 +1,21 @@
-import { useCallback, useMemo, useState } from "react";
+// pages/GenericPaginatedPage.tsx
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FiEdit } from "react-icons/fi";
 import { HiOutlineTrash } from "react-icons/hi2";
-import { ConfirmationDialog } from "../common/ConfirmationDialog";
-import GenericAddEditPanel from "../components/panelComponents/FormElements/GenericAddEditPanel";
-import {
-  FormKeyTypeEnum,
-  InputTypes,
-} from "../components/panelComponents/shared/types";
-import GenericTable from "../components/panelComponents/Tables/GenericTable";
-import { useGeneralContext } from "../context/General.context";
-import { UpdatePayload } from "../utils/api";
+import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
+import { useGeneralContext } from "../../../context/General.context";
+import { FormElementsState } from "../../../types";
+import { UpdatePayload } from "../../../utils/api";
 import {
   ContainerModel,
   Field,
   useGetContainers,
-} from "../utils/api/container";
-import { useDynamicCrud, useGetDynamicItems } from "../utils/dynamic";
+} from "../../../utils/api/container";
+import { useDynamicCrud, useGetPaginatedItems } from "../../../utils/dynamic";
+import { FormKeyTypeEnum, InputTypes } from "../shared/types";
+import GenericTable from "../Tables/GenericTable";
+import GenericAddEditPanel from "./GenericAddEditPanel";
 
 type GenericItem = Record<string, unknown> & { _id: string };
 
@@ -27,7 +26,6 @@ type Props = {
   actionsEnabled?: boolean;
 };
 
-// Raw field type from API with possible case variations
 type RawField = {
   name?: string;
   Name?: string;
@@ -51,7 +49,6 @@ type RawField = {
   Children?: RawField[];
 };
 
-// Raw container type from API with possible case variations
 type RawContainer = {
   _id?: string;
   ID?: string;
@@ -104,8 +101,12 @@ const normalizeContainer = (c: RawContainer): ContainerModel => ({
   _id: c._id ?? c.ID,
   schemaName: c.schemaName ?? c.SchemaName ?? "",
   fields: (c.fields ?? c.Fields ?? []).map((f: RawField) => normalizeField(f)),
-  routes: (c.routes ?? c.Routes) as ContainerModel["routes"],
-  redis: (c.redis ?? c.Redis) as ContainerModel["redis"],
+  routes:
+    (c.routes as ContainerModel["routes"]) ??
+    (c.Routes as ContainerModel["routes"]),
+  redis:
+    (c.redis as ContainerModel["redis"]) ??
+    (c.Redis as ContainerModel["redis"]),
   pipelines: (c.pipelines ?? c.Pipelines ?? []) as ContainerModel["pipelines"],
   dynamicFunctions: (c.dynamicFunctions ??
     c.DynamicFunctions ??
@@ -156,15 +157,21 @@ function fieldToInput(field: Field) {
   };
 }
 
-export default function GenericUnpaginatedPage({
+export default function GenericPaginatedPage({
   schemaName,
   includeFields,
   excludeFields,
   actionsEnabled = true,
 }: Props) {
   const { t } = useTranslation();
-  const { selectedRows, setSelectedRows, setIsSelectionActive } =
-    useGeneralContext();
+  const {
+    rowsPerPage,
+    currentPage,
+    setCurrentPage,
+    selectedRows,
+    setSelectedRows,
+    setIsSelectionActive,
+  } = useGeneralContext();
 
   const {
     createDynamicItem,
@@ -173,7 +180,14 @@ export default function GenericUnpaginatedPage({
     deleteMultipleDynamicItem,
     updateMultipleDynamicItem,
   } = useDynamicCrud<GenericItem>(schemaName);
-  const items = useGetDynamicItems<GenericItem>(schemaName);
+
+  const [filterPanelFormElements, setFilterPanelFormElements] =
+    useState<FormElementsState>({
+      search: "",
+      sort: "",
+      asc: 1,
+    });
+
   const rawContainers = useGetContainers();
 
   const container: ContainerModel | undefined = useMemo(() => {
@@ -201,7 +215,14 @@ export default function GenericUnpaginatedPage({
       const ex = new Set(excludeFields);
       fields = fields.filter((f) => !ex.has(f.name));
     }
-    fields = fields.filter((f) => f.name !== "_id" && f.name !== "id");
+    const uniq = new Set<string>();
+    fields = fields.filter(
+      (f) =>
+        f.name &&
+        !["_id", "id"].includes(f.name) &&
+        !uniq.has(f.name) &&
+        (uniq.add(f.name), true)
+    );
     return fields;
   }, [container, includeFields, excludeFields]);
 
@@ -216,10 +237,9 @@ export default function GenericUnpaginatedPage({
       isSortable: true,
       correspondingKey: f.name,
     }));
-    if (actionsEnabled) {
-      return [...baseCols, { key: t("Actions"), isSortable: false }];
-    }
-    return baseCols;
+    return actionsEnabled
+      ? [...baseCols, { key: t("Actions"), isSortable: false }]
+      : baseCols;
   }, [displayFields, t, actionsEnabled]);
 
   const { inputs, formKeys } = useMemo(() => {
@@ -240,6 +260,45 @@ export default function GenericUnpaginatedPage({
     });
     return { inputs: ins, formKeys: fks };
   }, [displayFields, t]);
+
+  const itemsPayload = useGetPaginatedItems(
+    currentPage,
+    rowsPerPage,
+    schemaName,
+    filterPanelFormElements
+  );
+
+  const rows = useMemo(() => itemsPayload?.items || [], [itemsPayload?.items]);
+
+  const outsideSort = useMemo(
+    () => ({ filterPanelFormElements, setFilterPanelFormElements }),
+    [filterPanelFormElements]
+  );
+
+  const pagination = useMemo(
+    () =>
+      itemsPayload
+        ? {
+            totalPages: itemsPayload.totalPages,
+            totalRows: itemsPayload.totalItems,
+          }
+        : null,
+    [itemsPayload]
+  );
+
+  const outsideSearchProps = useMemo(
+    () => ({ t, filterPanelFormElements, setFilterPanelFormElements }),
+    [t, filterPanelFormElements]
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    filterPanelFormElements.search,
+    filterPanelFormElements.sort,
+    filterPanelFormElements.asc,
+    setCurrentPage,
+  ]);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -553,8 +612,6 @@ export default function GenericUnpaginatedPage({
     ]
   );
 
-  const rows = useMemo(() => items || [], [items]);
-
   return (
     <div className="w-[95%] mx-auto">
       <GenericTable
@@ -566,6 +623,10 @@ export default function GenericUnpaginatedPage({
         addButton={addButton}
         isCollapsible={false}
         isActionsActive={actionsEnabled}
+        isSearch={false}
+        outsideSortProps={outsideSort}
+        {...(pagination && { pagination })}
+        outsideSearchProps={outsideSearchProps}
         selectionActions={selectionActions}
       />
     </div>

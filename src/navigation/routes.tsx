@@ -1,11 +1,13 @@
 import { Route, Routes } from "react-router-dom";
-import GenericPaginatedPage from "../pages/GenericPaginatedPage";
-import { PublicRoutes } from "./constants";
+import GenericPaginatedPage from "../components/panelComponents/FormElements/GenericPaginatedPage";
+import { allRoutes, PublicRoutes } from "./constants";
+import { PrivateRoutes } from "./PrivateRoutes";
 
 const RouterContainer = () => {
+  console.log("allRoutes", allRoutes);
   return (
     <Routes>
-      {/* {allRoutes.map((route) => (
+      {allRoutes.map((route) => (
         <Route key={route.name} element={<PrivateRoutes />}>
           {allRoutes?.map((route) => (
             <Route
@@ -15,7 +17,7 @@ const RouterContainer = () => {
             />
           ))}
         </Route>
-      ))} */}
+      ))}
 
       <Route
         path={PublicRoutes.Login}

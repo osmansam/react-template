@@ -3,12 +3,12 @@ import {
 } from "react-router-dom";
 // import { toast } from "react-toastify";
 // import { useUserContext } from "../context/User.context";
-import useAuth from "../hooks/useAuth";
+// import useAuth from "../hooks/useAuth";
 // import { useGetPanelControlPages } from "../utils/api/panelControl/page";
 // import { allRoutes, PublicRoutes } from "./constants";
 
 export function PrivateRoutes() {
-  useAuth();
+  // useAuth();
   // const pages = useGetPanelControlPages();
   // const location = useLocation();
   // const { user } = useUserContext();
