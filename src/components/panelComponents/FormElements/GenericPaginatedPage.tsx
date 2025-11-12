@@ -1,10 +1,8 @@
 // pages/GenericPaginatedPage.tsx
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FaFileUpload } from "react-icons/fa";
 import { FiEdit } from "react-icons/fi";
 import { HiOutlineTrash } from "react-icons/hi2";
-import * as XLSX from "xlsx";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { useGeneralContext } from "../../../context/General.context";
 import { FormElementsState } from "../../../types";
@@ -16,7 +14,6 @@ import {
 } from "../../../utils/api/container";
 import { useDynamicCrud, useGetPaginatedItems } from "../../../utils/dynamic";
 import { FormKeyTypeEnum, InputTypes } from "../shared/types";
-import ButtonTooltip from "../Tables/ButtonTooltip";
 import GenericTable from "../Tables/GenericTable";
 import GenericAddEditPanel from "./GenericAddEditPanel";
 
@@ -323,59 +320,6 @@ export default function GenericPaginatedPage({
     [updateDynamicItem, createDynamicItem]
   );
 
-  // Excel upload functionality
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const processExcelData = useCallback(
-    (data: unknown[]) => {
-      const headers = data[0] as string[];
-      const keys = rowKeys.map((rowKey) => rowKey.key);
-      const translatedHeaders = columns
-        .filter((col) => "correspondingKey" in col && col.correspondingKey)
-        .map((col) => col.key);
-
-      const items = data.slice(1).map((row) => {
-        const item: Record<string, unknown> = {};
-        (row as unknown[]).forEach((cell: unknown, index: number) => {
-          const translatedIndex = translatedHeaders.indexOf(headers[index]);
-          if (translatedIndex !== -1) {
-            const key = keys[translatedIndex];
-            item[key] = cell;
-          }
-        });
-        return item;
-      });
-      createMultipleDynamicItem(items);
-    },
-    [rowKeys, columns, createMultipleDynamicItem]
-  );
-
-  const uploadExcelFile = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e: ProgressEvent<FileReader>) => {
-        const buffer = e.target?.result;
-        if (buffer) {
-          const wb = XLSX.read(buffer, { type: "array" });
-          const wsname = wb.SheetNames[0];
-          const ws = wb.Sheets[wsname];
-          const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-          processExcelData(data);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    },
-    [processExcelData]
-  );
-
-  const handleFileButtonClick = useCallback(() => {
-    if (inputRef.current) {
-      inputRef.current.click();
-    }
-  }, []);
-
   const addButton = useMemo(
     () => ({
       name: t("Add"),
@@ -668,32 +612,6 @@ export default function GenericPaginatedPage({
     ]
   );
 
-  const filters = useMemo(
-    () => [
-      {
-        isUpperSide: false,
-        node: (
-          <div
-            className="my-auto items-center text-xl cursor-pointer border px-2 py-1 rounded-md hover:bg-blue-50 bg-opacity-50 hover:scale-105"
-            onClick={handleFileButtonClick}
-          >
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={uploadExcelFile}
-              style={{ display: "none" }}
-              ref={inputRef}
-            />
-            <ButtonTooltip content={t("Create Multiple from Excel")}>
-              <FaFileUpload />
-            </ButtonTooltip>
-          </div>
-        ),
-      },
-    ],
-    [t, handleFileButtonClick, uploadExcelFile]
-  );
-
   return (
     <div className="w-[95%] mx-auto">
       <GenericTable
@@ -710,7 +628,8 @@ export default function GenericPaginatedPage({
         {...(pagination && { pagination })}
         outsideSearchProps={outsideSearchProps}
         selectionActions={selectionActions}
-        filters={filters}
+        isExcel={true}
+        onExcelUpload={createMultipleDynamicItem}
       />
     </div>
   );

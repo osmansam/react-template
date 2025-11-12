@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BsFilePdf } from "react-icons/bs";
 import { CgChevronDownR, CgChevronUpR } from "react-icons/cg";
-import { FaFileExcel } from "react-icons/fa";
+import { FaFileExcel, FaFileUpload } from "react-icons/fa";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { GoPlusCircle } from "react-icons/go";
@@ -88,6 +88,7 @@ type Props<T> = {
   isToolTipEnabled?: boolean;
   isEmtpyExcel?: boolean;
   showOrientationToggle?: boolean;
+  onExcelUpload?: (items: Partial<T>[]) => void;
 };
 
 const GenericTable = <T,>({
@@ -130,6 +131,7 @@ const GenericTable = <T,>({
   pagination,
   selectionActions,
   showOrientationToggle,
+  onExcelUpload,
 }: Props<T>) => {
   const { t } = useTranslation();
   const {
@@ -165,6 +167,95 @@ const GenericTable = <T,>({
     key: string;
     direction: "ascending" | "descending";
   } | null>(null);
+  const [isExcelMenuOpen, setIsExcelMenuOpen] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleUploadExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("File input changed");
+    const file = event.target.files?.[0];
+    if (!file) {
+      console.log("No file selected");
+      return;
+    }
+    console.log("File selected:", file.name);
+    const reader = new FileReader();
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      console.log("File loaded");
+      const buffer = e.target?.result;
+      if (buffer) {
+        try {
+          const wb = XLSX.read(buffer, { type: "array" });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+          console.log("Excel data parsed:", data);
+
+          if (!data || data.length === 0) {
+            toast.error(t("No data found in the Excel file"));
+            return;
+          }
+
+          const headers = data[0] as string[];
+          console.log("Excel headers:", headers);
+
+          // Map column keys to their translated names
+          const columnMap = new Map<string, string>();
+          usedColumns.forEach((col, index) => {
+            if (col.correspondingKey) {
+              columnMap.set(col.key, usedRowKeys[index]?.key as string);
+            }
+          });
+
+          console.log("Column map:", Array.from(columnMap.entries()));
+
+          const items = data.slice(1).map((row) => {
+            const item: Record<string, unknown> = {};
+            (row as unknown[]).forEach((cell: unknown, index: number) => {
+              const header = headers[index];
+              const fieldKey = columnMap.get(header);
+              if (fieldKey) {
+                item[fieldKey] = cell;
+              }
+            });
+            return item;
+          });
+
+          console.log("Processed items:", items);
+
+          if (items.length > 0 && onExcelUpload) {
+            console.log("Calling onExcelUpload with processed items");
+            onExcelUpload(items as Partial<T>[]);
+            toast.success(t(`${items.length} items uploaded successfully`));
+          } else if (items.length === 0) {
+            toast.warning(t("No valid items found in the Excel file"));
+          } else {
+            console.log("No onExcelUpload callback provided");
+          }
+        } catch (error) {
+          console.error("Error parsing Excel file:", error);
+          toast.error(t("Error reading Excel file"));
+        }
+      }
+    };
+    reader.onerror = (error) => {
+      console.error("FileReader error:", error);
+      toast.error(t("Error reading file"));
+    };
+    reader.readAsArrayBuffer(file);
+    // Reset the input so the same file can be uploaded again
+    event.target.value = "";
+  };
+
+  const handleUploadClick = () => {
+    console.log("Upload button clicked");
+    console.log("Upload input ref:", uploadInputRef.current);
+    if (uploadInputRef.current) {
+      uploadInputRef.current.click();
+      console.log("File input clicked");
+    } else {
+      console.error("Upload input ref is null");
+    }
+  };
 
   useEffect(() => {
     if (!title) return;
@@ -215,7 +306,7 @@ const GenericTable = <T,>({
       )
     : rowKeys;
 
-  const baseRows = rows ?? [];
+  const baseRows = useMemo(() => rows ?? [], [rows]);
 
   const filteredRows = useMemo(() => {
     if (!isSearch) return baseRows;
@@ -844,16 +935,63 @@ const GenericTable = <T,>({
                       <BsFilePdf />
                     </div>
                   )}
-                  {/* Excel Button - mobilde de göster */}
-                  {isExcel && (
-                    <div
-                      className="my-auto items-center text-lg sm:text-xl cursor-pointer border px-1.5 py-1 sm:px-2 sm:py-1 rounded-md hover:bg-blue-50 bg-opacity-50 hover:scale-105"
-                      onClick={generateExcel}
-                    >
-                      <ButtonTooltip content={"Excel"}>
-                        <FaFileExcel />
-                      </ButtonTooltip>
-                    </div>
+                  {/* Excel Button with Dropdown - mobilde de göster */}
+                  {(isExcel || onExcelUpload) && (
+                    <>
+                      {onExcelUpload && (
+                        <input
+                          type="file"
+                          accept=".xlsx, .xls"
+                          onChange={handleUploadExcel}
+                          style={{ display: "none" }}
+                          ref={uploadInputRef}
+                        />
+                      )}
+                      <Tooltip content={t("Excel")} placement="top">
+                        <div
+                          onClick={() => {
+                            setIsExcelMenuOpen((prev) => !prev);
+                            setIsColumnActiveModalOpen(false);
+                            setIsFilterModalOpen(false);
+                          }}
+                          className="my-auto items-center text-lg sm:text-xl cursor-pointer border px-1.5 py-1 sm:px-2 sm:py-1 rounded-md hover:bg-blue-50 bg-opacity-50 hover:scale-105"
+                        >
+                          <FaFileExcel />
+                        </div>
+                      </Tooltip>
+                      {isExcelMenuOpen && (
+                        <div className="absolute top-10 right-0 flex flex-col gap-2 bg-white rounded-md py-2 px-2 max-w-fit border border-gray-200 drop-shadow-lg z-[60] min-w-48">
+                          {isExcel && (
+                            <div
+                              onClick={() => {
+                                generateExcel();
+                                setIsExcelMenuOpen(false);
+                              }}
+                              className="flex flex-row items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-md cursor-pointer transition-colors"
+                            >
+                              <FaFileExcel className="text-green-600" />
+                              <P1 className="text-sm font-medium">
+                                {t("Download Excel")}
+                              </P1>
+                            </div>
+                          )}
+                          {onExcelUpload && (
+                            <div
+                              onClick={() => {
+                                handleUploadClick();
+                                setIsExcelMenuOpen(false);
+                              }}
+                              className="flex flex-row items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-md cursor-pointer transition-colors"
+                            >
+                              <FaFileUpload className="text-blue-600" />
+                              <P1 className="text-sm font-medium">
+                                {t("Upload Excel")}
+                              </P1>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                   {/* Mobile Filter Button - dropdown style */}
                   {filters &&
@@ -861,9 +999,11 @@ const GenericTable = <T,>({
                       <>
                         <Tooltip content={t("Filters")} placement="top">
                           <div
-                            onClick={() =>
-                              setIsFilterModalOpen((prev) => !prev)
-                            }
+                            onClick={() => {
+                              setIsFilterModalOpen((prev) => !prev);
+                              setIsExcelMenuOpen(false);
+                              setIsColumnActiveModalOpen(false);
+                            }}
                             className="items-center my-auto text-lg sm:text-xl cursor-pointer border p-1.5 sm:p-2 rounded-md hover:bg-blue-50 bg-opacity-50 hover:scale-105 sm:hidden"
                           >
                             <RiFilter3Line />
@@ -900,9 +1040,11 @@ const GenericTable = <T,>({
                     <>
                       <Tooltip content={t("Filter Columns")} placement="top">
                         <div
-                          onClick={() =>
-                            setIsColumnActiveModalOpen((prev) => !prev)
-                          }
+                          onClick={() => {
+                            setIsColumnActiveModalOpen((prev) => !prev);
+                            setIsExcelMenuOpen(false);
+                            setIsFilterModalOpen(false);
+                          }}
                           className="items-center my-auto text-lg sm:text-xl cursor-pointer border p-1.5 sm:p-2 rounded-md hover:bg-blue-50 bg-opacity-50 hover:scale-105"
                         >
                           <PiFadersHorizontal />
