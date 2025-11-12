@@ -302,9 +302,31 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   };
 }
 
-export function useGetDynamicItems<T>(schemaName: string) {
-  const path = `${BASE}?${qs({ schemaName })}`;
-  const queryKey = listKey(schemaName);
+export function useGetDynamicItems<T>(
+  schemaName: string,
+  filters?: FormElementsState
+) {
+  const queryParams: Record<string, unknown> = { schemaName };
+
+  // Add filter parameters if provided
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        if (Array.isArray(value)) {
+          queryParams[key] = value.join(",");
+        } else if (value instanceof Date) {
+          queryParams[key] = value.toISOString();
+        } else {
+          queryParams[key] = value;
+        }
+      }
+    });
+  }
+
+  const path = `${BASE}?${qs(queryParams)}`;
+  const queryKey = filters
+    ? (["dynamic", schemaName, "all", filters] as const)
+    : listKey(schemaName);
   return useGet<T[]>(path, queryKey);
 }
 
@@ -321,6 +343,7 @@ export function useGetPaginatedItems<T>(
     "page",
     { page, limit, filters },
   ] as const;
+
   const parts = [
     `schemaName=${schemaName}`,
     `page=${page}`,
@@ -334,6 +357,32 @@ export function useGetPaginatedItems<T>(
           : filters.search
       }`,
   ];
+
+  // Add all other filter fields as query parameters
+  Object.entries(filters).forEach(([key, value]) => {
+    // Skip the standard pagination/sort/search fields
+    if (
+      !["sort", "asc", "search"].includes(key) &&
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    ) {
+      if (Array.isArray(value)) {
+        // For arrays, send each value as a separate parameter with the same key
+        // This allows age=lte-32&age=gt-123
+        value.forEach((val) => {
+          if (val !== undefined && val !== null && val !== "") {
+            parts.push(`${key}=${encodeURIComponent(String(val))}`);
+          }
+        });
+      } else if (value instanceof Date) {
+        parts.push(`${key}=${value.toISOString()}`);
+      } else {
+        parts.push(`${key}=${encodeURIComponent(String(value))}`);
+      }
+    }
+  });
+
   const queryString = parts.filter(Boolean).join("&");
   const url = `${baseQueryUrl}?${queryString}`;
 

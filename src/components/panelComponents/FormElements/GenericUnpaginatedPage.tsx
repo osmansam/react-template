@@ -4,6 +4,7 @@ import { FiEdit } from "react-icons/fi";
 import { HiOutlineTrash } from "react-icons/hi2";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { useGeneralContext } from "../../../context/General.context";
+import { FormElementsState } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
 import {
   ContainerModel,
@@ -11,6 +12,7 @@ import {
   useGetContainers,
 } from "../../../utils/api/container";
 import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
+import SwitchButton from "../common/SwitchButton";
 import { FormKeyTypeEnum, InputTypes } from "../shared/types";
 import GenericTable from "../Tables/GenericTable";
 import GenericAddEditPanel from "./GenericAddEditPanel";
@@ -165,7 +167,15 @@ export default function GenericUnpaginatedPage({
   const { selectedRows, setSelectedRows, setIsSelectionActive } =
     useGeneralContext();
 
-  const items = useGetDynamicItems<GenericItem>(schemaName);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [rowToAction, setRowToAction] = useState<GenericItem | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterFormElements, setFilterFormElements] =
+    useState<FormElementsState>({});
+
+  const items = useGetDynamicItems<GenericItem>(schemaName, filterFormElements);
   const rawContainers = useGetContainers();
 
   const container: ContainerModel | undefined = useMemo(() => {
@@ -256,11 +266,6 @@ export default function GenericUnpaginatedPage({
     });
     return { inputs: ins, formKeys: fks };
   }, [displayFields, t]);
-
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [rowToAction, setRowToAction] = useState<GenericItem | null>(null);
 
   const handleSubmitItem = useCallback(
     (item: GenericItem | UpdatePayload<GenericItem>) => {
@@ -497,6 +502,58 @@ export default function GenericUnpaginatedPage({
     setIsSelectionActive,
   ]);
 
+  const filterPanelInputs = useMemo(() => {
+    return displayFields
+      .filter((f) => {
+        const fieldType = (f.type || "").toLowerCase();
+        // Exclude id, image fields from filters
+        return (
+          !["_id", "id"].includes(f.name) &&
+          fieldType !== "image" &&
+          fieldType !== "img"
+        );
+      })
+      .map((f) => {
+        const m = fieldToInput(f);
+        const label = t(humanize(f.name));
+        return {
+          type: m.inputType,
+          formKey: f.name,
+          label,
+          placeholder: label,
+          required: false,
+        };
+      });
+  }, [displayFields, t]);
+
+  const filters = useMemo(
+    () => [
+      {
+        label: t("Show Filters"),
+        isUpperSide: true,
+        node: (
+          <SwitchButton
+            checked={showFilters}
+            onChange={() => setShowFilters(!showFilters)}
+          />
+        ),
+      },
+    ],
+    [t, showFilters]
+  );
+
+  const filterPanel = useMemo(
+    () => ({
+      isFilterPanelActive: showFilters,
+      inputs: filterPanelInputs,
+      formElements: filterFormElements,
+      setFormElements: setFilterFormElements,
+      closeFilters: () => setShowFilters(false),
+      isApplyButtonActive: true,
+    }),
+    [showFilters, filterPanelInputs, filterFormElements]
+  );
+
   const selectionActions = useMemo(
     () => [
       {
@@ -589,6 +646,8 @@ export default function GenericUnpaginatedPage({
         selectionActions={selectionActions}
         isExcel={!hasImageField}
         onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
+        filters={filters}
+        filterPanel={filterPanel}
       />
     </div>
   );

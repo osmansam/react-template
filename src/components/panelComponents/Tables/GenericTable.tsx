@@ -145,11 +145,22 @@ const GenericTable = <T,>({
   // Helper function to format dates
   const formatDate = (value: unknown): string | null => {
     if (!value) return null;
-
     try {
-      const date = new Date(value as string | number | Date);
+      // handle ISO strings safely
+      const str = String(value);
 
-      // Check if date is valid
+      // Detect "YYYY-MM-DD" or "YYYY/MM/DD" manually
+      const match = str.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
+      let date: Date;
+
+      if (match) {
+        const [, y, m, d] = match;
+        // ✅ Create date in local time
+        date = new Date(Number(y), Number(m) - 1, Number(d));
+      } else {
+        date = new Date(value as string | number | Date);
+      }
+
       if (isNaN(date.getTime())) return null;
 
       const day = String(date.getDate()).padStart(2, "0");
@@ -171,7 +182,7 @@ const GenericTable = <T,>({
         default:
           return `${month}/${day}/${year}`;
       }
-    } catch (error) {
+    } catch {
       return null;
     }
   };

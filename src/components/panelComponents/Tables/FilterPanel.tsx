@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IoIosClose } from "react-icons/io";
+import { IoAddCircleOutline } from "react-icons/io5";
 import { ActionMeta, MultiValue, SingleValue } from "react-select";
 import { useGeneralContext } from "../../../context/General.context";
 import { FormElementsState, FormElementValue } from "../../../types";
@@ -28,6 +29,11 @@ const FilterPanel = ({
   const [tempFormElements, setTempFormElements] =
     useState<FormElementsState>(formElements);
 
+  // Track operators for number inputs
+  const [numberOperators, setNumberOperators] = useState<
+    Record<string, string>
+  >({});
+
   // Sync tempFormElements with formElements when not in apply button mode
   useEffect(() => {
     if (!isApplyButtonActive) {
@@ -39,14 +45,16 @@ const FilterPanel = ({
     setCurrentPage(1); // Reset to the first page after applying filters
   };
   const handleClearAllFilters = () => {
-    setFormElements((prev) => {
-      const newFormElements = { ...prev };
-      inputs.forEach((input) => {
-        newFormElements[input.formKey] = "";
-      });
-      return newFormElements;
+    const clearedFormElements: FormElementsState = {};
+    inputs.forEach((input) => {
+      clearedFormElements[input.formKey] = "";
     });
+
+    setFormElements(clearedFormElements);
+    setTempFormElements(clearedFormElements);
+    setNumberOperators({});
     additionalFilterCleanFunction?.();
+    setCurrentPage(1);
   };
   const buttons = [
     {
@@ -170,8 +178,91 @@ const FilterPanel = ({
         if (input.isDisabled) return null;
         return (
           <div key={input.formKey} className="flex flex-col gap-2">
+            {input.type === InputTypes.NUMBER && (
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700">
+                  {input.label}
+                </label>
+                <div className="flex flex-row gap-2">
+                  <select
+                    value={numberOperators[input.formKey] || "="}
+                    onChange={(e) => {
+                      const operator = e.target.value;
+                      setNumberOperators((prev) => ({
+                        ...prev,
+                        [input.formKey]: operator,
+                      }));
+
+                      // Update the form element with operator prefix
+                      const rawValue = String(value).replace(
+                        /^(gte-|gt-|lte-|lt-)/,
+                        ""
+                      );
+                      if (rawValue) {
+                        const newValue =
+                          operator === "="
+                            ? rawValue
+                            : `${operator}-${rawValue}`;
+                        isApplyButtonActive
+                          ? setTempFormElements((prev) => ({
+                              ...prev,
+                              [input.formKey]: newValue,
+                            }))
+                          : setFormElements((prev) => ({
+                              ...prev,
+                              [input.formKey]: newValue,
+                            }));
+                      }
+                    }}
+                    className={`border border-gray-300 rounded-md px-4 mt-auto py-2.5 text-sm w-20 h-[42px] ${
+                      (numberOperators[input.formKey] || "=") === "="
+                        ? "opacity-30"
+                        : ""
+                    }`}
+                  >
+                    <option value="=">=</option>
+                    <option value="gte">&gt;=</option>
+                    <option value="gt">&gt;</option>
+                    <option value="lte">&lt;=</option>
+                    <option value="lt">&lt;</option>
+                  </select>
+                  <TextInput
+                    key={input.formKey}
+                    type={input.type}
+                    value={String(value).replace(/^(gte-|gt-|lte-|lt-)/, "")}
+                    label=""
+                    placeholder={input.placeholder ?? ""}
+                    onChange={(newValue) => {
+                      const operator = numberOperators[input.formKey] || "=";
+                      const finalValue =
+                        operator === "="
+                          ? String(newValue)
+                          : `${operator}-${newValue}`;
+                      handleChange(input.formKey)(finalValue);
+                    }}
+                    isDatePicker={false}
+                    isOnClearActive={input?.isOnClearActive}
+                    isDebounce={input?.isDebounce ?? false}
+                    onClear={() => {
+                      isApplyButtonActive
+                        ? setTempFormElements((prev) => ({
+                            ...prev,
+                            [input.formKey]: "",
+                          }))
+                        : setFormElements((prev) => ({
+                            ...prev,
+                            [input.formKey]: "",
+                          }));
+                      setNumberOperators((prev) => ({
+                        ...prev,
+                        [input.formKey]: "=",
+                      }));
+                    }}
+                  />
+                </div>
+              </div>
+            )}
             {(input.type === InputTypes.TEXT ||
-              input.type === InputTypes.NUMBER ||
               input.type === InputTypes.TIME ||
               input.type === InputTypes.COLOR ||
               input.type === InputTypes.PASSWORD) && (

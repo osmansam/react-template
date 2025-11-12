@@ -13,6 +13,7 @@ import {
   useGetContainers,
 } from "../../../utils/api/container";
 import { useDynamicCrud, useGetPaginatedItems } from "../../../utils/dynamic";
+import SwitchButton from "../common/SwitchButton";
 import { FormKeyTypeEnum, InputTypes } from "../shared/types";
 import GenericTable from "../Tables/GenericTable";
 import GenericAddEditPanel from "./GenericAddEditPanel";
@@ -219,6 +220,8 @@ export default function GenericPaginatedPage({
       asc: 1,
     });
 
+  const [showFilters, setShowFilters] = useState(false);
+
   const displayFields: Field[] = useMemo(() => {
     if (!container?.fields) return [];
     let fields = container.fields
@@ -249,7 +252,7 @@ export default function GenericPaginatedPage({
       displayFields.map((f) => ({
         key: f.name,
         isImage: (f.type || "").toLowerCase() === "image",
-        // isDate: (f.type || "").toLowerCase() === "date",
+        isDate: (f.type || "").toLowerCase() === "date",
       })),
     [displayFields]
   );
@@ -565,6 +568,58 @@ export default function GenericPaginatedPage({
     setIsSelectionActive,
   ]);
 
+  const filterPanelInputs = useMemo(() => {
+    return displayFields
+      .filter((f) => {
+        const fieldType = (f.type || "").toLowerCase();
+        // Exclude id, image fields from filters
+        return (
+          !["_id", "id"].includes(f.name) &&
+          fieldType !== "image" &&
+          fieldType !== "img"
+        );
+      })
+      .map((f) => {
+        const m = fieldToInput(f);
+        const label = t(humanize(f.name));
+        return {
+          type: m.inputType,
+          formKey: f.name,
+          label,
+          placeholder: label,
+          required: false,
+        };
+      });
+  }, [displayFields, t]);
+
+  const filters = useMemo(
+    () => [
+      {
+        label: t("Show Filters"),
+        isUpperSide: true,
+        node: (
+          <SwitchButton
+            checked={showFilters}
+            onChange={() => setShowFilters(!showFilters)}
+          />
+        ),
+      },
+    ],
+    [t, showFilters]
+  );
+
+  const filterPanel = useMemo(
+    () => ({
+      isFilterPanelActive: showFilters,
+      inputs: filterPanelInputs,
+      formElements: filterPanelFormElements,
+      setFormElements: setFilterPanelFormElements,
+      closeFilters: () => setShowFilters(false),
+      isApplyButtonActive: true,
+    }),
+    [showFilters, filterPanelInputs, filterPanelFormElements]
+  );
+
   const selectionActions = useMemo(
     () => [
       {
@@ -659,6 +714,8 @@ export default function GenericPaginatedPage({
         selectionActions={selectionActions}
         isExcel={!hasImageField}
         onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
+        filters={filters}
+        filterPanel={filterPanel}
       />
     </div>
   );
