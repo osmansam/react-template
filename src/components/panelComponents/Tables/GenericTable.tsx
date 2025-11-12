@@ -18,10 +18,15 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import { useGeneralContext } from "../../../context/General.context";
-import { FormElementsState, RowPerPageEnum } from "../../../types";
 import {
-  OutsideSearchProps,
+  DateFormatEnum,
+  DEFAULT_DATE_FORMAT,
+  FormElementsState,
+  RowPerPageEnum,
+} from "../../../types";
+import {
   outsideSearch,
+  OutsideSearchProps,
 } from "../../../utils/outsideSearch";
 import { outsideSort } from "../../../utils/outsideSort";
 import { GenericButton } from "../FormElements/GenericButton";
@@ -89,6 +94,7 @@ type Props<T> = {
   isEmtpyExcel?: boolean;
   showOrientationToggle?: boolean;
   onExcelUpload?: (items: Partial<T>[]) => void;
+  dateFormat?: DateFormatEnum;
 };
 
 const GenericTable = <T,>({
@@ -132,8 +138,44 @@ const GenericTable = <T,>({
   selectionActions,
   showOrientationToggle,
   onExcelUpload,
+  dateFormat = DEFAULT_DATE_FORMAT,
 }: Props<T>) => {
   const { t } = useTranslation();
+
+  // Helper function to format dates
+  const formatDate = (value: unknown): string | null => {
+    if (!value) return null;
+
+    try {
+      const date = new Date(value as string | number | Date);
+
+      // Check if date is valid
+      if (isNaN(date.getTime())) return null;
+
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+
+      switch (dateFormat) {
+        case DateFormatEnum["DD/MM/YYYY"]:
+          return `${day}/${month}/${year}`;
+        case DateFormatEnum["DD-MM-YYYY"]:
+          return `${day}-${month}-${year}`;
+        case DateFormatEnum["YYYY/MM/DD"]:
+          return `${year}/${month}/${day}`;
+        case DateFormatEnum["YYYY-MM-DD"]:
+          return `${year}-${month}-${day}`;
+        case DateFormatEnum["MM-DD-YYYY"]:
+          return `${month}-${day}-${year}`;
+        case DateFormatEnum["MM/DD/YYYY"]:
+        default:
+          return `${month}/${day}/${year}`;
+      }
+    } catch (error) {
+      return null;
+    }
+  };
+
   const {
     currentPage,
     setCurrentPage,
@@ -615,7 +657,13 @@ const GenericTable = <T,>({
                 </td>
               );
             }
-            const cellValue = `${row[rowKey.key as keyof T]}`;
+
+            // Format date if explicitly marked as date field
+            const rawValue = row[rowKey.key as keyof T];
+            const cellValue = rowKey.isDate
+              ? formatDate(rawValue) || `${rawValue}`
+              : `${rawValue}`;
+
             const displayValue =
               cellValue.length > tooltipLimit && isToolTipEnabled
                 ? `${cellValue.substring(0, tooltipLimit)}...`
@@ -742,9 +790,12 @@ const GenericTable = <T,>({
                         >
                           {row?.collapsible?.collapsibleRowKeys?.map(
                             (rowKey: RowKeyType<T>, keyIndex: number) => {
-                              const cellValue = `${
-                                collapsibleRow[rowKey?.key as keyof T]
-                              }`;
+                              const rawValue =
+                                collapsibleRow[rowKey?.key as keyof T];
+                              const cellValue = rowKey.isDate
+                                ? formatDate(rawValue) || `${rawValue}`
+                                : `${rawValue}`;
+
                               if (rowKey.node) {
                                 return (
                                   <td

@@ -127,6 +127,8 @@ const isDisplayablePrimitive = (f: Field) => {
     "int",
     "float",
     "double",
+    "image",
+    "img",
   ].includes(t);
 };
 
@@ -163,13 +165,6 @@ export default function GenericUnpaginatedPage({
   const { selectedRows, setSelectedRows, setIsSelectionActive } =
     useGeneralContext();
 
-  const {
-    createDynamicItem,
-    updateDynamicItem,
-    deleteDynamicItem,
-    deleteMultipleDynamicItem,
-    updateMultipleDynamicItem,
-  } = useDynamicCrud<GenericItem>(schemaName);
   const items = useGetDynamicItems<GenericItem>(schemaName);
   const rawContainers = useGetContainers();
 
@@ -183,6 +178,25 @@ export default function GenericUnpaginatedPage({
         (c.schemaName || "").toLowerCase() === schemaName.toLowerCase()
     );
   }, [rawContainers, schemaName]);
+
+  // Check if container has image fields
+  const hasImageField = useMemo(() => {
+    if (!container?.fields) return false;
+    return container.fields.some(
+      (field) =>
+        (field.type || "").toLowerCase() === "image" ||
+        (field.type || "").toLowerCase() === "img"
+    );
+  }, [container]);
+
+  const {
+    createDynamicItem,
+    createMultipleDynamicItem,
+    updateDynamicItem,
+    deleteDynamicItem,
+    deleteMultipleDynamicItem,
+    updateMultipleDynamicItem,
+  } = useDynamicCrud<GenericItem>(schemaName, hasImageField);
 
   const displayFields: Field[] = useMemo(() => {
     if (!container?.fields) return [];
@@ -203,7 +217,12 @@ export default function GenericUnpaginatedPage({
   }, [container, includeFields, excludeFields]);
 
   const rowKeys = useMemo(
-    () => displayFields.map((f) => ({ key: f.name })),
+    () =>
+      displayFields.map((f) => ({
+        key: f.name,
+        isImage: (f.type || "").toLowerCase() === "image",
+        isDate: (f.type || "").toLowerCase() === "date",
+      })),
     [displayFields]
   );
 
@@ -257,8 +276,8 @@ export default function GenericUnpaginatedPage({
     [updateDynamicItem, createDynamicItem]
   );
 
-  const addButton = useMemo(
-    () => ({
+  const addButton = useMemo(() => {
+    return {
       name: t("Add"),
       isModal: true,
       modal: (
@@ -276,9 +295,8 @@ export default function GenericUnpaginatedPage({
       isPath: false,
       icon: null,
       className: "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
-    }),
-    [t, isAddOpen, inputs, formKeys, handleSubmitItem]
-  );
+    };
+  }, [t, isAddOpen, inputs, formKeys, handleSubmitItem, displayFields]);
 
   const actions = useMemo(() => {
     if (!actionsEnabled) return [];
@@ -348,10 +366,15 @@ export default function GenericUnpaginatedPage({
   const [bulkForm, setBulkForm] = useState<Record<string, unknown>>({});
   const bulkFieldOptions = useMemo(
     () =>
-      displayFields.map((f) => ({
-        value: f.name,
-        label: t(humanize(f.name)),
-      })),
+      displayFields
+        .filter((f) => {
+          const fieldType = (f.type || "").toLowerCase();
+          return fieldType !== "image" && fieldType !== "img";
+        })
+        .map((f) => ({
+          value: f.name,
+          label: t(humanize(f.name)),
+        })),
     [displayFields, t]
   );
 
@@ -564,6 +587,8 @@ export default function GenericUnpaginatedPage({
         isCollapsible={false}
         isActionsActive={actionsEnabled}
         selectionActions={selectionActions}
+        isExcel={!hasImageField}
+        onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
       />
     </div>
   );

@@ -10,6 +10,18 @@ export enum RowPerPageEnum {
   THIRD = 50,
   ALL = 10000000000,
 }
+
+export enum DateFormatEnum {
+  "MM/DD/YYYY" = "MM/DD/YYYY",
+  "DD/MM/YYYY" = "DD/MM/YYYY",
+  "YYYY/MM/DD" = "YYYY/MM/DD",
+  "DD-MM-YYYY" = "DD-MM-YYYY",
+  "MM-DD-YYYY" = "MM-DD-YYYY",
+  "YYYY-MM-DD" = "YYYY-MM-DD",
+}
+
+export const DEFAULT_DATE_FORMAT = DateFormatEnum["DD/MM/YYYY"];
+
 export const NO_IMAGE_URL =
   "https://res.cloudinary.com/dvbg/image/upload/ar_4:4,c_crop/c_fit,h_100/davinci/no-image_pyet1d.jpg";
 

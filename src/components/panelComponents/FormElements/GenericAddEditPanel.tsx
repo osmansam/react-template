@@ -1,5 +1,3 @@
-import { useMutation } from "@tanstack/react-query";
-import { AxiosHeaders } from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FaChevronDown } from "react-icons/fa6";
@@ -9,7 +7,7 @@ import { toast } from "react-toastify";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { useGeneralContext } from "../../../context/General.context";
 import { FormElementsState, NO_IMAGE_URL, OptionType } from "../../../types";
-import { UpdatePayload, postWithHeader } from "../../../utils/api";
+import { UpdatePayload } from "../../../utils/api";
 import { H6 } from "../Typography";
 import {
   FormKeyType,
@@ -87,7 +85,6 @@ const GenericAddEditPanel = <T,>({
   constantValues,
   isEditMode = false,
   itemToEdit,
-  folderName,
   handleUpdate,
   anotherPanel,
   optionalCreateButtonActive,
@@ -113,7 +110,6 @@ const GenericAddEditPanel = <T,>({
 }: Props<T>) => {
   const { t } = useTranslation();
   const [allRequiredFilled, setAllRequiredFilled] = useState(false);
-  const [imageFormKey, setImageFormKey] = useState<string>("");
   const { isTabInputScreenOpen, tabInputScreenOptions } = useGeneralContext();
   const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] =
     useState(false);
@@ -167,10 +163,10 @@ const GenericAddEditPanel = <T,>({
     }
     return mergedInitialState;
   });
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsExtraModalOpen?.(false);
     close?.();
-  };
+  }, [setIsExtraModalOpen, close]);
   const isValueEmpty = useCallback((value: unknown) => {
     if (Array.isArray(value)) return value.length === 0;
     return value === undefined || value === null || value === "";
@@ -183,36 +179,6 @@ const GenericAddEditPanel = <T,>({
     });
   }, [inputs, formElements, isValueEmpty]);
 
-  const uploadImageMutation = useMutation({
-    mutationFn: async ({
-      file,
-      filename,
-    }: {
-      file: File;
-      filename: string;
-    }) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("filename", filename);
-      formData.append("foldername", folderName ?? "forgotton");
-
-      const res = await postWithHeader<FormData, { url: string }>({
-        path: "/asset/upload",
-        payload: formData,
-        headers: new AxiosHeaders({
-          "Content-Type": "multipart/form-data",
-        }),
-      });
-      return res;
-    },
-    onSuccess: (data: { url: string }) => {
-      setFormElements((prev) => ({ ...prev, [imageFormKey]: data.url }));
-    },
-    onError: (error: Error) => {
-      console.error("Error uploading file:", error);
-    },
-  });
-
   useEffect(() => {
     if (setForm) {
       setForm(formElements as T);
@@ -223,29 +189,28 @@ const GenericAddEditPanel = <T,>({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        isEditMode ? additionalCancelFunction?.() : undefined;
+        if (isEditMode) {
+          additionalCancelFunction?.();
+        }
         handleClose();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
-    // triggerOnTriggerTabInput();
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [isEditMode, additionalCancelFunction, handleClose]);
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>, input: GenericInputType) => {
-      setImageFormKey(input.formKey);
+      console.log("File change triggered for input:", input.formKey);
       if (event.target.files?.[0]) {
         const file = event.target.files[0];
-        const filename = file.name;
-        uploadImageMutation.mutate({
-          file,
-          filename,
-        });
+        console.log("File selected:", file.name, "for key:", input.formKey);
+        // Store the File object directly in formElements
+        setFormElements((prev) => ({ ...prev, [input.formKey]: file }));
       }
     },
-    [uploadImageMutation]
+    []
   );
   const finalSubmitFunction = () => {
     try {
@@ -378,33 +343,43 @@ const GenericAddEditPanel = <T,>({
           >
             <div>
               {/* Image inputs */}
-              {imageInputs.map((input) => (
-                <div className="flex flex-col gap-2" key={input.formKey}>
-                  <img
-                    src={
-                      formElements[input.formKey]
-                        ? formElements[input.formKey]
-                        : NO_IMAGE_URL
-                    }
-                    alt="image"
-                    className="w-full h-40 object-contain rounded-md"
-                  />
-                  <label
-                    key={input.formKey}
-                    className="w-fit ml-auto inline-block bg-blue-500 hover:bg-blue-600 text-white text-sm py-2 px-3 rounded-md cursor-pointer my-auto border-b sm:border-b-0"
-                  >
-                    {t("Upload")}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        handleFileChange(e, input);
-                      }}
-                      className="hidden"
+              {imageInputs.map((input) => {
+                const value = formElements[input.formKey];
+                console.log(
+                  `Rendering image input for ${input.formKey}, value:`,
+                  value
+                );
+
+                // If value is a File object, create a preview URL
+                const imageSrc =
+                  value instanceof File
+                    ? URL.createObjectURL(value)
+                    : value || NO_IMAGE_URL;
+
+                return (
+                  <div className="flex flex-col gap-2" key={input.formKey}>
+                    <img
+                      src={imageSrc}
+                      alt="image"
+                      className="w-full h-40 object-contain rounded-md"
                     />
-                  </label>
-                </div>
-              ))}
+                    <label
+                      key={input.formKey}
+                      className="w-fit ml-auto inline-block bg-blue-500 hover:bg-blue-600 text-white text-sm py-2 px-3 rounded-md cursor-pointer my-auto border-b sm:border-b-0"
+                    >
+                      {t("Upload")}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          handleFileChange(e, input);
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                );
+              })}
             </div>
             <div
               className={`${

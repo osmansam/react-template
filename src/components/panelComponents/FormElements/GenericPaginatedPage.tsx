@@ -131,6 +131,8 @@ const isDisplayablePrimitive = (f: Field) => {
     "int",
     "float",
     "double",
+    "image",
+    "img",
   ].includes(t);
 };
 
@@ -145,6 +147,11 @@ function fieldToInput(field: Field) {
     return {
       inputType: InputTypes.CHECKBOX as const,
       formKeyType: FormKeyTypeEnum.BOOLEAN as const,
+    };
+  if (["image", "img"].includes(t))
+    return {
+      inputType: InputTypes.IMAGE as const,
+      formKeyType: FormKeyTypeEnum.STRING as const,
     };
   if (["date", "datetime", "timestamp"].includes(t))
     return {
@@ -173,22 +180,6 @@ export default function GenericPaginatedPage({
     setIsSelectionActive,
   } = useGeneralContext();
 
-  const {
-    createDynamicItem,
-    createMultipleDynamicItem,
-    updateDynamicItem,
-    deleteDynamicItem,
-    deleteMultipleDynamicItem,
-    updateMultipleDynamicItem,
-  } = useDynamicCrud<GenericItem>(schemaName);
-
-  const [filterPanelFormElements, setFilterPanelFormElements] =
-    useState<FormElementsState>({
-      search: "",
-      sort: "",
-      asc: 1,
-    });
-
   const rawContainers = useGetContainers();
 
   const container: ContainerModel | undefined = useMemo(() => {
@@ -201,6 +192,32 @@ export default function GenericPaginatedPage({
         (c.schemaName || "").toLowerCase() === schemaName.toLowerCase()
     );
   }, [rawContainers, schemaName]);
+
+  // Check if container has image fields
+  const hasImageField = useMemo(() => {
+    if (!container?.fields) return false;
+    return container.fields.some(
+      (field) =>
+        (field.type || "").toLowerCase() === "image" ||
+        (field.type || "").toLowerCase() === "img"
+    );
+  }, [container]);
+
+  const {
+    createDynamicItem,
+    createMultipleDynamicItem,
+    updateDynamicItem,
+    deleteDynamicItem,
+    deleteMultipleDynamicItem,
+    updateMultipleDynamicItem,
+  } = useDynamicCrud<GenericItem>(schemaName, hasImageField);
+
+  const [filterPanelFormElements, setFilterPanelFormElements] =
+    useState<FormElementsState>({
+      search: "",
+      sort: "",
+      asc: 1,
+    });
 
   const displayFields: Field[] = useMemo(() => {
     if (!container?.fields) return [];
@@ -228,7 +245,12 @@ export default function GenericPaginatedPage({
   }, [container, includeFields, excludeFields]);
 
   const rowKeys = useMemo(
-    () => displayFields.map((f) => ({ key: f.name })),
+    () =>
+      displayFields.map((f) => ({
+        key: f.name,
+        isImage: (f.type || "").toLowerCase() === "image",
+        isDate: (f.type || "").toLowerCase() === "date",
+      })),
     [displayFields]
   );
 
@@ -408,12 +430,19 @@ export default function GenericPaginatedPage({
   const [isBulkStepTwo, setIsBulkStepTwo] = useState(false);
   const [bulkSelectedKeys, setBulkSelectedKeys] = useState<string[]>([]);
   const [bulkForm, setBulkForm] = useState<Record<string, unknown>>({});
+
+  // Filter out image fields from bulk edit options
   const bulkFieldOptions = useMemo(
     () =>
-      displayFields.map((f) => ({
-        value: f.name,
-        label: t(humanize(f.name)),
-      })),
+      displayFields
+        .filter((f) => {
+          const fieldType = (f.type || "").toLowerCase();
+          return fieldType !== "image" && fieldType !== "img";
+        })
+        .map((f) => ({
+          value: f.name,
+          label: t(humanize(f.name)),
+        })),
     [displayFields, t]
   );
 
@@ -628,8 +657,8 @@ export default function GenericPaginatedPage({
         {...(pagination && { pagination })}
         outsideSearchProps={outsideSearchProps}
         selectionActions={selectionActions}
-        isExcel={true}
-        onExcelUpload={createMultipleDynamicItem}
+        isExcel={!hasImageField}
+        onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
       />
     </div>
   );

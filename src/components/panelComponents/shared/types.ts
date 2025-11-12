@@ -47,6 +47,7 @@ export interface RowKeyType<T> {
   isParseFloat?: boolean;
   isOptional?: boolean;
   isImage?: boolean;
+  isDate?: boolean;
   className?: string;
   options?: {
     label: string;
