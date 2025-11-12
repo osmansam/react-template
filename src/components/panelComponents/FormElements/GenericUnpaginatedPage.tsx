@@ -296,7 +296,7 @@ export default function GenericUnpaginatedPage({
       icon: null,
       className: "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
     };
-  }, [t, isAddOpen, inputs, formKeys, handleSubmitItem, displayFields]);
+  }, [t, isAddOpen, inputs, formKeys, handleSubmitItem]);
 
   const actions = useMemo(() => {
     if (!actionsEnabled) return [];

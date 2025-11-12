@@ -10,6 +10,7 @@ export enum PublicRoutes {
 
 export enum Routes {
   Test = "/test",
+  Mest = "/mest",
 }
 
 export const allRoutes: {
@@ -25,6 +26,22 @@ export const allRoutes: {
   {
     name: "test",
     path: Routes.Test,
+    element: () => (
+      <GenericTabPage
+        tabs={[
+          { schemaName: "can" },
+          { schemaName: "konu" },
+          { schemaName: "pi" },
+          { schemaName: "furkan" },
+          { schemaName: "resim" },
+        ]}
+      />
+    ),
+    isOnSidebar: true,
+  },
+  {
+    name: "mest",
+    path: Routes.Mest,
     element: () => (
       <GenericTabPage
         tabs={[

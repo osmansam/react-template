@@ -1,18 +1,18 @@
-import { useUserContext } from "../context/User.context";
 import { allRoutes } from "../navigation/constants";
 // import { Role } from "../types";
 // import { useGetPanelControlPages } from "../utils/api/panelControl/page";
 
 export const useFilteredRoutes = () => {
-  const { user } = useUserContext();
+  // const { user } = useUserContext();
   // const pages = useGetPanelControlPages();
 
-  if (
-    !user
-    // || !pages
-  ) {
-    return [];
-  }
+  // Commented out user check since authentication is disabled
+  // if (
+  //   !user
+  //   // || !pages
+  // ) {
+  //   return [];
+  // }
 
   const routes = allRoutes;
   // ?.filter((route) => {

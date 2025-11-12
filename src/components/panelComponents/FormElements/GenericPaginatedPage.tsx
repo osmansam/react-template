@@ -249,7 +249,7 @@ export default function GenericPaginatedPage({
       displayFields.map((f) => ({
         key: f.name,
         isImage: (f.type || "").toLowerCase() === "image",
-        isDate: (f.type || "").toLowerCase() === "date",
+        // isDate: (f.type || "").toLowerCase() === "date",
       })),
     [displayFields]
   );

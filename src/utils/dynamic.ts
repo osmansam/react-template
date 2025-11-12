@@ -327,7 +327,12 @@ export function useGetPaginatedItems<T>(
     `limit=${limit}`,
     filters.sort && `sort=${filters.sort}`,
     filters.asc !== undefined && `asc=${filters.asc}`,
-    filters.search && `search=${filters.search}`,
+    filters.search &&
+      `search=${
+        typeof filters.search === "string"
+          ? filters.search.trim()
+          : filters.search
+      }`,
   ];
   const queryString = parts.filter(Boolean).join("&");
   const url = `${baseQueryUrl}?${queryString}`;

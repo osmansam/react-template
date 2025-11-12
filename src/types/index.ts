@@ -20,7 +20,7 @@ export enum DateFormatEnum {
   "YYYY-MM-DD" = "YYYY-MM-DD",
 }
 
-export const DEFAULT_DATE_FORMAT = DateFormatEnum["DD/MM/YYYY"];
+export const DEFAULT_DATE_FORMAT = DateFormatEnum["MM/DD/YYYY"];
 
 export const NO_IMAGE_URL =
   "https://res.cloudinary.com/dvbg/image/upload/ar_4:4,c_crop/c_fit,h_100/davinci/no-image_pyet1d.jpg";

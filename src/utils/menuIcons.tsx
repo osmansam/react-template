@@ -71,6 +71,7 @@ export const getMenuIcon = (menuName: string): IconType => {
     Memberships: MdVerifiedUser,
     Rewards: MdCardGiftcard,
     Games: MdSportsEsports,
+    test: MdSportsEsports,
     Oyunlar: MdSportsEsports,
     Gameplays: MdExtension,
     Analytics: MdBarChart,
