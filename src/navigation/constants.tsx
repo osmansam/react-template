@@ -32,6 +32,8 @@ export const allRoutes: {
           { schemaName: "konu" },
           { schemaName: "pi" },
           { schemaName: "mustafa" },
+          { schemaName: "hilmi" },
+          { schemaName: "furkan" },
         ]}
       />
     ),

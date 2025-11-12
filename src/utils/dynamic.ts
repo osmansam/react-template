@@ -45,9 +45,50 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   const deleteDynamicItem = (id: string | number) =>
     deleteItem(`${id}?${qs({ schemaName })}`);
 
-  // Delete multiple items functionality
+  // Multiple items functionality
   const qc = useQueryClient();
   const { t } = useTranslation();
+
+  // Create multiple items functionality
+  async function createManyRequest(payload: Array<Partial<T>>) {
+    const { data } = await axiosClient.post(
+      `${BASE}/multiple?${qs({ schemaName })}`,
+      payload,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    return data;
+  }
+
+  const createManyMutation = useMutation({
+    mutationFn: createManyRequest,
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey });
+      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
+      return { previousItems };
+    },
+    onSuccess: (newItems: T[]) => {
+      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
+      qc.setQueryData<T[]>(queryKey, [...previousItems, ...newItems]);
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onError: (err: any, _vars, context) => {
+      if (context?.previousItems) {
+        qc.setQueryData<T[]>(queryKey, context.previousItems);
+      }
+      const errorMessage =
+        err?.response?.data?.message || "An unexpected error occurred";
+      // setTimeout(() => toast.error(t(errorMessage)), 200);
+      console.log("Error creating multiple items:", errorMessage);
+    },
+    onSettled: async () => {
+      qc.invalidateQueries({ queryKey });
+    },
+  });
+
+  const createMultipleDynamicItem = (docs: Array<Partial<T>>) =>
+    createManyMutation.mutate(docs);
 
   async function deleteManyRequest(payload: Array<{ _id: string | number }>) {
     const { data } = await axiosClient.delete(
@@ -153,6 +194,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   return {
     createDynamicItem,
+    createMultipleDynamicItem,
+    createManyMutation,
     updateDynamicItem,
     deleteDynamicItem,
     deleteMultipleDynamicItem,

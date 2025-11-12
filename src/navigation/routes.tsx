@@ -4,7 +4,6 @@ import { allRoutes, PublicRoutes } from "./constants";
 import { PrivateRoutes } from "./PrivateRoutes";
 
 const RouterContainer = () => {
-  console.log("allRoutes", allRoutes);
   return (
     <Routes>
       {allRoutes.map((route) => (
