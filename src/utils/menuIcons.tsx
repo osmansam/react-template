@@ -138,3 +138,58 @@ export const getMenuIcon = (menuName: string): IconType => {
 
   return iconMap[menuName] || MdSpaceDashboard;
 };
+
+// Get icon by icon component name (e.g., "MdSportsEsports")
+export const getIconByName = (iconName: string): IconType => {
+  const iconComponentMap: { [key: string]: IconType } = {
+    MdAccountBalanceWallet,
+    MdAddShoppingCart,
+    MdAdminPanelSettings,
+    MdArchive,
+    MdAssessment,
+    MdAttachMoney,
+    MdBarChart,
+    MdBuild,
+    MdCardGiftcard,
+    MdChecklist,
+    MdDeliveryDining,
+    MdDescription,
+    MdEventAvailable,
+    MdExtension,
+    MdFeedback,
+    MdFilePresent,
+    MdFolder,
+    MdImage,
+    MdInventory2,
+    MdLink,
+    MdListAlt,
+    MdLocalOffer,
+    MdLocalShipping,
+    MdLocationOn,
+    MdLock,
+    MdMenuBook,
+    MdNotifications,
+    MdPerson,
+    MdPlaylistAddCheck,
+    MdPointOfSale,
+    MdReceipt,
+    MdSchedule,
+    MdSchool,
+    MdSettings,
+    MdShoppingBag,
+    MdShoppingCart,
+    MdSort,
+    MdSpaceDashboard,
+    MdSportsEsports,
+    MdStorefront,
+    MdSummarize,
+    MdSupervisorAccount,
+    MdTableRestaurant,
+    MdTimer,
+    MdTrendingUp,
+    MdVerifiedUser,
+    MdWarning,
+  };
+
+  return iconComponentMap[iconName] || MdSpaceDashboard;
+};

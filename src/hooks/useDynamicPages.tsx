@@ -8,6 +8,7 @@ interface PageSchema {
   schemaName: string;
   label?: string;
   isPaginated?: boolean; // Add isPaginated prop
+  icon?: string; // Add icon for individual schemas in tabs
 }
 
 interface Page {
@@ -54,6 +55,7 @@ export const useDynamicPages = () => {
               schemaName: schema.schemaName,
               label: schema.label,
               isPaginated: schema.isPaginated ?? true, // Default to true
+              iconName: schema.icon, // Pass icon name from schema
             }))}
           />
         ),

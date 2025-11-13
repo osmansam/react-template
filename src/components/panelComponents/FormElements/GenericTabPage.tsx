@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { IconType } from "react-icons";
 // import { GiGreatPyramid } from "react-icons/gi";
 import { useGeneralContext } from "../../../context/General.context";
+import { getIconByName } from "../../../utils/menuIcons";
 import { Header } from "../../header/Header";
 import UnifiedTabPanel from "../TabPanel/UnifiedTabPanel";
 import GenericPaginatedPage from "./GenericPaginatedPage";
@@ -11,6 +12,7 @@ type TabConfig = {
   schemaName: string;
   label?: string;
   icon?: IconType;
+  iconName?: string; // Icon name string (e.g., "MdSportsEsports")
   includeFields?: string[];
   excludeFields?: string[];
   actionsEnabled?: boolean;
@@ -43,10 +45,19 @@ export default function GenericTabPage({
         const label = t.label ?? humanize(t.schemaName);
         const isPaginated = t.isPaginated ?? true; // Default to true
 
+        // Get icon from iconName string or use the icon prop
+        let iconElement = undefined;
+        if (t.iconName) {
+          const IconComponent = getIconByName(t.iconName);
+          iconElement = <IconComponent className="text-lg font-thin" />;
+        } else if (t.icon) {
+          iconElement = <t.icon className="text-lg font-thin" />;
+        }
+
         return {
           number: idx,
           label,
-          icon: t.icon ? <t.icon className="text-lg font-thin" /> : undefined,
+          icon: iconElement,
           isDisabled: false,
           content: isPaginated ? (
             <GenericPaginatedPage
