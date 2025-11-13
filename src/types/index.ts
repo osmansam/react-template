@@ -22,6 +22,14 @@ export enum DateFormatEnum {
 
 export const DEFAULT_DATE_FORMAT = DateFormatEnum["MM-DD-YYYY"];
 
+export const NUMBER_FILTER_OPERATORS = [
+  { value: "=", label: "=" },
+  { value: "gte", label: ">=" },
+  { value: "gt", label: ">" },
+  { value: "lte", label: "<=" },
+  { value: "lt", label: "<" },
+] as const;
+
 export const NO_IMAGE_URL =
   "https://res.cloudinary.com/dvbg/image/upload/ar_4:4,c_crop/c_fit,h_100/davinci/no-image_pyet1d.jpg";
 

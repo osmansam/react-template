@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import logo from "./logo.svg";
 import { PageSelector } from "./PageSelector";
 
 interface HeaderProps {
@@ -12,10 +11,10 @@ interface HeaderProps {
 }
 
 export function Header({
-  logoSrc = logo,
+  logoSrc = "",
   logoAlt = "logo",
   appName = "Panel",
-  homeRoute = "/",
+  homeRoute = "/test",
   showMobileMenu = true,
   className = "",
 }: HeaderProps) {
@@ -26,7 +25,7 @@ export function Header({
   };
 
   return (
-    <div className={`sticky top-0 z-50 ${className}`}>
+    <div className={`sticky top-0 z-40 ${className}`}>
       <nav className="w-full bg-gray-800 shadow">
         <div className="h-16 flex justify-between pl-2 lg:pl-4 pr-2 lg:pr-6 mr-2 lg:mr-20">
           <div className="flex flex-row gap-2 items-center">

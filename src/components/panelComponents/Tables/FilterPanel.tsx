@@ -3,7 +3,11 @@ import { useTranslation } from "react-i18next";
 import { IoIosClose } from "react-icons/io";
 import { ActionMeta, MultiValue, SingleValue } from "react-select";
 import { useGeneralContext } from "../../../context/General.context";
-import { FormElementsState, FormElementValue } from "../../../types";
+import {
+  FormElementsState,
+  FormElementValue,
+  NUMBER_FILTER_OPERATORS,
+} from "../../../types";
 import { OptionType } from "../../panelComponents/shared/types";
 import DateInput from "../FormElements/DateInput";
 import { GenericButton } from "../FormElements/GenericButton";
@@ -67,6 +71,144 @@ const FilterPanel = ({
       isDisabled: !isApplyButtonActive,
     },
   ];
+
+  // Helper function to render operator select dropdown
+  const renderOperatorSelect = (
+    fieldKey: string,
+    position: "first" | "second",
+    currentOperator: string
+  ) => (
+    <select
+      value={currentOperator}
+      onChange={(e) => {
+        const operator = e.target.value;
+        setNumberOperators((prev) => ({
+          ...prev,
+          [fieldKey]: {
+            first:
+              position === "first" ? operator : prev[fieldKey]?.first || "=",
+            second:
+              position === "second" ? operator : prev[fieldKey]?.second || "=",
+          },
+        }));
+
+        // Get current array or create new one
+        const currentValue = tempFormElements[fieldKey] ?? "";
+        const currentArray = Array.isArray(currentValue) ? currentValue : [];
+        const otherValue =
+          position === "first" ? currentArray[1] || "" : currentArray[0] || "";
+
+        // Extract raw value from current position
+        const currentRaw = currentArray[position === "first" ? 0 : 1]
+          ? String(currentArray[position === "first" ? 0 : 1]).replace(
+              /^(gte-|gt-|lte-|lt-)/,
+              ""
+            )
+          : "";
+
+        if (currentRaw) {
+          const newValue =
+            operator === "=" ? currentRaw : `${operator}-${currentRaw}`;
+          const newArray: string[] = (
+            position === "first"
+              ? [newValue, otherValue].filter((v) => v !== "")
+              : [otherValue, newValue].filter((v) => v !== "")
+          ) as string[];
+
+          isApplyButtonActive
+            ? setTempFormElements((prev) => ({
+                ...prev,
+                [fieldKey]: newArray.length > 0 ? newArray : "",
+              }))
+            : setFormElements((prev) => ({
+                ...prev,
+                [fieldKey]: newArray.length > 0 ? newArray : "",
+              }));
+        }
+      }}
+      className={`border border-gray-300 rounded-md px-4 py-2.5 text-sm w-20 h-[42px] ${
+        currentOperator === "=" ? "opacity-30" : ""
+      }`}
+    >
+      {NUMBER_FILTER_OPERATORS.map((op) => (
+        <option key={op.value} value={op.value}>
+          {op.label}
+        </option>
+      ))}
+    </select>
+  );
+
+  // Helper function to render number input field
+  const renderNumberInput = (
+    fieldKey: string,
+    position: "first" | "second",
+    value: FormElementValue,
+    placeholder: string,
+    isDebounce: boolean,
+    isOnClearActive?: boolean
+  ) => {
+    const currentArray = Array.isArray(value) ? value : [];
+    const currentValue = currentArray[position === "first" ? 0 : 1]
+      ? String(currentArray[position === "first" ? 0 : 1]).replace(
+          /^(gte-|gt-|lte-|lt-)/,
+          ""
+        )
+      : "";
+
+    return (
+      <TextInput
+        key={`${fieldKey}-${position}`}
+        type={InputTypes.NUMBER}
+        value={currentValue}
+        label=""
+        placeholder={placeholder}
+        onChange={(newValue) => {
+          const operator = numberOperators[fieldKey]?.[position] || "=";
+          const finalValue =
+            operator === "=" ? String(newValue) : `${operator}-${newValue}`;
+
+          const otherValue = currentArray[position === "first" ? 1 : 0] || "";
+          const newArray: string[] = (
+            position === "first"
+              ? [finalValue, otherValue].filter((v) => v !== "")
+              : [otherValue, finalValue].filter((v) => v !== "")
+          ) as string[];
+
+          isApplyButtonActive
+            ? setTempFormElements((prev) => ({
+                ...prev,
+                [fieldKey]: newArray.length > 0 ? newArray : "",
+              }))
+            : setFormElements((prev) => ({
+                ...prev,
+                [fieldKey]: newArray.length > 0 ? newArray : "",
+              }));
+        }}
+        isDatePicker={false}
+        isOnClearActive={position === "second" ? isOnClearActive : false}
+        isDebounce={isDebounce}
+        onClear={
+          position === "second"
+            ? () => {
+                isApplyButtonActive
+                  ? setTempFormElements((prev) => ({
+                      ...prev,
+                      [fieldKey]: "",
+                    }))
+                  : setFormElements((prev) => ({
+                      ...prev,
+                      [fieldKey]: "",
+                    }));
+                setNumberOperators((prev) => ({
+                  ...prev,
+                  [fieldKey]: { first: "=", second: "=" },
+                }));
+              }
+            : undefined
+        }
+      />
+    );
+  };
 
   return (
     <div
@@ -184,227 +326,35 @@ const FilterPanel = ({
                 </label>
                 {/* First condition */}
                 <div className="flex flex-row gap-2 items-center">
-                  <select
-                    value={numberOperators[input.formKey]?.first || "="}
-                    onChange={(e) => {
-                      const operator = e.target.value;
-                      setNumberOperators((prev) => ({
-                        ...prev,
-                        [input.formKey]: {
-                          first: operator,
-                          second: prev[input.formKey]?.second || "=",
-                        },
-                      }));
-
-                      // Get current array or create new one
-                      const currentArray = Array.isArray(value) ? value : [];
-                      const secondValue = currentArray[1] || "";
-
-                      // Extract raw value from first position
-                      const firstRaw = currentArray[0]
-                        ? String(currentArray[0]).replace(
-                            /^(gte-|gt-|lte-|lt-)/,
-                            ""
-                          )
-                        : "";
-
-                      if (firstRaw) {
-                        const newFirstValue =
-                          operator === "="
-                            ? firstRaw
-                            : `${operator}-${firstRaw}`;
-                        const newArray: string[] = [
-                          newFirstValue,
-                          secondValue,
-                        ].filter((v) => v !== "") as string[];
-
-                        isApplyButtonActive
-                          ? setTempFormElements((prev) => ({
-                              ...prev,
-                              [input.formKey]:
-                                newArray.length > 0 ? newArray : "",
-                            }))
-                          : setFormElements((prev) => ({
-                              ...prev,
-                              [input.formKey]:
-                                newArray.length > 0 ? newArray : "",
-                            }));
-                      }
-                    }}
-                    className={`border border-gray-300 rounded-md px-4 py-2.5 text-sm w-20 h-[42px] ${
-                      (numberOperators[input.formKey]?.first || "=") === "="
-                        ? "opacity-30"
-                        : ""
-                    }`}
-                  >
-                    <option value="=">=</option>
-                    <option value="gte">&gt;=</option>
-                    <option value="gt">&gt;</option>
-                    <option value="lte">&lt;=</option>
-                    <option value="lt">&lt;</option>
-                  </select>
-                  <TextInput
-                    key={`${input.formKey}-first`}
-                    type={input.type}
-                    value={
-                      Array.isArray(value) && value[0]
-                        ? String(value[0]).replace(/^(gte-|gt-|lte-|lt-)/, "")
-                        : ""
-                    }
-                    label=""
-                    placeholder={input.placeholder ?? ""}
-                    onChange={(newValue) => {
-                      const operator =
-                        numberOperators[input.formKey]?.first || "=";
-                      const finalFirstValue =
-                        operator === "="
-                          ? String(newValue)
-                          : `${operator}-${newValue}`;
-
-                      const currentArray = Array.isArray(value) ? value : [];
-                      const secondValue = currentArray[1] || "";
-
-                      const newArray: string[] = [
-                        finalFirstValue,
-                        secondValue,
-                      ].filter((v) => v !== "") as string[];
-
-                      isApplyButtonActive
-                        ? setTempFormElements((prev) => ({
-                            ...prev,
-                            [input.formKey]:
-                              newArray.length > 0 ? newArray : "",
-                          }))
-                        : setFormElements((prev) => ({
-                            ...prev,
-                            [input.formKey]:
-                              newArray.length > 0 ? newArray : "",
-                          }));
-                    }}
-                    isDatePicker={false}
-                    isOnClearActive={false}
-                    isDebounce={input?.isDebounce ?? false}
-                  />
+                  {renderOperatorSelect(
+                    input.formKey,
+                    "first",
+                    numberOperators[input.formKey]?.first || "="
+                  )}
+                  {renderNumberInput(
+                    input.formKey,
+                    "first",
+                    value,
+                    input.placeholder ?? "",
+                    input?.isDebounce ?? false
+                  )}
                 </div>
 
                 {/* Second condition */}
                 <div className="flex flex-row gap-2 items-center">
-                  <select
-                    value={numberOperators[input.formKey]?.second || "="}
-                    onChange={(e) => {
-                      const operator = e.target.value;
-                      setNumberOperators((prev) => ({
-                        ...prev,
-                        [input.formKey]: {
-                          first: prev[input.formKey]?.first || "=",
-                          second: operator,
-                        },
-                      }));
-
-                      // Get current array or create new one
-                      const currentArray = Array.isArray(value) ? value : [];
-                      const firstValue = currentArray[0] || "";
-
-                      // Extract raw value from second position
-                      const secondRaw = currentArray[1]
-                        ? String(currentArray[1]).replace(
-                            /^(gte-|gt-|lte-|lt-)/,
-                            ""
-                          )
-                        : "";
-
-                      if (secondRaw) {
-                        const newSecondValue =
-                          operator === "="
-                            ? secondRaw
-                            : `${operator}-${secondRaw}`;
-                        const newArray: string[] = [
-                          firstValue,
-                          newSecondValue,
-                        ].filter((v) => v !== "") as string[];
-
-                        isApplyButtonActive
-                          ? setTempFormElements((prev) => ({
-                              ...prev,
-                              [input.formKey]:
-                                newArray.length > 0 ? newArray : "",
-                            }))
-                          : setFormElements((prev) => ({
-                              ...prev,
-                              [input.formKey]:
-                                newArray.length > 0 ? newArray : "",
-                            }));
-                      }
-                    }}
-                    className={`border border-gray-300 rounded-md px-4 py-2.5 text-sm w-20 h-[42px] ${
-                      (numberOperators[input.formKey]?.second || "=") === "="
-                        ? "opacity-30"
-                        : ""
-                    }`}
-                  >
-                    <option value="=">=</option>
-                    <option value="gte">&gt;=</option>
-                    <option value="gt">&gt;</option>
-                    <option value="lte">&lt;=</option>
-                    <option value="lt">&lt;</option>
-                  </select>
-                  <TextInput
-                    key={`${input.formKey}-second`}
-                    type={input.type}
-                    value={
-                      Array.isArray(value) && value[1]
-                        ? String(value[1]).replace(/^(gte-|gt-|lte-|lt-)/, "")
-                        : ""
-                    }
-                    label=""
-                    placeholder={input.placeholder ?? ""}
-                    onChange={(newValue) => {
-                      const operator =
-                        numberOperators[input.formKey]?.second || "=";
-                      const finalSecondValue =
-                        operator === "="
-                          ? String(newValue)
-                          : `${operator}-${newValue}`;
-
-                      const currentArray = Array.isArray(value) ? value : [];
-                      const firstValue = currentArray[0] || "";
-
-                      const newArray: string[] = [
-                        firstValue,
-                        finalSecondValue,
-                      ].filter((v) => v !== "") as string[];
-
-                      isApplyButtonActive
-                        ? setTempFormElements((prev) => ({
-                            ...prev,
-                            [input.formKey]:
-                              newArray.length > 0 ? newArray : "",
-                          }))
-                        : setFormElements((prev) => ({
-                            ...prev,
-                            [input.formKey]:
-                              newArray.length > 0 ? newArray : "",
-                          }));
-                    }}
-                    isDatePicker={false}
-                    isOnClearActive={input?.isOnClearActive}
-                    isDebounce={input?.isDebounce ?? false}
-                    onClear={() => {
-                      isApplyButtonActive
-                        ? setTempFormElements((prev) => ({
-                            ...prev,
-                            [input.formKey]: "",
-                          }))
-                        : setFormElements((prev) => ({
-                            ...prev,
-                            [input.formKey]: "",
-                          }));
-                      setNumberOperators((prev) => ({
-                        ...prev,
-                        [input.formKey]: { first: "=", second: "=" },
-                      }));
-                    }}
-                  />
+                  {renderOperatorSelect(
+                    input.formKey,
+                    "second",
+                    numberOperators[input.formKey]?.second || "="
+                  )}
+                  {renderNumberInput(
+                    input.formKey,
+                    "second",
+                    value,
+                    input.placeholder ?? "",
+                    input?.isDebounce ?? false,
+                    input?.isOnClearActive
+                  )}
                 </div>
               </div>
             )}

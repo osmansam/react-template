@@ -6,6 +6,7 @@ import {
 import { Slide, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Loading from "./common/Loading";
+import { Sidebar } from "./common/Sidebar";
 import { GeneralContextProvider } from "./context/General.context";
 import { UserContextProvider } from "./context/User.context";
 import { useWebSocket } from "./hooks/useWebSocket";
@@ -20,8 +21,10 @@ function App() {
       <UserContextProvider>
         <GeneralContextProvider>
           {isMutating ? <Loading /> : null}
-          {/* <Sidebar /> */}
-          <RouterContainer />
+          <Sidebar />
+          <div className="lg:ml-16">
+            <RouterContainer />
+          </div>
           <ToastContainer
             autoClose={2000}
             hideProgressBar={true}

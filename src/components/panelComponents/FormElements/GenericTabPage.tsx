@@ -5,6 +5,7 @@ import { useGeneralContext } from "../../../context/General.context";
 import { Header } from "../../header/Header";
 import UnifiedTabPanel from "../TabPanel/UnifiedTabPanel";
 import GenericPaginatedPage from "./GenericPaginatedPage";
+import GenericUnpaginatedPage from "./GenericUnpaginatedPage";
 
 type TabConfig = {
   schemaName: string;
@@ -13,6 +14,7 @@ type TabConfig = {
   includeFields?: string[];
   excludeFields?: string[];
   actionsEnabled?: boolean;
+  isPaginated?: boolean; // Add isPaginated prop, default true
 };
 
 type Props = {
@@ -39,13 +41,22 @@ export default function GenericTabPage({
     () =>
       tabs.map((t, idx) => {
         const label = t.label ?? humanize(t.schemaName);
+        const isPaginated = t.isPaginated ?? true; // Default to true
+
         return {
           number: idx,
           label,
           icon: t.icon ? <t.icon className="text-lg font-thin" /> : undefined,
           isDisabled: false,
-          content: (
+          content: isPaginated ? (
             <GenericPaginatedPage
+              schemaName={t.schemaName}
+              includeFields={t.includeFields}
+              excludeFields={t.excludeFields}
+              actionsEnabled={t.actionsEnabled ?? true}
+            />
+          ) : (
+            <GenericUnpaginatedPage
               schemaName={t.schemaName}
               includeFields={t.includeFields}
               excludeFields={t.excludeFields}

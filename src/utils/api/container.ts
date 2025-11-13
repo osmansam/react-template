@@ -16,6 +16,9 @@ export interface Field {
   isLoginCredential?: boolean;
   isSearchable?: boolean;
   children?: Field[];
+  frontend?: {
+    displayName?: string;
+  };
 }
 
 /** Per-route auth/availability spec */

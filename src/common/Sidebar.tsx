@@ -241,7 +241,7 @@ export const Sidebar = () => {
               }
 
               if (!route.isOnSidebar) return null;
-              const IconComponent = getMenuIcon(route.name);
+              const IconComponent = getMenuIcon(route.icon || route.name);
               return (
                 <SidebarTooltip key={route.name} content={t(route.name)}>
                   <button

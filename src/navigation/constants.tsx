@@ -9,23 +9,24 @@ export enum PublicRoutes {
 }
 
 export enum Routes {
-  Test = "/test",
+  Kest = "/kest",
   Mest = "/mest",
 }
 
-export const allRoutes: {
+// Static/hardcoded routes (you can keep these or move them to dynamic pages)
+export const staticRoutes: {
   name: string;
   path?: string;
   isOnSidebar: boolean;
   exceptionalRoles?: number[];
   link?: string;
+  icon?: string;
   element?: () => JSX.Element;
-  // tabs?: Tab[];
-  children?: typeof allRoutes;
+  children?: typeof staticRoutes;
 }[] = [
   {
-    name: "test",
-    path: Routes.Test,
+    name: "kest",
+    path: Routes.Kest,
     element: () => (
       <GenericTabPage
         tabs={[
@@ -34,6 +35,9 @@ export const allRoutes: {
           { schemaName: "pi" },
           { schemaName: "furkan" },
           { schemaName: "resim" },
+          { schemaName: "obos" },
+          { schemaName: "demir" },
+          { schemaName: "abc" },
         ]}
       />
     ),
@@ -56,6 +60,9 @@ export const allRoutes: {
     isOnSidebar: true,
   },
 ];
+
+// This will be replaced with dynamic routes
+export const allRoutes = staticRoutes;
 
 export const NO_IMAGE_URL =
   "https://res.cloudinary.com/dvbg/image/upload/ar_4:4,c_crop/c_fit,h_100/davinci/no-image_pyet1d.jpg";

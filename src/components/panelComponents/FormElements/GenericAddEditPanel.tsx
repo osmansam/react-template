@@ -159,7 +159,12 @@ const GenericAddEditPanel = <T,>({
   const mergedInitialState = { ...initialState, ...constantValues };
   const [formElements, setFormElements] = useState(() => {
     if (isEditMode && itemToEdit) {
-      return itemToEdit.updates as unknown as FormElementsState;
+      // Merge with initialState to ensure boolean fields default to false if not present
+      return {
+        ...initialState,
+        ...constantValues,
+        ...(itemToEdit.updates as unknown as FormElementsState),
+      };
     }
     return mergedInitialState;
   });
@@ -214,15 +219,46 @@ const GenericAddEditPanel = <T,>({
   );
   const finalSubmitFunction = () => {
     try {
+      // Convert form elements to proper types based on formKeys
+      const convertedFormElements = { ...formElements };
+
+      // Ensure ALL formKeys are present with proper defaults
+      formKeys.forEach((formKey) => {
+        const value = convertedFormElements[formKey.key];
+
+        // Convert boolean values - ensure false default for undefined/null
+        if (formKey.type === FormKeyTypeEnum.BOOLEAN) {
+          if (value === undefined || value === null || value === "") {
+            convertedFormElements[formKey.key] = false;
+          } else if (typeof value === "string") {
+            convertedFormElements[formKey.key] = value === "true";
+          } else if (typeof value === "boolean") {
+            convertedFormElements[formKey.key] = value;
+          } else {
+            // Fallback for any other unexpected type
+            convertedFormElements[formKey.key] = false;
+          }
+        }
+
+        // Convert number values from string to actual number
+        if (formKey.type === FormKeyTypeEnum.NUMBER) {
+          if (typeof value === "string" && value !== "") {
+            const numValue = Number(value);
+            if (!isNaN(numValue)) {
+              convertedFormElements[formKey.key] = numValue;
+            }
+          }
+        }
+      });
       if (isEditMode && itemToEdit) {
-        submitItem({ id: itemToEdit.id, updates: formElements as T });
+        submitItem({ id: itemToEdit.id, updates: convertedFormElements as T });
       } else if (isEditMode && handleUpdate) {
         handleUpdate();
       } else {
         if (submitFunction) {
           submitFunction();
         } else {
-          submitItem(formElements as T);
+          submitItem(convertedFormElements as T);
         }
       }
       additionalSubmitFunction?.();
@@ -390,7 +426,13 @@ const GenericAddEditPanel = <T,>({
             >
               {/* nonimage inputs */}
               {nonImageInputs.map((input) => {
-                const value = formElements[input.formKey];
+                // Default boolean fields to false if undefined/null
+                const rawValue = formElements[input.formKey];
+                const value =
+                  input.type === InputTypes.CHECKBOX &&
+                  (rawValue === undefined || rawValue === null)
+                    ? false
+                    : rawValue;
                 const handleChange = (key: string) => (value: string) => {
                   const changedInput = inputs.find(
                     (input) => input.formKey === key

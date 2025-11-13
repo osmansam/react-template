@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FiEdit } from "react-icons/fi";
 import { HiOutlineTrash } from "react-icons/hi2";
+import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { useGeneralContext } from "../../../context/General.context";
 import { FormElementsState } from "../../../types";
@@ -12,6 +13,7 @@ import {
   useGetContainers,
 } from "../../../utils/api/container";
 import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
+import { Header } from "../../header/Header";
 import SwitchButton from "../common/SwitchButton";
 import { FormKeyTypeEnum, InputTypes } from "../shared/types";
 import GenericTable from "../Tables/GenericTable";
@@ -24,6 +26,7 @@ type Props = {
   includeFields?: string[];
   excludeFields?: string[];
   actionsEnabled?: boolean;
+  isHeader?: boolean;
 };
 
 // Raw field type from API with possible case variations
@@ -48,6 +51,12 @@ type RawField = {
   IsSearchable?: boolean;
   children?: RawField[];
   Children?: RawField[];
+  frontend?: {
+    displayName?: string;
+  };
+  Frontend?: {
+    DisplayName?: string;
+  };
 };
 
 // Raw container type from API with possible case variations
@@ -84,6 +93,11 @@ const humanize = (key: string) =>
     .trim()
     .replace(/^./, (c) => c.toUpperCase());
 
+// Helper to get display label - uses Frontend.DisplayName if available, otherwise humanizes the field name
+const getFieldLabel = (field: Field): string => {
+  return field.frontend?.displayName ?? humanize(field.name);
+};
+
 const normalizeField = (f: RawField): Field => ({
   name: f.name ?? f.Name ?? "",
   type: f.type ?? f.Type ?? "",
@@ -97,6 +111,13 @@ const normalizeField = (f: RawField): Field => ({
   children: (f.children ?? f.Children ?? [])?.map((c: RawField) =>
     normalizeField(c)
   ),
+  frontend:
+    f.frontend ??
+    (f.Frontend
+      ? {
+          displayName: f.Frontend.DisplayName,
+        }
+      : undefined),
 });
 
 const normalizeContainer = (c: RawContainer): ContainerModel => ({
@@ -162,6 +183,7 @@ export default function GenericUnpaginatedPage({
   includeFields,
   excludeFields,
   actionsEnabled = true,
+  isHeader = false,
 }: Props) {
   const { t } = useTranslation();
   const { selectedRows, setSelectedRows, setIsSelectionActive } =
@@ -228,17 +250,43 @@ export default function GenericUnpaginatedPage({
 
   const rowKeys = useMemo(
     () =>
-      displayFields.map((f) => ({
-        key: f.name,
-        isImage: (f.type || "").toLowerCase() === "image",
-        isDate: (f.type || "").toLowerCase() === "date",
-      })),
-    [displayFields]
+      displayFields.map((f) => {
+        const fieldType = (f.type || "").toLowerCase();
+        const rowKey: {
+          key: string;
+          isImage?: boolean;
+          isDate?: boolean;
+          isBoolean?: boolean;
+          node?: (row: GenericItem) => React.ReactNode;
+        } = {
+          key: f.name,
+          isImage: fieldType === "image",
+          isDate: fieldType === "date",
+          isBoolean: fieldType === "boolean" || fieldType === "bool",
+        };
+
+        // Add node function for boolean fields
+        if (rowKey.isBoolean) {
+          rowKey.node = (row: GenericItem) => (
+            <CheckSwitch
+              checked={!!row[f.name]}
+              onChange={() => {
+                updateDynamicItem(row._id, {
+                  [f.name]: !row[f.name],
+                });
+              }}
+            />
+          );
+        }
+
+        return rowKey;
+      }),
+    [displayFields, updateDynamicItem]
   );
 
   const columns = useMemo(() => {
     const baseCols = displayFields.map((f) => ({
-      key: t(humanize(f.name)),
+      key: t(getFieldLabel(f)),
       isSortable: true,
       correspondingKey: f.name,
     }));
@@ -251,7 +299,7 @@ export default function GenericUnpaginatedPage({
   const { inputs, formKeys } = useMemo(() => {
     const ins = displayFields.map((f) => {
       const m = fieldToInput(f);
-      const label = t(humanize(f.name));
+      const label = t(getFieldLabel(f));
       return {
         type: m.inputType,
         formKey: f.name,
@@ -378,7 +426,7 @@ export default function GenericUnpaginatedPage({
         })
         .map((f) => ({
           value: f.name,
-          label: t(humanize(f.name)),
+          label: t(getFieldLabel(f)),
         })),
     [displayFields, t]
   );
@@ -416,7 +464,7 @@ export default function GenericUnpaginatedPage({
       .filter((f) => chosen.has(f.name))
       .map((f) => {
         const m = fieldToInput(f);
-        const label = t(humanize(f.name));
+        const label = t(getFieldLabel(f));
         return {
           type: m.inputType,
           formKey: f.name,
@@ -437,9 +485,38 @@ export default function GenericUnpaginatedPage({
 
     const chosen = new Set(bulkSelectedKeys);
     const updates: Partial<GenericItem> = {};
+
+    // Convert values to proper types before submission
     for (const k of Object.keys(bulkForm)) {
-      if (chosen.has(k)) updates[k] = bulkForm[k];
+      if (chosen.has(k)) {
+        const formKey = bulkFormKeys.find((fk) => fk.key === k);
+        let value = bulkForm[k];
+
+        // Convert boolean values - ensure false default
+        if (formKey?.type === FormKeyTypeEnum.BOOLEAN) {
+          if (value === undefined || value === null || value === "") {
+            value = false;
+          } else if (typeof value === "string") {
+            value = value === "true";
+          } else if (typeof value !== "boolean") {
+            value = false;
+          }
+        }
+
+        // Convert number values from string to actual number
+        if (formKey?.type === FormKeyTypeEnum.NUMBER) {
+          if (typeof value === "string" && value !== "") {
+            const numValue = Number(value);
+            if (!isNaN(numValue)) {
+              value = numValue;
+            }
+          }
+        }
+
+        updates[k] = value;
+      }
     }
+
     const items = (selectedRows as GenericItem[]).map((r) => ({
       _id: r._id,
       updates,
@@ -455,6 +532,7 @@ export default function GenericUnpaginatedPage({
     isBulkStepTwo,
     bulkForm,
     bulkSelectedKeys,
+    bulkFormKeys,
     selectedRows,
     updateMultipleDynamicItem,
     setSelectedRows,
@@ -483,10 +561,23 @@ export default function GenericUnpaginatedPage({
         : [];
       if (selectedKeys.length > 0) {
         setBulkSelectedKeys(selectedKeys);
+
+        // Initialize boolean fields to false for the selected fields
+        const initialBulkValues: Record<string, unknown> = {};
+        displayFields
+          .filter((f) => selectedKeys.includes(f.name))
+          .forEach((f) => {
+            const m = fieldToInput(f);
+            if (m.formKeyType === FormKeyTypeEnum.BOOLEAN) {
+              initialBulkValues[f.name] = false;
+            }
+          });
+
+        setBulkForm((prev) => ({ ...prev, ...initialBulkValues }));
         setIsBulkStepTwo(true);
       }
     }
-  }, [isBulkStepTwo, bulkForm]);
+  }, [isBulkStepTwo, bulkForm, displayFields]);
 
   const handleBulkDeleteConfirm = useCallback(() => {
     deleteMultipleDynamicItem(
@@ -515,7 +606,23 @@ export default function GenericUnpaginatedPage({
       })
       .map((f) => {
         const m = fieldToInput(f);
-        const label = t(humanize(f.name));
+        const label = t(getFieldLabel(f));
+
+        // Convert boolean fields to SELECT input for filter panel
+        if (m.inputType === InputTypes.CHECKBOX) {
+          return {
+            type: InputTypes.SELECT,
+            formKey: f.name,
+            label,
+            placeholder: label,
+            required: false,
+            options: [
+              { value: "true", label: t("True") },
+              { value: "false", label: t("False") },
+            ],
+          };
+        }
+
         return {
           type: m.inputType,
           formKey: f.name,
@@ -633,22 +740,25 @@ export default function GenericUnpaginatedPage({
   const rows = useMemo(() => items || [], [items]);
 
   return (
-    <div className="w-[95%] mx-auto">
-      <GenericTable
-        rowKeys={rowKeys}
-        actions={actions}
-        columns={columns}
-        rows={rows}
-        title={t(humanize(schemaName))}
-        addButton={addButton}
-        isCollapsible={false}
-        isActionsActive={actionsEnabled}
-        selectionActions={selectionActions}
-        isExcel={!hasImageField}
-        onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
-        filters={filters}
-        filterPanel={filterPanel}
-      />
-    </div>
+    <>
+      {isHeader && <Header />}
+      <div className={isHeader ? "w-[98%] mx-auto my-10" : "w-[95%] mx-auto"}>
+        <GenericTable
+          rowKeys={rowKeys}
+          actions={actions}
+          columns={columns}
+          rows={rows}
+          title={t(humanize(schemaName))}
+          addButton={addButton}
+          isCollapsible={false}
+          isActionsActive={actionsEnabled}
+          selectionActions={selectionActions}
+          isExcel={!hasImageField}
+          onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
+          filters={filters}
+          filterPanel={filterPanel}
+        />
+      </div>
+    </>
   );
 }

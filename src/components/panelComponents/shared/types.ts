@@ -48,6 +48,7 @@ export interface RowKeyType<T> {
   isOptional?: boolean;
   isImage?: boolean;
   isDate?: boolean;
+  isBoolean?: boolean;
   className?: string;
   options?: {
     label: string;
