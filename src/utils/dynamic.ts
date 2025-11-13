@@ -306,24 +306,31 @@ export function useGetDynamicItems<T>(
   schemaName: string,
   filters?: FormElementsState
 ) {
-  const queryParams: Record<string, unknown> = { schemaName };
+  const parts = [`schemaName=${schemaName}`];
 
   // Add filter parameters if provided
   if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         if (Array.isArray(value)) {
-          queryParams[key] = value.join(",");
+          // Send each array value as a separate parameter with the same key
+          // This creates: age=gt-32&age=lt-123
+          value.forEach((item) => {
+            if (item !== undefined && item !== null && item !== "") {
+              parts.push(`${key}=${encodeURIComponent(String(item))}`);
+            }
+          });
         } else if (value instanceof Date) {
-          queryParams[key] = value.toISOString();
+          parts.push(`${key}=${value.toISOString()}`);
         } else {
-          queryParams[key] = value;
+          parts.push(`${key}=${encodeURIComponent(String(value))}`);
         }
       }
     });
   }
 
-  const path = `${BASE}?${qs(queryParams)}`;
+  const queryString = parts.join("&");
+  const path = `${BASE}?${queryString}`;
   const queryKey = filters
     ? (["dynamic", schemaName, "all", filters] as const)
     : listKey(schemaName);
@@ -368,11 +375,11 @@ export function useGetPaginatedItems<T>(
       value !== ""
     ) {
       if (Array.isArray(value)) {
-        // For arrays, send each value as a separate parameter with the same key
-        // This allows age=lte-32&age=gt-123
-        value.forEach((val) => {
-          if (val !== undefined && val !== null && val !== "") {
-            parts.push(`${key}=${encodeURIComponent(String(val))}`);
+        // For arrays, send each value as a separate query parameter with the same key
+        // This creates: age=gt-32&age=lt-123
+        value.forEach((item) => {
+          if (item !== undefined && item !== null && item !== "") {
+            parts.push(`${key}=${encodeURIComponent(String(item))}`);
           }
         });
       } else if (value instanceof Date) {

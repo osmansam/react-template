@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IoIosClose } from "react-icons/io";
-import { IoAddCircleOutline } from "react-icons/io5";
 import { ActionMeta, MultiValue, SingleValue } from "react-select";
 import { useGeneralContext } from "../../../context/General.context";
 import { FormElementsState, FormElementValue } from "../../../types";
@@ -29,9 +28,9 @@ const FilterPanel = ({
   const [tempFormElements, setTempFormElements] =
     useState<FormElementsState>(formElements);
 
-  // Track operators for number inputs
+  // Track operators for number inputs - now supporting two conditions per field
   const [numberOperators, setNumberOperators] = useState<
-    Record<string, string>
+    Record<string, { first: string; second: string }>
   >({});
 
   // Sync tempFormElements with formElements when not in apply button mode
@@ -183,39 +182,57 @@ const FilterPanel = ({
                 <label className="text-sm font-medium text-gray-700">
                   {input.label}
                 </label>
-                <div className="flex flex-row gap-2">
+                {/* First condition */}
+                <div className="flex flex-row gap-2 items-center">
                   <select
-                    value={numberOperators[input.formKey] || "="}
+                    value={numberOperators[input.formKey]?.first || "="}
                     onChange={(e) => {
                       const operator = e.target.value;
                       setNumberOperators((prev) => ({
                         ...prev,
-                        [input.formKey]: operator,
+                        [input.formKey]: {
+                          first: operator,
+                          second: prev[input.formKey]?.second || "=",
+                        },
                       }));
 
-                      // Update the form element with operator prefix
-                      const rawValue = String(value).replace(
-                        /^(gte-|gt-|lte-|lt-)/,
-                        ""
-                      );
-                      if (rawValue) {
-                        const newValue =
+                      // Get current array or create new one
+                      const currentArray = Array.isArray(value) ? value : [];
+                      const secondValue = currentArray[1] || "";
+
+                      // Extract raw value from first position
+                      const firstRaw = currentArray[0]
+                        ? String(currentArray[0]).replace(
+                            /^(gte-|gt-|lte-|lt-)/,
+                            ""
+                          )
+                        : "";
+
+                      if (firstRaw) {
+                        const newFirstValue =
                           operator === "="
-                            ? rawValue
-                            : `${operator}-${rawValue}`;
+                            ? firstRaw
+                            : `${operator}-${firstRaw}`;
+                        const newArray: string[] = [
+                          newFirstValue,
+                          secondValue,
+                        ].filter((v) => v !== "") as string[];
+
                         isApplyButtonActive
                           ? setTempFormElements((prev) => ({
                               ...prev,
-                              [input.formKey]: newValue,
+                              [input.formKey]:
+                                newArray.length > 0 ? newArray : "",
                             }))
                           : setFormElements((prev) => ({
                               ...prev,
-                              [input.formKey]: newValue,
+                              [input.formKey]:
+                                newArray.length > 0 ? newArray : "",
                             }));
                       }
                     }}
-                    className={`border border-gray-300 rounded-md px-4 mt-auto py-2.5 text-sm w-20 h-[42px] ${
-                      (numberOperators[input.formKey] || "=") === "="
+                    className={`border border-gray-300 rounded-md px-4 py-2.5 text-sm w-20 h-[42px] ${
+                      (numberOperators[input.formKey]?.first || "=") === "="
                         ? "opacity-30"
                         : ""
                     }`}
@@ -227,18 +244,147 @@ const FilterPanel = ({
                     <option value="lt">&lt;</option>
                   </select>
                   <TextInput
-                    key={input.formKey}
+                    key={`${input.formKey}-first`}
                     type={input.type}
-                    value={String(value).replace(/^(gte-|gt-|lte-|lt-)/, "")}
+                    value={
+                      Array.isArray(value) && value[0]
+                        ? String(value[0]).replace(/^(gte-|gt-|lte-|lt-)/, "")
+                        : ""
+                    }
                     label=""
                     placeholder={input.placeholder ?? ""}
                     onChange={(newValue) => {
-                      const operator = numberOperators[input.formKey] || "=";
-                      const finalValue =
+                      const operator =
+                        numberOperators[input.formKey]?.first || "=";
+                      const finalFirstValue =
                         operator === "="
                           ? String(newValue)
                           : `${operator}-${newValue}`;
-                      handleChange(input.formKey)(finalValue);
+
+                      const currentArray = Array.isArray(value) ? value : [];
+                      const secondValue = currentArray[1] || "";
+
+                      const newArray: string[] = [
+                        finalFirstValue,
+                        secondValue,
+                      ].filter((v) => v !== "") as string[];
+
+                      isApplyButtonActive
+                        ? setTempFormElements((prev) => ({
+                            ...prev,
+                            [input.formKey]:
+                              newArray.length > 0 ? newArray : "",
+                          }))
+                        : setFormElements((prev) => ({
+                            ...prev,
+                            [input.formKey]:
+                              newArray.length > 0 ? newArray : "",
+                          }));
+                    }}
+                    isDatePicker={false}
+                    isOnClearActive={false}
+                    isDebounce={input?.isDebounce ?? false}
+                  />
+                </div>
+
+                {/* Second condition */}
+                <div className="flex flex-row gap-2 items-center">
+                  <select
+                    value={numberOperators[input.formKey]?.second || "="}
+                    onChange={(e) => {
+                      const operator = e.target.value;
+                      setNumberOperators((prev) => ({
+                        ...prev,
+                        [input.formKey]: {
+                          first: prev[input.formKey]?.first || "=",
+                          second: operator,
+                        },
+                      }));
+
+                      // Get current array or create new one
+                      const currentArray = Array.isArray(value) ? value : [];
+                      const firstValue = currentArray[0] || "";
+
+                      // Extract raw value from second position
+                      const secondRaw = currentArray[1]
+                        ? String(currentArray[1]).replace(
+                            /^(gte-|gt-|lte-|lt-)/,
+                            ""
+                          )
+                        : "";
+
+                      if (secondRaw) {
+                        const newSecondValue =
+                          operator === "="
+                            ? secondRaw
+                            : `${operator}-${secondRaw}`;
+                        const newArray: string[] = [
+                          firstValue,
+                          newSecondValue,
+                        ].filter((v) => v !== "") as string[];
+
+                        isApplyButtonActive
+                          ? setTempFormElements((prev) => ({
+                              ...prev,
+                              [input.formKey]:
+                                newArray.length > 0 ? newArray : "",
+                            }))
+                          : setFormElements((prev) => ({
+                              ...prev,
+                              [input.formKey]:
+                                newArray.length > 0 ? newArray : "",
+                            }));
+                      }
+                    }}
+                    className={`border border-gray-300 rounded-md px-4 py-2.5 text-sm w-20 h-[42px] ${
+                      (numberOperators[input.formKey]?.second || "=") === "="
+                        ? "opacity-30"
+                        : ""
+                    }`}
+                  >
+                    <option value="=">=</option>
+                    <option value="gte">&gt;=</option>
+                    <option value="gt">&gt;</option>
+                    <option value="lte">&lt;=</option>
+                    <option value="lt">&lt;</option>
+                  </select>
+                  <TextInput
+                    key={`${input.formKey}-second`}
+                    type={input.type}
+                    value={
+                      Array.isArray(value) && value[1]
+                        ? String(value[1]).replace(/^(gte-|gt-|lte-|lt-)/, "")
+                        : ""
+                    }
+                    label=""
+                    placeholder={input.placeholder ?? ""}
+                    onChange={(newValue) => {
+                      const operator =
+                        numberOperators[input.formKey]?.second || "=";
+                      const finalSecondValue =
+                        operator === "="
+                          ? String(newValue)
+                          : `${operator}-${newValue}`;
+
+                      const currentArray = Array.isArray(value) ? value : [];
+                      const firstValue = currentArray[0] || "";
+
+                      const newArray: string[] = [
+                        firstValue,
+                        finalSecondValue,
+                      ].filter((v) => v !== "") as string[];
+
+                      isApplyButtonActive
+                        ? setTempFormElements((prev) => ({
+                            ...prev,
+                            [input.formKey]:
+                              newArray.length > 0 ? newArray : "",
+                          }))
+                        : setFormElements((prev) => ({
+                            ...prev,
+                            [input.formKey]:
+                              newArray.length > 0 ? newArray : "",
+                          }));
                     }}
                     isDatePicker={false}
                     isOnClearActive={input?.isOnClearActive}
@@ -255,7 +401,7 @@ const FilterPanel = ({
                           }));
                       setNumberOperators((prev) => ({
                         ...prev,
-                        [input.formKey]: "=",
+                        [input.formKey]: { first: "=", second: "=" },
                       }));
                     }}
                   />
