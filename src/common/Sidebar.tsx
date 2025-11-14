@@ -7,7 +7,7 @@ import { IoIosLogOut } from "react-icons/io";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGeneralContext } from "../context/General.context";
 import { useFilteredRoutes } from "../hooks/useFilteredRoutes";
-import { getMenuIcon } from "../utils/menuIcons";
+import { getIconByName, getMenuIcon } from "../utils/menuIcons";
 import SidebarTooltip from "./SidebarTooltip";
 
 export const Sidebar = () => {
@@ -109,7 +109,12 @@ export const Sidebar = () => {
               */
 
               if (filteredRouteChildren && filteredRouteChildren?.length > 1) {
-                const IconComponent = getMenuIcon(route.name);
+                // If route.icon exists and looks like an icon name (starts with 2+ capital letters like "MdCard", "FaHeart"), use getIconByName
+                // Otherwise, use getMenuIcon with the route name
+                const IconComponent =
+                  route.icon && /^[A-Z][a-z]+[A-Z]/.test(route.icon)
+                    ? getIconByName(route.icon)
+                    : getMenuIcon(route.icon || route.name);
                 return (
                   <div key={route.name}>
                     <SidebarTooltip content={t(route.name)}>
@@ -188,9 +193,12 @@ export const Sidebar = () => {
                 filteredRouteChildren?.length === 1
               ) {
                 if (!filteredRouteChildren[0].isOnSidebar) return null;
-                const IconComponent = getMenuIcon(
-                  filteredRouteChildren[0].name
-                );
+                const child = filteredRouteChildren[0];
+                // If child.icon exists and looks like an icon name, use getIconByName
+                const IconComponent =
+                  child.icon && /^[A-Z][a-z]+[A-Z]/.test(child.icon)
+                    ? getIconByName(child.icon)
+                    : getMenuIcon(child.icon || child.name);
                 return (
                   <SidebarTooltip
                     key={filteredRouteChildren[0].name}
@@ -241,7 +249,11 @@ export const Sidebar = () => {
               }
 
               if (!route.isOnSidebar) return null;
-              const IconComponent = getMenuIcon(route.icon || route.name);
+              // If route.icon exists and looks like an icon name, use getIconByName
+              const IconComponent =
+                route.icon && /^[A-Z][a-z]+[A-Z]/.test(route.icon)
+                  ? getIconByName(route.icon)
+                  : getMenuIcon(route.icon || route.name);
               return (
                 <SidebarTooltip key={route.name} content={t(route.name)}>
                   <button

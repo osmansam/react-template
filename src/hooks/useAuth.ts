@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUserContext } from "../context/User.context";
+import { PublicRoutes } from "../navigation/constants";
 import { ACCESS_TOKEN } from "../utils/api/axiosClient";
-import { Paths } from "../utils/api/factory";
 // import { getUserWithToken } from "../utils/api/user";
 
 const useAuth = () => {
@@ -15,7 +15,7 @@ const useAuth = () => {
       if (user) return;
       const token = localStorage.getItem(ACCESS_TOKEN);
       if (!token) {
-        navigate(Paths.Login, {
+        navigate(PublicRoutes.Login, {
           replace: true,
           state: { from: location },
         });
@@ -25,7 +25,7 @@ const useAuth = () => {
           // setUser(loggedInUser);
         } catch (e) {
           console.log(e);
-          navigate(Paths.Login, {
+          navigate(PublicRoutes.Login, {
             replace: true,
             state: { from: location },
           });
@@ -36,7 +36,7 @@ const useAuth = () => {
     const handleStorageEvent = (event: StorageEvent) => {
       if (event.key === "loggedOut" && event.newValue === "true") {
         setUser(undefined);
-        navigate(Paths.Login, {
+        navigate(PublicRoutes.Login, {
           replace: true,
         });
       }

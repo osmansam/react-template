@@ -1,4 +1,19 @@
 import { IconType } from "react-icons";
+import * as AiIcons from "react-icons/ai";
+import * as BiIcons from "react-icons/bi";
+import * as BsIcons from "react-icons/bs";
+import * as CgIcons from "react-icons/cg";
+import * as DiIcons from "react-icons/di";
+import * as FaIcons from "react-icons/fa";
+import * as FcIcons from "react-icons/fc";
+import * as FiIcons from "react-icons/fi";
+import * as GiIcons from "react-icons/gi";
+import * as GoIcons from "react-icons/go";
+import * as GrIcons from "react-icons/gr";
+import * as HiIcons from "react-icons/hi";
+import * as ImIcons from "react-icons/im";
+import * as IoIcons from "react-icons/io";
+import * as MdIcons from "react-icons/md";
 import {
   MdAccountBalanceWallet,
   MdAddShoppingCart,
@@ -48,6 +63,11 @@ import {
   MdVerifiedUser,
   MdWarning,
 } from "react-icons/md";
+import * as RiIcons from "react-icons/ri";
+import * as SiIcons from "react-icons/si";
+import * as SlIcons from "react-icons/sl";
+import * as TbIcons from "react-icons/tb";
+import * as TiIcons from "react-icons/ti";
 
 export const getMenuIcon = (menuName: string): IconType => {
   const iconMap: { [key: string]: IconType } = {
@@ -139,57 +159,37 @@ export const getMenuIcon = (menuName: string): IconType => {
   return iconMap[menuName] || MdSpaceDashboard;
 };
 
-// Get icon by icon component name (e.g., "MdSportsEsports")
+// Get icon by icon component name dynamically from react-icons
 export const getIconByName = (iconName: string): IconType => {
-  const iconComponentMap: { [key: string]: IconType } = {
-    MdAccountBalanceWallet,
-    MdAddShoppingCart,
-    MdAdminPanelSettings,
-    MdArchive,
-    MdAssessment,
-    MdAttachMoney,
-    MdBarChart,
-    MdBuild,
-    MdCardGiftcard,
-    MdChecklist,
-    MdDeliveryDining,
-    MdDescription,
-    MdEventAvailable,
-    MdExtension,
-    MdFeedback,
-    MdFilePresent,
-    MdFolder,
-    MdImage,
-    MdInventory2,
-    MdLink,
-    MdListAlt,
-    MdLocalOffer,
-    MdLocalShipping,
-    MdLocationOn,
-    MdLock,
-    MdMenuBook,
-    MdNotifications,
-    MdPerson,
-    MdPlaylistAddCheck,
-    MdPointOfSale,
-    MdReceipt,
-    MdSchedule,
-    MdSchool,
-    MdSettings,
-    MdShoppingBag,
-    MdShoppingCart,
-    MdSort,
-    MdSpaceDashboard,
-    MdSportsEsports,
-    MdStorefront,
-    MdSummarize,
-    MdSupervisorAccount,
-    MdTableRestaurant,
-    MdTimer,
-    MdTrendingUp,
-    MdVerifiedUser,
-    MdWarning,
+  // Default icon if not found
+  const defaultIcon = MdIcons.MdSpaceDashboard;
+
+  if (!iconName) return defaultIcon;
+
+  // Combine all icon libraries
+  const allIcons = {
+    ...MdIcons,
+    ...FaIcons,
+    ...AiIcons,
+    ...BsIcons,
+    ...BiIcons,
+    ...DiIcons,
+    ...FiIcons,
+    ...FcIcons,
+    ...GiIcons,
+    ...GoIcons,
+    ...GrIcons,
+    ...HiIcons,
+    ...ImIcons,
+    ...IoIcons,
+    ...RiIcons,
+    ...SiIcons,
+    ...SlIcons,
+    ...TbIcons,
+    ...TiIcons,
+    ...CgIcons,
   };
 
-  return iconComponentMap[iconName] || MdSpaceDashboard;
+  // Return the icon if it exists, otherwise return default
+  return (allIcons as any)[iconName] || defaultIcon;
 };

@@ -5,6 +5,16 @@ import { useDynamicPages } from "../hooks/useDynamicPages";
 import { allRoutes, PublicRoutes } from "./constants";
 import { PrivateRoutes } from "./PrivateRoutes";
 
+interface RouteConfig {
+  name: string;
+  path?: string;
+  isOnSidebar: boolean;
+  icon?: string;
+  element?: () => JSX.Element;
+  children?: RouteConfig[];
+  link?: string;
+}
+
 const RouterContainer = () => {
   const { dynamicRoutes } = useDynamicPages();
 
@@ -15,11 +25,11 @@ const RouterContainer = () => {
 
   // Flatten routes to include children
   const flattenedRoutes = useMemo(() => {
-    const routes: any[] = [];
+    const routes: RouteConfig[] = [];
     combinedRoutes.forEach((route) => {
       if (route.children) {
         // Add all children routes
-        route.children.forEach((child: any) => {
+        route.children.forEach((child: RouteConfig) => {
           if (child.path) {
             routes.push(child);
           }

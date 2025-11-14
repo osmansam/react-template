@@ -2,22 +2,7 @@ import { useMemo } from "react";
 import GenericPaginatedPage from "../components/panelComponents/FormElements/GenericPaginatedPage";
 import GenericTabPage from "../components/panelComponents/FormElements/GenericTabPage";
 import GenericUnpaginatedPage from "../components/panelComponents/FormElements/GenericUnpaginatedPage";
-import { useGetDynamicItems } from "../utils/dynamic";
-
-interface PageSchema {
-  schemaName: string;
-  label?: string;
-  isPaginated?: boolean; // Add isPaginated prop
-  icon?: string; // Add icon for individual schemas in tabs
-}
-
-interface Page {
-  _id: string;
-  name: string;
-  icon?: string; // Icon name from page data
-  schemas?: PageSchema[]; // Optional top-level schemas
-  page?: Page; // Single nested page
-}
+import { Page, PageSchema, useGetAllPages } from "../utils/api/page";
 
 interface DynamicRoute {
   name: string;
@@ -26,11 +11,12 @@ interface DynamicRoute {
   icon?: string; // Icon name from page data
   element?: () => JSX.Element;
   children?: DynamicRoute[]; // Support nested routes
+  link?: string; // External link (optional)
 }
 
 export const useDynamicPages = () => {
-  // Fetch all pages from the "page" schema
-  const pages = useGetDynamicItems<Page>("page");
+  // Fetch all pages from the page API
+  const pages = useGetAllPages();
 
   // Helper function to create a route from a page's schemas
   const createRouteFromSchemas = (

@@ -132,7 +132,7 @@ export const GeneralContextProvider = ({ children }: PropsWithChildren) => {
   const [userPageActiveTab, setUserPageActiveTab] = useState<number>(0);
 
   const [isSelectionActive, setIsSelectionActive] = useState<boolean>(false);
-  const [rowsPerPage, setRowsPerPage] = useState<number>(RowPerPageEnum.THIRD);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(RowPerPageEnum.FIRST);
 
   const [tableColumns, setTableColumns] = useState<{
     [key: string]: ColumnType[];

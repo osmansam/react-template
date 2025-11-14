@@ -69,3 +69,6 @@ export async function patch<P, R>({
 export async function remove<R>({ path }: BaseRequest): Promise<R> {
   return axiosClient.delete(`${path}`);
 }
+
+// Export page API
+export * from "./page";

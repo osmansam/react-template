@@ -2,7 +2,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
-type WSInvalidateEvent = { type: "invalidate"; schema: string; ts?: number };
+type WSInvalidateEvent =
+  | { type: "invalidate"; schema: string; ts?: number }
+  | { type: "pageChanged"; ts?: number };
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
@@ -25,6 +27,7 @@ export function useWebSocket() {
     }
 
     const WS_URL = toWsUrl(API_URL, "/ws");
+    const state = stateRef.current;
 
     const connect = () => {
       const ws = new WebSocket(WS_URL);
@@ -32,13 +35,26 @@ export function useWebSocket() {
 
       ws.onopen = () => {
         console.log("WS connected:", WS_URL);
-        stateRef.current.delay = 1000;
+        state.delay = 1000;
       };
 
       ws.onmessage = async (evt) => {
         try {
           const msg: WSInvalidateEvent = JSON.parse(evt.data);
           console.log("WS message received:", msg);
+
+          // Handle pageChanged event
+          if (msg?.type === "pageChanged") {
+            console.log("WS: Page data changed, invalidating page queries");
+            await queryClient.invalidateQueries({
+              queryKey: ["page"],
+              type: "all",
+              exact: false,
+            });
+            return;
+          }
+
+          // Handle schema invalidate event
           if (msg?.type !== "invalidate" || !msg?.schema) return;
           console.log("WS invalidating queries for schema:", msg.schema);
           await queryClient.invalidateQueries({
@@ -65,17 +81,17 @@ export function useWebSocket() {
 
       ws.onclose = () => {
         console.log("WS disconnected. Reconnecting...");
-        if (stateRef.current.userClosed) return;
-        const d = stateRef.current.delay;
+        if (state.userClosed) return;
+        const d = state.delay;
         setTimeout(connect, d);
-        stateRef.current.delay = Math.min(d + 1000, 5000);
+        state.delay = Math.min(d + 1000, 5000);
       };
     };
 
     connect();
 
     return () => {
-      stateRef.current.userClosed = true;
+      state.userClosed = true;
       try {
         wsRef.current?.close();
       } catch {
