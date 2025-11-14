@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 
 type WSInvalidateEvent =
   | { type: "invalidate"; schema: string; ts?: number }
-  | { type: "pageChanged"; ts?: number };
+  | { type: "pageChanged"; ts?: number }
+  | { type: "containerChanged"; ts?: number };
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
@@ -48,6 +49,19 @@ export function useWebSocket() {
             console.log("WS: Page data changed, invalidating page queries");
             await queryClient.invalidateQueries({
               queryKey: ["page"],
+              type: "all",
+              exact: false,
+            });
+            return;
+          }
+
+          // Handle containerChanged event
+          if (msg?.type === "containerChanged") {
+            console.log(
+              "WS: Container data changed, invalidating container queries"
+            );
+            await queryClient.invalidateQueries({
+              queryKey: ["container"],
               type: "all",
               exact: false,
             });

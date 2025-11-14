@@ -24,6 +24,7 @@ import {
   FormElementsState,
   RowPerPageEnum,
 } from "../../../types";
+import { Field } from "../../../utils/api/container";
 import {
   outsideSearch,
   OutsideSearchProps,
@@ -95,6 +96,7 @@ type Props<T> = {
   showOrientationToggle?: boolean;
   onExcelUpload?: (items: Partial<T>[]) => void;
   dateFormat?: DateFormatEnum;
+  containerFields?: Field[]; // Add container fields for type conversion
 };
 
 const GenericTable = <T,>({
@@ -139,8 +141,46 @@ const GenericTable = <T,>({
   showOrientationToggle,
   onExcelUpload,
   dateFormat = DEFAULT_DATE_FORMAT,
+  containerFields,
 }: Props<T>) => {
   const { t } = useTranslation();
+
+  // Helper function to convert value based on field type
+  const convertValueByType = (value: unknown, fieldType: string): unknown => {
+    if (value === null || value === undefined || value === "") {
+      return value;
+    }
+
+    const type = fieldType.toLowerCase();
+
+    // Handle number types (int, float, double, number, etc.)
+    if (
+      type.includes("int") ||
+      type.includes("float") ||
+      type.includes("double") ||
+      type === "number"
+    ) {
+      const num = Number(value);
+      return isNaN(num) ? value : num;
+    }
+
+    // Handle boolean types
+    if (type === "boolean" || type === "bool") {
+      if (typeof value === "boolean") return value;
+      const strValue = String(value).toLowerCase();
+      return strValue === "true" || strValue === "1";
+    }
+
+    // Handle date types
+    if (type === "date" || type === "datetime") {
+      if (value instanceof Date) return value;
+      const dateValue = new Date(value as string);
+      return isNaN(dateValue.getTime()) ? value : dateValue;
+    }
+
+    // Default: return as-is
+    return value;
+  };
 
   // Helper function to format dates
   const formatDate = (value: unknown): string | null => {
@@ -261,13 +301,26 @@ const GenericTable = <T,>({
 
           console.log("Column map:", Array.from(columnMap.entries()));
 
+          // Create a field type map for quick lookup
+          const fieldTypeMap = new Map<string, string>();
+          if (containerFields) {
+            containerFields.forEach((field) => {
+              fieldTypeMap.set(field.name, field.type);
+            });
+          }
+
           const items = data.slice(1).map((row) => {
             const item: Record<string, unknown> = {};
             (row as unknown[]).forEach((cell: unknown, index: number) => {
               const header = headers[index];
               const fieldKey = columnMap.get(header);
               if (fieldKey) {
-                item[fieldKey] = cell;
+                // Convert value based on field type if available
+                const fieldType = fieldTypeMap.get(fieldKey);
+                const convertedValue = fieldType
+                  ? convertValueByType(cell, fieldType)
+                  : cell;
+                item[fieldKey] = convertedValue;
               }
             });
             return item;

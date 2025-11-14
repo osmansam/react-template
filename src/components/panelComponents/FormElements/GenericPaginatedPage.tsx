@@ -824,6 +824,7 @@ export default function GenericPaginatedPage({
           onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
           filters={filters}
           filterPanel={filterPanel}
+          containerFields={container?.fields}
         />
       </div>
     </>

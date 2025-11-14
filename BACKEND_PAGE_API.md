@@ -150,6 +150,8 @@ type Page struct {
 
 ## WebSocket Events
 
+### Page Changes
+
 When a page is created, updated, or deleted, broadcast this WebSocket message:
 
 ```json
@@ -160,6 +162,31 @@ When a page is created, updated, or deleted, broadcast this WebSocket message:
 ```
 
 This will trigger the frontend to refetch all page data automatically.
+
+### Container Changes
+
+When a container is created, updated, or deleted, broadcast this WebSocket message:
+
+```json
+{
+  "type": "containerChanged",
+  "ts": 1699900800000
+}
+```
+
+This will trigger the frontend to refetch all container data automatically.
+
+### Schema Changes
+
+For dynamic schema changes, use the existing format:
+
+```json
+{
+  "type": "invalidate",
+  "schema": "schemaName",
+  "ts": 1699900800000
+}
+```
 
 ## Implementation Reference
 
@@ -210,7 +237,10 @@ func DeletePage(c *fiber.Ctx) error {
 
 ## Important Notes
 
-1. **WebSocket Broadcasting**: Every mutation (create/update/delete) should broadcast a `pageChanged` event
+1. **WebSocket Broadcasting**: Every mutation (create/update/delete) should broadcast appropriate events:
+   - `pageChanged` for page mutations
+   - `containerChanged` for container mutations
+   - `invalidate` with schema name for dynamic schema mutations
 2. **Nested Pages**: The `page` field can contain another complete Page object (for nested structures)
 3. **Optional Fields**: All fields except `name` are optional
 4. **Icon Names**: Icons use react-icons component names (e.g., "MdCardGiftcard", "FaHeart")
@@ -222,8 +252,11 @@ The frontend will:
 
 - Fetch pages on app load using `useGetAllPages()`
 - Auto-generate routes from page data
-- Listen for `pageChanged` WebSocket events
-- Automatically refetch when pages are modified
+- Listen for WebSocket events:
+  - `pageChanged` - refetches all page queries
+  - `containerChanged` - refetches all container queries
+  - `invalidate` - refetches specific schema queries
+- Automatically refetch when data is modified
 - Display pages in the sidebar with dynamic icons
 
 ## Testing
