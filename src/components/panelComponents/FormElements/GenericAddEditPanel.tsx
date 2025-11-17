@@ -148,6 +148,11 @@ const GenericAddEditPanel = <T,>({
         case FormKeyTypeEnum.DATE:
           defaultValue = "";
           break;
+        case FormKeyTypeEnum.STRING_ARRAY:
+        case FormKeyTypeEnum.INT_ARRAY:
+        case FormKeyTypeEnum.NUMBER_ARRAY:
+          defaultValue = "";
+          break;
         default:
           defaultValue = null;
       }
@@ -159,11 +164,26 @@ const GenericAddEditPanel = <T,>({
   const mergedInitialState = { ...initialState, ...constantValues };
   const [formElements, setFormElements] = useState(() => {
     if (isEditMode && itemToEdit) {
+      const updates = itemToEdit.updates as unknown as FormElementsState;
+
+      // Convert arrays to comma-separated strings for editing
+      const processedUpdates = { ...updates };
+      formKeys.forEach(({ key, type }) => {
+        if (
+          (type === FormKeyTypeEnum.STRING_ARRAY ||
+            type === FormKeyTypeEnum.INT_ARRAY ||
+            type === FormKeyTypeEnum.NUMBER_ARRAY) &&
+          Array.isArray(updates[key])
+        ) {
+          processedUpdates[key] = updates[key].join(", ");
+        }
+      });
+
       // Merge with initialState to ensure boolean fields default to false if not present
       return {
         ...initialState,
         ...constantValues,
-        ...(itemToEdit.updates as unknown as FormElementsState),
+        ...processedUpdates,
       };
     }
     return mergedInitialState;
@@ -247,6 +267,53 @@ const GenericAddEditPanel = <T,>({
             if (!isNaN(numValue)) {
               convertedFormElements[formKey.key] = numValue;
             }
+          }
+        }
+
+        // Convert string array - split comma-separated values into array
+        if (formKey.type === FormKeyTypeEnum.STRING_ARRAY) {
+          if (typeof value === "string" && value !== "") {
+            // Split by comma and trim whitespace from each item
+            convertedFormElements[formKey.key] = value
+              .split(",")
+              .map((item) => item.trim())
+              .filter((item) => item !== "");
+          } else if (Array.isArray(value)) {
+            convertedFormElements[formKey.key] = value;
+          } else {
+            convertedFormElements[formKey.key] = [];
+          }
+        }
+
+        // Convert int array - split comma-separated values and parse to integers
+        if (formKey.type === FormKeyTypeEnum.INT_ARRAY) {
+          if (typeof value === "string" && value !== "") {
+            convertedFormElements[formKey.key] = value
+              .split(",")
+              .map((item) => parseInt(item.trim(), 10))
+              .filter((item) => !isNaN(item));
+          } else if (Array.isArray(value)) {
+            convertedFormElements[formKey.key] = value.map((item) =>
+              typeof item === "string" ? parseInt(item, 10) : item
+            );
+          } else {
+            convertedFormElements[formKey.key] = [];
+          }
+        }
+
+        // Convert number array - split comma-separated values and parse to numbers
+        if (formKey.type === FormKeyTypeEnum.NUMBER_ARRAY) {
+          if (typeof value === "string" && value !== "") {
+            convertedFormElements[formKey.key] = value
+              .split(",")
+              .map((item) => parseFloat(item.trim()))
+              .filter((item) => !isNaN(item));
+          } else if (Array.isArray(value)) {
+            convertedFormElements[formKey.key] = value.map((item) =>
+              typeof item === "string" ? parseFloat(item) : item
+            );
+          } else {
+            convertedFormElements[formKey.key] = [];
           }
         }
       });

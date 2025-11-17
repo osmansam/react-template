@@ -152,6 +152,69 @@ const GenericTable = <T,>({
     }
 
     const type = fieldType.toLowerCase();
+    const originalType = fieldType;
+
+    // Handle string array types
+    const isStringArray =
+      type === "stringarray" ||
+      originalType === "stringArray" ||
+      type === "string[]" ||
+      type === "array<string>";
+
+    if (isStringArray) {
+      if (Array.isArray(value)) return value;
+      if (typeof value === "string") {
+        return value
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item !== "");
+      }
+      return [];
+    }
+
+    // Handle int array types
+    const isIntArray =
+      type === "intarray" ||
+      originalType === "intArray" ||
+      type === "int[]" ||
+      type === "array<int>";
+
+    if (isIntArray) {
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => (typeof item === "string" ? parseInt(item, 10) : item))
+          .filter((item) => !isNaN(item as number));
+      }
+      if (typeof value === "string") {
+        return value
+          .split(",")
+          .map((item) => parseInt(item.trim(), 10))
+          .filter((item) => !isNaN(item));
+      }
+      return [];
+    }
+
+    // Handle number array types
+    const isNumberArray =
+      type === "numberarray" ||
+      originalType === "numberArray" ||
+      type === "number[]" ||
+      type === "array<number>";
+
+    if (isNumberArray) {
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => (typeof item === "string" ? parseFloat(item) : item))
+          .filter((item) => !isNaN(item as number));
+      }
+      if (typeof value === "string") {
+        return value
+          .split(",")
+          .map((item) => parseFloat(item.trim()))
+          .filter((item) => !isNaN(item));
+      }
+      return [];
+    }
 
     // Handle number types (int, float, double, number, etc.)
     if (

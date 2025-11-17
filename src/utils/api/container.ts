@@ -10,6 +10,7 @@ export interface Field {
   type: string;
   tag?: string;
   objectSchemaName?: string;
+  enumList?: (string | number)[];
   isForceDelete?: boolean;
   unique?: boolean;
   isHashed?: boolean;

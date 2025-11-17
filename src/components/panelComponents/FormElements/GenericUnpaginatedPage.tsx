@@ -39,6 +39,8 @@ type RawField = {
   Tag?: string;
   objectSchemaName?: string;
   ObjectSchemaName?: string;
+  enumList?: (string | number)[];
+  EnumList?: (string | number)[];
   isForceDelete?: boolean;
   IsForceDelete?: boolean;
   unique?: boolean;
@@ -103,6 +105,7 @@ const normalizeField = (f: RawField): Field => ({
   type: f.type ?? f.Type ?? "",
   tag: f.tag ?? f.Tag,
   objectSchemaName: f.objectSchemaName ?? f.ObjectSchemaName,
+  enumList: f.enumList ?? f.EnumList,
   isForceDelete: f.isForceDelete ?? f.IsForceDelete,
   unique: f.unique ?? f.Unique,
   isHashed: f.isHashed ?? f.IsHashed,
@@ -142,7 +145,24 @@ const normalizeContainer = (c: RawContainer): ContainerModel => ({
 
 const isDisplayablePrimitive = (f: Field) => {
   const t = (f.type || "").toLowerCase();
-  return [
+  const originalType = f.type || "";
+
+  // Check for array types (both camelCase and lowercase)
+  const isArrayType =
+    t === "stringarray" ||
+    originalType === "stringArray" ||
+    t === "string[]" ||
+    t === "array<string>" ||
+    t === "intarray" ||
+    originalType === "intArray" ||
+    t === "int[]" ||
+    t === "array<int>" ||
+    t === "numberarray" ||
+    originalType === "numberArray" ||
+    t === "number[]" ||
+    t === "array<number>";
+
+  const isPrimitive = [
     "string",
     "number",
     "boolean",
@@ -153,10 +173,53 @@ const isDisplayablePrimitive = (f: Field) => {
     "image",
     "img",
   ].includes(t);
+
+  return isPrimitive || isArrayType;
 };
 
 function fieldToInput(field: Field) {
   const t = (field.type || "").toLowerCase();
+  const originalType = field.type || "";
+
+  // Check for string array types
+  const isStringArray =
+    t === "stringarray" ||
+    originalType === "stringArray" ||
+    t === "string[]" ||
+    t === "array<string>";
+
+  // Check for int array types
+  const isIntArray =
+    t === "intarray" ||
+    originalType === "intArray" ||
+    t === "int[]" ||
+    t === "array<int>";
+
+  // Check for number array types
+  const isNumberArray =
+    t === "numberarray" ||
+    originalType === "numberArray" ||
+    t === "number[]" ||
+    t === "array<number>";
+
+  if (isStringArray)
+    return {
+      inputType: InputTypes.TEXT as const,
+      formKeyType: FormKeyTypeEnum.STRING_ARRAY as const,
+    };
+
+  if (isIntArray)
+    return {
+      inputType: InputTypes.TEXT as const,
+      formKeyType: FormKeyTypeEnum.INT_ARRAY as const,
+    };
+
+  if (isNumberArray)
+    return {
+      inputType: InputTypes.TEXT as const,
+      formKeyType: FormKeyTypeEnum.NUMBER_ARRAY as const,
+    };
+
   if (["number", "int", "float", "double"].includes(t))
     return {
       inputType: InputTypes.NUMBER as const,
@@ -166,6 +229,11 @@ function fieldToInput(field: Field) {
     return {
       inputType: InputTypes.CHECKBOX as const,
       formKeyType: FormKeyTypeEnum.BOOLEAN as const,
+    };
+  if (["image", "img"].includes(t))
+    return {
+      inputType: InputTypes.IMAGE as const,
+      formKeyType: FormKeyTypeEnum.STRING as const,
     };
   if (["date", "datetime", "timestamp"].includes(t))
     return {
@@ -252,6 +320,24 @@ export default function GenericUnpaginatedPage({
     () =>
       displayFields.map((f) => {
         const fieldType = (f.type || "").toLowerCase();
+        const originalType = f.type || "";
+        const isStringArray =
+          fieldType === "stringarray" ||
+          originalType === "stringArray" ||
+          fieldType === "string[]" ||
+          fieldType === "array<string>";
+        const isIntArray =
+          fieldType === "intarray" ||
+          originalType === "intArray" ||
+          fieldType === "int[]" ||
+          fieldType === "array<int>";
+        const isNumberArray =
+          fieldType === "numberarray" ||
+          originalType === "numberArray" ||
+          fieldType === "number[]" ||
+          fieldType === "array<number>";
+        const isArray = isStringArray || isIntArray || isNumberArray;
+
         const rowKey: {
           key: string;
           isImage?: boolean;
@@ -277,6 +363,15 @@ export default function GenericUnpaginatedPage({
               }}
             />
           );
+        } else if (isArray) {
+          // Handle array types - display as comma-separated values
+          rowKey.node = (row: GenericItem) => {
+            const value = row[f.name];
+            if (Array.isArray(value)) {
+              return <span>{value.join(", ")}</span>;
+            }
+            return <span>{String(value || "")}</span>;
+          };
         }
 
         return rowKey;
@@ -300,6 +395,45 @@ export default function GenericUnpaginatedPage({
     const ins = displayFields.map((f) => {
       const m = fieldToInput(f);
       const label = t(getFieldLabel(f));
+
+      // Check if field has enumList
+      if (f.enumList && f.enumList.length > 0) {
+        const fieldType = (f.type || "").toLowerCase();
+        const originalType = f.type || "";
+
+        // Check if it's an array type
+        const isStringArray =
+          fieldType === "stringarray" ||
+          originalType === "stringArray" ||
+          fieldType === "string[]" ||
+          fieldType === "array<string>";
+        const isIntArray =
+          fieldType === "intarray" ||
+          originalType === "intArray" ||
+          fieldType === "int[]" ||
+          fieldType === "array<int>";
+        const isNumberArray =
+          fieldType === "numberarray" ||
+          originalType === "numberArray" ||
+          fieldType === "number[]" ||
+          fieldType === "array<number>";
+
+        const isArrayType = isStringArray || isIntArray || isNumberArray;
+
+        return {
+          type: InputTypes.SELECT,
+          formKey: f.name,
+          label,
+          placeholder: label,
+          required: false,
+          isMultiple: isArrayType,
+          options: f.enumList.map((item) => ({
+            value: item,
+            label: String(item),
+          })),
+        };
+      }
+
       return {
         type: m.inputType,
         formKey: f.name,
@@ -465,6 +599,46 @@ export default function GenericUnpaginatedPage({
       .map((f) => {
         const m = fieldToInput(f);
         const label = t(getFieldLabel(f));
+
+        // Check if field has enumList
+        if (f.enumList && f.enumList.length > 0) {
+          const fieldType = (f.type || "").toLowerCase();
+          const originalType = f.type || "";
+
+          // Check if it's an array type
+          const isStringArray =
+            fieldType === "stringarray" ||
+            originalType === "stringArray" ||
+            fieldType === "string[]" ||
+            fieldType === "array<string>";
+          const isIntArray =
+            fieldType === "intarray" ||
+            originalType === "intArray" ||
+            fieldType === "int[]" ||
+            fieldType === "array<int>";
+          const isNumberArray =
+            fieldType === "numberarray" ||
+            originalType === "numberArray" ||
+            fieldType === "number[]" ||
+            fieldType === "array<number>";
+
+          const isArrayType = isStringArray || isIntArray || isNumberArray;
+
+          return {
+            type: InputTypes.SELECT,
+            formKey: f.name,
+            label,
+            placeholder: label,
+            required: false,
+            isDisabled: !isBulkStepTwo,
+            isMultiple: isArrayType,
+            options: f.enumList.map((item) => ({
+              value: item,
+              label: String(item),
+            })),
+          };
+        }
+
         return {
           type: m.inputType,
           formKey: f.name,
@@ -510,6 +684,50 @@ export default function GenericUnpaginatedPage({
             if (!isNaN(numValue)) {
               value = numValue;
             }
+          }
+        }
+
+        // Convert string array - split comma-separated values into array
+        if (formKey?.type === FormKeyTypeEnum.STRING_ARRAY) {
+          if (typeof value === "string" && value !== "") {
+            value = value
+              .split(",")
+              .map((item) => item.trim())
+              .filter((item) => item !== "");
+          } else if (!Array.isArray(value)) {
+            value = [];
+          }
+        }
+
+        // Convert int array - split comma-separated values and parse to integers
+        if (formKey?.type === FormKeyTypeEnum.INT_ARRAY) {
+          if (typeof value === "string" && value !== "") {
+            value = value
+              .split(",")
+              .map((item) => parseInt(item.trim(), 10))
+              .filter((item) => !isNaN(item));
+          } else if (Array.isArray(value)) {
+            value = value.map((item) =>
+              typeof item === "string" ? parseInt(item, 10) : item
+            );
+          } else {
+            value = [];
+          }
+        }
+
+        // Convert number array - split comma-separated values and parse to numbers
+        if (formKey?.type === FormKeyTypeEnum.NUMBER_ARRAY) {
+          if (typeof value === "string" && value !== "") {
+            value = value
+              .split(",")
+              .map((item) => parseFloat(item.trim()))
+              .filter((item) => !isNaN(item));
+          } else if (Array.isArray(value)) {
+            value = value.map((item) =>
+              typeof item === "string" ? parseFloat(item) : item
+            );
+          } else {
+            value = [];
           }
         }
 
