@@ -35,7 +35,7 @@ export default function DateInput({
   onClear,
   requiredField = false,
   disabled = false,
-  placeholder = "DD/MM/YYYY",
+  placeholder = "MM/DD/YYYY",
   isTopFlexRow = false,
   isOnClearActive = true,
   isReadOnly = false,
@@ -55,7 +55,7 @@ export default function DateInput({
     if (value) {
       const p = dayjs(value, "YYYY-MM-DD", true);
       if (p.isValid()) {
-        setInputText(p.format("DD/MM/YYYY"));
+        setInputText(p.format("MM/DD/YYYY"));
         setMonth(p.toDate());
       }
     } else {
@@ -86,11 +86,11 @@ export default function DateInput({
 
   const commit = (raw: string) => {
     const digits = raw.replace(/\D/g, "");
-    const d = digits.slice(0, 2);
-    const m = digits.slice(2, 4);
+    const m = digits.slice(0, 2);
+    const d = digits.slice(2, 4);
     const y = digits.slice(4, 8) || todayYear;
-    const str = `${d}/${m}/${y}`;
-    const p = dayjs(str, "DD/MM/YYYY", true);
+    const str = `${m}/${d}/${y}`;
+    const p = dayjs(str, "MM/DD/YYYY", true);
     if (p.isValid()) {
       onChange(p.format("YYYY-MM-DD"));
     }
@@ -113,7 +113,7 @@ export default function DateInput({
   const handleSelect = (date?: Date) => {
     if (date) {
       const p = dayjs(date);
-      const txt = p.format("DD/MM/YYYY");
+      const txt = p.format("MM/DD/YYYY");
       setInputText(txt);
       onChange(p.format("YYYY-MM-DD"));
       setMonth(date);
@@ -129,7 +129,7 @@ export default function DateInput({
   };
 
   const selectedDate = (() => {
-    const fromText = dayjs(inputText, "DD/MM/YYYY", true);
+    const fromText = dayjs(inputText, "MM/DD/YYYY", true);
     if (fromText.isValid()) return fromText.toDate();
     if (value) {
       const fromVal = dayjs(value, "YYYY-MM-DD", true);
@@ -144,7 +144,7 @@ export default function DateInput({
       selectedDate ??
       (value ? dayjs(value, "YYYY-MM-DD", true).toDate() : new Date());
     const next = dayjs(base).add(delta, "day");
-    setInputText(next.format("DD/MM/YYYY"));
+    setInputText(next.format("MM/DD/YYYY"));
     onChange(next.format("YYYY-MM-DD"));
     setMonth(next.toDate());
   };
