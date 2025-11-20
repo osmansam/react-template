@@ -7,6 +7,7 @@ import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { Header } from "../../../components/header/Header";
 import { useGeneralContext } from "../../../context/General.context";
+import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
 import {
@@ -28,6 +29,19 @@ type Props = {
   excludeFields?: string[];
   actionsEnabled?: boolean;
   isHeader?: boolean;
+};
+
+type RawPopulationSettings = {
+  fieldName?: string;
+  FieldName?: string;
+  populatedFields?: string[];
+  PopulatedFields?: string[];
+  displayFields?: string[];
+  DisplayFields?: string[];
+  inputSelectionField?: string;
+  InputSelectionField?: string;
+  displayLabel?: string;
+  DisplayLabel?: string;
 };
 
 type RawField = {
@@ -59,6 +73,8 @@ type RawField = {
   Frontend?: {
     DisplayName?: string;
   };
+  populationSettings?: RawPopulationSettings;
+  PopulationSettings?: RawPopulationSettings;
 };
 
 type RawContainer = {
@@ -99,28 +115,40 @@ const getFieldLabel = (field: Field): string => {
   return field.frontend?.displayName ?? humanize(field.name);
 };
 
-const normalizeField = (f: RawField): Field => ({
-  name: f.name ?? f.Name ?? "",
-  type: f.type ?? f.Type ?? "",
-  tag: f.tag ?? f.Tag,
-  objectSchemaName: f.objectSchemaName ?? f.ObjectSchemaName,
-  enumList: f.enumList ?? f.EnumList,
-  isForceDelete: f.isForceDelete ?? f.IsForceDelete,
-  unique: f.unique ?? f.Unique,
-  isHashed: f.isHashed ?? f.IsHashed,
-  isLoginCredential: f.isLoginCredential ?? f.IsLoginCredential,
-  isSearchable: f.isSearchable ?? f.IsSearchable,
-  children: (f.children ?? f.Children ?? [])?.map((c: RawField) =>
-    normalizeField(c)
-  ),
-  frontend:
-    f.frontend ??
-    (f.Frontend
+const normalizeField = (f: RawField): Field => {
+  const rawPopSettings = f.populationSettings ?? f.PopulationSettings;
+  return {
+    name: f.name ?? f.Name ?? "",
+    type: f.type ?? f.Type ?? "",
+    tag: f.tag ?? f.Tag,
+    objectSchemaName: f.objectSchemaName ?? f.ObjectSchemaName,
+    enumList: f.enumList ?? f.EnumList,
+    isForceDelete: f.isForceDelete ?? f.IsForceDelete,
+    unique: f.unique ?? f.Unique,
+    isHashed: f.isHashed ?? f.IsHashed,
+    isLoginCredential: f.isLoginCredential ?? f.IsLoginCredential,
+    isSearchable: f.isSearchable ?? f.IsSearchable,
+    children: (f.children ?? f.Children ?? [])?.map((c: RawField) =>
+      normalizeField(c)
+    ),
+    frontend:
+      f.frontend ??
+      (f.Frontend
+        ? {
+            displayName: f.Frontend.DisplayName,
+          }
+        : undefined),
+    populationSettings: rawPopSettings
       ? {
-          displayName: f.Frontend.DisplayName,
+          fieldName: rawPopSettings.fieldName ?? rawPopSettings.FieldName ?? "",
+          populatedFields: rawPopSettings.populatedFields ?? rawPopSettings.PopulatedFields ?? [],
+          displayFields: rawPopSettings.displayFields ?? rawPopSettings.DisplayFields ?? [],
+          inputSelectionField: rawPopSettings.inputSelectionField ?? rawPopSettings.InputSelectionField ?? "",
+          displayLabel: rawPopSettings.displayLabel ?? rawPopSettings.DisplayLabel ?? "",
         }
-      : undefined),
-});
+      : undefined,
+  };
+};
 
 const normalizeContainer = (c: RawContainer): ContainerModel => ({
   _id: c._id ?? c.ID,
@@ -175,6 +203,8 @@ const isDisplayablePrimitive = (f: Field) => {
     "double",
     "image",
     "img",
+    "objectid",
+    "autoincrementid",
   ].includes(t);
 
   return isPrimitive || isArrayType;
@@ -333,6 +363,10 @@ export default function GenericPaginatedPage({
   }, [container, includeFields, excludeFields]);
   console.log("displayFields:", displayFields);
   console.log("container fields:", container?.fields);
+
+  // Fetch selection data for objectId/autoIncrementId fields with populationSettings
+  const selectionDataMap = useSelectionData(container?.fields || []);
+
   const rowKeys = useMemo(
     () =>
       displayFields.map((f) => {
@@ -355,10 +389,7 @@ export default function GenericPaginatedPage({
           fieldType === "array<number>";
         const isArray = isStringArray || isIntArray || isNumberArray;
 
-        // Debug log to see field types
-        if (isArray) {
-          console.log(`Field ${f.name} detected as array type: ${fieldType}`);
-        }
+
 
         const rowKey: {
           key: string;
@@ -388,9 +419,28 @@ export default function GenericPaginatedPage({
           // Handle array types - display as comma-separated values
           rowKey.node = (row: GenericItem) => {
             const value = row[f.name];
-            console.log(`Rendering array field ${f.name}:`, value);
             if (Array.isArray(value)) {
               return <span>{value.join(", ")}</span>;
+            }
+            return <span>{String(value || "")}</span>;
+          };
+        } else if (
+          (fieldType === "objectid" || fieldType === "autoincrementid") &&
+          f.populationSettings &&
+          f.populationSettings.displayFields &&
+          f.populationSettings.displayFields.length > 0
+        ) {
+          // Handle populated objectId/autoIncrementId fields
+          rowKey.node = (row: GenericItem) => {
+            const value = row[f.name];
+            if (value && typeof value === "object") {
+              // Display the fields specified in displayFields
+              const valueObj = value as Record<string, unknown>;
+              const displayValues = f.populationSettings!.displayFields
+                .map((fieldName) => valueObj[fieldName])
+                .filter(Boolean)
+                .map(String);
+              return <span>{displayValues.join(" - ") || String(valueObj._id || "")}</span>;
             }
             return <span>{String(value || "")}</span>;
           };
@@ -416,10 +466,34 @@ export default function GenericPaginatedPage({
     const ins = displayFields.map((f) => {
       const m = fieldToInput(f);
       const label = t(getFieldLabel(f));
+      const fieldType = (f.type || "").toLowerCase();
+
+      // Check if field has populationSettings (objectId/autoIncrementId with selection data)
+      if (
+        (fieldType === "objectid" || fieldType === "autoincrementid") &&
+        f.populationSettings &&
+        f.objectSchemaName
+      ) {
+        const selectionData = selectionDataMap.get(f.name) || [];
+        const displayLabel = f.populationSettings.displayLabel || label;
+        
+        return {
+          type: InputTypes.SELECT,
+          formKey: f.name,
+          label: t(displayLabel),
+          placeholder: t(displayLabel),
+          required: false,
+          options: selectionData.map((item) => ({
+            value: String(item._id || ""),
+            label: String(
+              item[f.populationSettings!.inputSelectionField] || item._id || ""
+            ),
+          })),
+        };
+      }
 
       // Check if field has enumList
       if (f.enumList && f.enumList.length > 0) {
-        const fieldType = (f.type || "").toLowerCase();
         const originalType = f.type || "";
 
         // Check if it's an array type
@@ -468,7 +542,7 @@ export default function GenericPaginatedPage({
       return { key: f.name, type: m.formKeyType };
     });
     return { inputs: ins, formKeys: fks };
-  }, [displayFields, t]);
+  }, [displayFields, t, selectionDataMap]);
 
   const itemsPayload = useGetPaginatedItems(
     currentPage,
@@ -582,18 +656,36 @@ export default function GenericPaginatedPage({
         className: "text-blue-500 cursor-pointer text-xl mr-auto",
         isModal: true,
         setRow: setRowToAction as (value: GenericItem) => void,
-        modal: rowToAction ? (
-          <GenericAddEditPanel
-            isOpen={isEditOpen}
-            close={() => setIsEditOpen(false)}
-            inputs={inputs}
-            formKeys={formKeys}
-            submitItem={handleSubmitItem}
-            isEditMode
-            topClassName="flex flex-col gap-2"
-            itemToEdit={{ id: rowToAction._id, updates: rowToAction }}
-          />
-        ) : null,
+        modal: rowToAction ? (() => {
+          // Normalize the row data to extract IDs from populated fields
+          const normalizedUpdates = { ...rowToAction };
+          displayFields.forEach((f) => {
+            const fieldType = (f.type || "").toLowerCase();
+            if (
+              (fieldType === "objectid" || fieldType === "autoincrementid") &&
+              f.populationSettings &&
+              normalizedUpdates[f.name] &&
+              typeof normalizedUpdates[f.name] === "object"
+            ) {
+              // Extract the _id from the populated object
+              const populatedValue = normalizedUpdates[f.name] as Record<string, unknown>;
+              normalizedUpdates[f.name] = populatedValue._id;
+            }
+          });
+          
+          return (
+            <GenericAddEditPanel
+              isOpen={isEditOpen}
+              close={() => setIsEditOpen(false)}
+              inputs={inputs}
+              formKeys={formKeys}
+              submitItem={handleSubmitItem}
+              isEditMode
+              topClassName="flex flex-col gap-2"
+              itemToEdit={{ id: rowToAction._id, updates: normalizedUpdates }}
+            />
+          );
+        })() : null,
         isModalOpen: isEditOpen,
         setIsModal: setIsEditOpen,
         isPath: false,
@@ -666,10 +758,35 @@ export default function GenericPaginatedPage({
       .map((f) => {
         const m = fieldToInput(f);
         const label = t(getFieldLabel(f));
+        const fieldType = (f.type || "").toLowerCase();
+
+        // Check if field has populationSettings (objectId/autoIncrementId with selection data)
+        if (
+          (fieldType === "objectid" || fieldType === "autoincrementid") &&
+          f.populationSettings &&
+          f.objectSchemaName
+        ) {
+          const selectionData = selectionDataMap.get(f.name) || [];
+          const displayLabel = f.populationSettings.displayLabel || label;
+          
+          return {
+            type: InputTypes.SELECT,
+            formKey: f.name,
+            label: t(displayLabel),
+            placeholder: t(displayLabel),
+            required: false,
+            isDisabled: !isBulkStepTwo,
+            options: selectionData.map((item) => ({
+              value: String(item._id || ""),
+              label: String(
+                item[f.populationSettings!.inputSelectionField] || item._id || ""
+              ),
+            })),
+          };
+        }
 
         // Check if field has enumList
         if (f.enumList && f.enumList.length > 0) {
-          const fieldType = (f.type || "").toLowerCase();
           const originalType = f.type || "";
 
           // Check if it's an array type
@@ -892,6 +1009,30 @@ export default function GenericPaginatedPage({
       .map((f) => {
         const m = fieldToInput(f);
         const label = t(getFieldLabel(f));
+        const fieldType = (f.type || "").toLowerCase();
+
+        // Check if field is objectId/autoIncrementId with populationSettings
+        if (
+          (fieldType === "objectid" || fieldType === "autoincrementid") &&
+          f.populationSettings &&
+          f.populationSettings.inputSelectionField &&
+          selectionDataMap.has(f.name)
+        ) {
+          const selectionOptions = selectionDataMap.get(f.name) || [];
+          return {
+            type: InputTypes.SELECT,
+            formKey: f.name,
+            label,
+            placeholder: label,
+            required: false,
+            options: selectionOptions.map((item) => ({
+              value: String(item._id || ""),
+              label: String(
+                item[f.populationSettings!.inputSelectionField] || item._id || ""
+              ),
+            })),
+          };
+        }
 
         // Check if field has enumList
         if (f.enumList && f.enumList.length > 0) {
@@ -954,7 +1095,7 @@ export default function GenericPaginatedPage({
           required: false,
         };
       });
-  }, [displayFields, t]);
+  }, [displayFields, t, selectionDataMap]);
 
   const filters = useMemo(
     () => [

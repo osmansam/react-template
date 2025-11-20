@@ -5,6 +5,14 @@ import { useGetList } from "./factory";
 type Id = string;
 
 /** Field definition for dynamic container schemas */
+export interface PopulationSettings {
+  fieldName: string;
+  populatedFields: string[];
+  displayFields: string[];
+  inputSelectionField: string;
+  displayLabel: string;
+}
+
 export interface Field {
   name: string;
   type: string;
@@ -20,6 +28,7 @@ export interface Field {
   frontend?: {
     displayName?: string;
   };
+  populationSettings?: PopulationSettings;
 }
 
 /** Per-route auth/availability spec */

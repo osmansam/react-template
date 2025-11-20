@@ -5,12 +5,13 @@ import { HiOutlineTrash } from "react-icons/hi2";
 import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { useGeneralContext } from "../../../context/General.context";
+import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
 import {
-  ContainerModel,
-  Field,
-  useGetContainers,
+    ContainerModel,
+    Field,
+    useGetContainers,
 } from "../../../utils/api/container";
 import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
 import { Header } from "../../header/Header";
@@ -27,6 +28,19 @@ type Props = {
   excludeFields?: string[];
   actionsEnabled?: boolean;
   isHeader?: boolean;
+};
+
+type RawPopulationSettings = {
+  fieldName?: string;
+  FieldName?: string;
+  populatedFields?: string[];
+  PopulatedFields?: string[];
+  displayFields?: string[];
+  DisplayFields?: string[];
+  inputSelectionField?: string;
+  InputSelectionField?: string;
+  displayLabel?: string;
+  DisplayLabel?: string;
 };
 
 // Raw field type from API with possible case variations
@@ -59,6 +73,8 @@ type RawField = {
   Frontend?: {
     DisplayName?: string;
   };
+  populationSettings?: RawPopulationSettings;
+  PopulationSettings?: RawPopulationSettings;
 };
 
 // Raw container type from API with possible case variations
@@ -100,28 +116,40 @@ const getFieldLabel = (field: Field): string => {
   return field.frontend?.displayName ?? humanize(field.name);
 };
 
-const normalizeField = (f: RawField): Field => ({
-  name: f.name ?? f.Name ?? "",
-  type: f.type ?? f.Type ?? "",
-  tag: f.tag ?? f.Tag,
-  objectSchemaName: f.objectSchemaName ?? f.ObjectSchemaName,
-  enumList: f.enumList ?? f.EnumList,
-  isForceDelete: f.isForceDelete ?? f.IsForceDelete,
-  unique: f.unique ?? f.Unique,
-  isHashed: f.isHashed ?? f.IsHashed,
-  isLoginCredential: f.isLoginCredential ?? f.IsLoginCredential,
-  isSearchable: f.isSearchable ?? f.IsSearchable,
-  children: (f.children ?? f.Children ?? [])?.map((c: RawField) =>
-    normalizeField(c)
-  ),
-  frontend:
-    f.frontend ??
-    (f.Frontend
+const normalizeField = (f: RawField): Field => {
+  const rawPopSettings = f.populationSettings ?? f.PopulationSettings;
+  return {
+    name: f.name ?? f.Name ?? "",
+    type: f.type ?? f.Type ?? "",
+    tag: f.tag ?? f.Tag,
+    objectSchemaName: f.objectSchemaName ?? f.ObjectSchemaName,
+    enumList: f.enumList ?? f.EnumList,
+    isForceDelete: f.isForceDelete ?? f.IsForceDelete,
+    unique: f.unique ?? f.Unique,
+    isHashed: f.isHashed ?? f.IsHashed,
+    isLoginCredential: f.isLoginCredential ?? f.IsLoginCredential,
+    isSearchable: f.isSearchable ?? f.IsSearchable,
+    children: (f.children ?? f.Children ?? [])?.map((c: RawField) =>
+      normalizeField(c)
+    ),
+    frontend:
+      f.frontend ??
+      (f.Frontend
+        ? {
+            displayName: f.Frontend.DisplayName,
+          }
+        : undefined),
+    populationSettings: rawPopSettings
       ? {
-          displayName: f.Frontend.DisplayName,
+          fieldName: rawPopSettings.fieldName ?? rawPopSettings.FieldName ?? "",
+          populatedFields: rawPopSettings.populatedFields ?? rawPopSettings.PopulatedFields ?? [],
+          displayFields: rawPopSettings.displayFields ?? rawPopSettings.DisplayFields ?? [],
+          inputSelectionField: rawPopSettings.inputSelectionField ?? rawPopSettings.InputSelectionField ?? "",
+          displayLabel: rawPopSettings.displayLabel ?? rawPopSettings.DisplayLabel ?? "",
         }
-      : undefined),
-});
+      : undefined,
+  };
+};
 
 const normalizeContainer = (c: RawContainer): ContainerModel => ({
   _id: c._id ?? c.ID,
@@ -172,6 +200,8 @@ const isDisplayablePrimitive = (f: Field) => {
     "double",
     "image",
     "img",
+    "objectid",
+    "autoincrementid",
   ].includes(t);
 
   return isPrimitive || isArrayType;
@@ -316,6 +346,9 @@ export default function GenericUnpaginatedPage({
     return fields;
   }, [container, includeFields, excludeFields]);
 
+  // Fetch selection data for objectId/autoIncrementId fields with populationSettings
+  const selectionDataMap = useSelectionData(container?.fields || []);
+
   const rowKeys = useMemo(
     () =>
       displayFields.map((f) => {
@@ -372,6 +405,26 @@ export default function GenericUnpaginatedPage({
             }
             return <span>{String(value || "")}</span>;
           };
+        } else if (
+          (fieldType === "objectid" || fieldType === "autoincrementid") &&
+          f.populationSettings &&
+          f.populationSettings.displayFields &&
+          f.populationSettings.displayFields.length > 0
+        ) {
+          // Handle populated objectId/autoIncrementId fields
+          rowKey.node = (row: GenericItem) => {
+            const value = row[f.name];
+            if (value && typeof value === "object") {
+              // Display the fields specified in displayFields
+              const valueObj = value as Record<string, unknown>;
+              const displayValues = f.populationSettings!.displayFields
+                .map((fieldName) => valueObj[fieldName])
+                .filter(Boolean)
+                .map(String);
+              return <span>{displayValues.join(" - ") || String(valueObj._id || "")}</span>;
+            }
+            return <span>{String(value || "")}</span>;
+          };
         }
 
         return rowKey;
@@ -395,10 +448,34 @@ export default function GenericUnpaginatedPage({
     const ins = displayFields.map((f) => {
       const m = fieldToInput(f);
       const label = t(getFieldLabel(f));
+      const fieldType = (f.type || "").toLowerCase();
+
+      // Check if field has populationSettings (objectId/autoIncrementId with selection data)
+      if (
+        (fieldType === "objectid" || fieldType === "autoincrementid") &&
+        f.populationSettings &&
+        f.objectSchemaName
+      ) {
+        const selectionData = selectionDataMap.get(f.name) || [];
+        const displayLabel = f.populationSettings.displayLabel || label;
+        
+        return {
+          type: InputTypes.SELECT,
+          formKey: f.name,
+          label: t(displayLabel),
+          placeholder: t(displayLabel),
+          required: false,
+          options: selectionData.map((item) => ({
+            value: String(item._id || ""),
+            label: String(
+              item[f.populationSettings!.inputSelectionField] || item._id || ""
+            ),
+          })),
+        };
+      }
 
       // Check if field has enumList
       if (f.enumList && f.enumList.length > 0) {
-        const fieldType = (f.type || "").toLowerCase();
         const originalType = f.type || "";
 
         // Check if it's an array type
@@ -447,7 +524,7 @@ export default function GenericUnpaginatedPage({
       return { key: f.name, type: m.formKeyType };
     });
     return { inputs: ins, formKeys: fks };
-  }, [displayFields, t]);
+  }, [displayFields, t, selectionDataMap]);
 
   const handleSubmitItem = useCallback(
     (item: GenericItem | UpdatePayload<GenericItem>) => {
@@ -599,10 +676,35 @@ export default function GenericUnpaginatedPage({
       .map((f) => {
         const m = fieldToInput(f);
         const label = t(getFieldLabel(f));
+        const fieldType = (f.type || "").toLowerCase();
+
+        // Check if field has populationSettings (objectId/autoIncrementId with selection data)
+        if (
+          (fieldType === "objectid" || fieldType === "autoincrementid") &&
+          f.populationSettings &&
+          f.objectSchemaName
+        ) {
+          const selectionData = selectionDataMap.get(f.name) || [];
+          const displayLabel = f.populationSettings.displayLabel || label;
+          
+          return {
+            type: InputTypes.SELECT,
+            formKey: f.name,
+            label: t(displayLabel),
+            placeholder: t(displayLabel),
+            required: false,
+            isDisabled: !isBulkStepTwo,
+            options: selectionData.map((item) => ({
+              value: String(item._id || ""),
+              label: String(
+                item[f.populationSettings!.inputSelectionField] || item._id || ""
+              ),
+            })),
+          };
+        }
 
         // Check if field has enumList
         if (f.enumList && f.enumList.length > 0) {
-          const fieldType = (f.type || "").toLowerCase();
           const originalType = f.type || "";
 
           // Check if it's an array type

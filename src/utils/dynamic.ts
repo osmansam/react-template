@@ -395,3 +395,24 @@ export function useGetPaginatedItems<T>(
 
   return useGet<DynamicPayload<T>>(url, queryKey, true);
 }
+
+// utils/dynamic.ts (or wherever this lives)
+export function useGetSelection<T>(schemaName: string, fieldName: string) {
+  const hasParams = Boolean(schemaName && fieldName);
+  const path = `${BASE}/selection?${qs({ schemaName, fieldName })}`;
+   
+
+  const queryKey = [
+    "dynamic",
+    schemaName || "",
+    "selection",
+    fieldName || "",
+  ] as const;
+
+  const enabled = hasParams;
+
+  const data = useGet<T>(path, queryKey, enabled);
+
+
+  return (data ?? ([] as T)) as T;
+}
