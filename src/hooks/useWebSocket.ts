@@ -1,6 +1,6 @@
 // useWebSocket.ts
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type WSInvalidateEvent =
   | { type: "invalidate"; schema: string; ts?: number }
@@ -20,6 +20,8 @@ export function useWebSocket() {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const stateRef = useRef({ userClosed: false, delay: 1000 });
+
+  const [connectTrigger, setConnectTrigger] = useState(0);
 
   useEffect(() => {
     if (!API_URL) {
@@ -112,6 +114,27 @@ export function useWebSocket() {
         /* ignore non-JSON */
       }
       wsRef.current = null;
+    };
+  }, [queryClient, connectTrigger]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        console.log("Tab became visible, refreshing data and checking WS...");
+        // Always invalidate to get fresh data
+        queryClient.invalidateQueries();
+
+        // Reconnect if not open
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          console.log("WS not open, forcing reconnect...");
+          setConnectTrigger((prev: number) => prev + 1);
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [queryClient]);
 }
