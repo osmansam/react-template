@@ -29,13 +29,14 @@ export interface Field {
     displayName?: string;
   };
   populationSettings?: PopulationSettings;
+  equation?: string;
 }
 
 /** Per-route auth/availability spec */
 export interface RouteSpec {
   isAuthenticated: boolean;
   isAuthorized: boolean;
-  authorizeRole: string;
+  authorizeRole: string[];
   /** NOTE: Go bson tag is `isActivated`; keeping that key for parity */
   isActivated: boolean;
   method: string; // e.g., "GET" | "POST" | "PUT" | "DELETE"
@@ -71,7 +72,7 @@ export interface PipelineStage {
   pipelineJson: string; // serialized JSON string
   isAuthenticated: boolean;
   isAuthorized: boolean;
-  authorizeRole: string;
+  authorizeRole: string[];
   isActive: boolean;
   isRedisCached: boolean;
   cacheTime: number;
@@ -83,7 +84,7 @@ export interface DynamicFunction {
   codeJson: string; // serialized JSON / code payload
   isAuthenticated: boolean;
   isAuthorized: boolean;
-  authorizeRole: string;
+  authorizeRole: string[];
   isActive: boolean;
   isRedisCached: boolean;
   cacheTime: number;
@@ -97,7 +98,7 @@ export interface DynamicApiModel {
   dependencies?: string[];
   isAuthenticated: boolean;
   isAuthorized: boolean;
-  authorizeRole: string;
+  authorizeRole: string[];
   isActive: boolean;
   isRedisCached: boolean;
   cacheTime: number;
@@ -144,3 +145,15 @@ export type HttpMethod =
 export function useGetContainers() {
   return useGetList<ContainerModel>("/container");
 }
+export const Types = {
+  String: "string",
+  Number: "number",
+  Boolean: "boolean",
+  Date: "date",
+  Image: "image",
+  ObjectId: "objectid",
+  AutoIncrementId: "autoincrementid",
+  StringArray: "stringarray",
+  NumberArray: "numberarray",
+  IntArray: "intarray",
+} as const;

@@ -11,9 +11,10 @@ import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
 import {
-  ContainerModel,
-  Field,
-  useGetContainers,
+    ContainerModel,
+    Field,
+    Types,
+    useGetContainers,
 } from "../../../utils/api/container";
 import { useDynamicCrud, useGetPaginatedItems } from "../../../utils/dynamic";
 import SwitchButton from "../common/SwitchButton";
@@ -75,6 +76,8 @@ type RawField = {
   };
   populationSettings?: RawPopulationSettings;
   PopulationSettings?: RawPopulationSettings;
+  equation?: string;
+  Equation?: string;
 };
 
 type RawContainer = {
@@ -147,6 +150,7 @@ const normalizeField = (f: RawField): Field => {
           displayLabel: rawPopSettings.displayLabel ?? rawPopSettings.DisplayLabel ?? "",
         }
       : undefined,
+    equation: f.equation ?? f.Equation,
   };
 };
 
@@ -194,17 +198,17 @@ const isDisplayablePrimitive = (f: Field) => {
     t === "array<number>";
 
   const isPrimitive = [
-    "string",
-    "number",
-    "boolean",
-    "date",
+    Types.String,
+    Types.Number,
+    Types.Boolean,
+    Types.Date,
     "int",
     "float",
     "double",
-    "image",
+    Types.Image,
     "img",
-    "objectid",
-    "autoincrementid",
+    Types.ObjectId,
+    Types.AutoIncrementId,
   ].includes(t);
 
   return isPrimitive || isArrayType;
@@ -216,21 +220,21 @@ function fieldToInput(field: Field) {
 
   // Check for string array types
   const isStringArray =
-    t === "stringarray" ||
+    t === Types.StringArray ||
     originalType === "stringArray" ||
     t === "string[]" ||
     t === "array<string>";
 
   // Check for int array types
   const isIntArray =
-    t === "intarray" ||
+    t === Types.IntArray ||
     originalType === "intArray" ||
     t === "int[]" ||
     t === "array<int>";
 
   // Check for number array types
   const isNumberArray =
-    t === "numberarray" ||
+    t === Types.NumberArray ||
     originalType === "numberArray" ||
     t === "number[]" ||
     t === "array<number>";
@@ -253,22 +257,22 @@ function fieldToInput(field: Field) {
       formKeyType: FormKeyTypeEnum.NUMBER_ARRAY as const,
     };
 
-  if (["number", "int", "float", "double"].includes(t))
+  if ([Types.Number, "int", "float", "double"].includes(t))
     return {
       inputType: InputTypes.NUMBER as const,
       formKeyType: FormKeyTypeEnum.NUMBER as const,
     };
-  if (["boolean", "bool"].includes(t))
+  if ([Types.Boolean, "bool"].includes(t))
     return {
       inputType: InputTypes.CHECKBOX as const,
       formKeyType: FormKeyTypeEnum.BOOLEAN as const,
     };
-  if (["image", "img"].includes(t))
+  if ([Types.Image, "img"].includes(t))
     return {
       inputType: InputTypes.IMAGE as const,
       formKeyType: FormKeyTypeEnum.STRING as const,
     };
-  if (["date", "datetime", "timestamp"].includes(t))
+  if ([Types.Date, "datetime", "timestamp"].includes(t))
     return {
       inputType: InputTypes.DATE as const,
       formKeyType: FormKeyTypeEnum.DATE as const,
@@ -314,7 +318,7 @@ export default function GenericPaginatedPage({
     if (!container?.fields) return false;
     return container.fields.some(
       (field) =>
-        (field.type || "").toLowerCase() === "image" ||
+        (field.type || "").toLowerCase() === Types.Image ||
         (field.type || "").toLowerCase() === "img"
     );
   }, [container]);
@@ -361,8 +365,6 @@ export default function GenericPaginatedPage({
     );
     return fields;
   }, [container, includeFields, excludeFields]);
-  console.log("displayFields:", displayFields);
-  console.log("container fields:", container?.fields);
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
@@ -373,17 +375,17 @@ export default function GenericPaginatedPage({
         const fieldType = (f.type || "").toLowerCase();
         const originalType = f.type || "";
         const isStringArray =
-          fieldType === "stringarray" ||
+          fieldType === Types.StringArray ||
           originalType === "stringArray" ||
           fieldType === "string[]" ||
           fieldType === "array<string>";
         const isIntArray =
-          fieldType === "intarray" ||
+          fieldType === Types.IntArray ||
           originalType === "intArray" ||
           fieldType === "int[]" ||
           fieldType === "array<int>";
         const isNumberArray =
-          fieldType === "numberarray" ||
+          fieldType === Types.NumberArray ||
           originalType === "numberArray" ||
           fieldType === "number[]" ||
           fieldType === "array<number>";
@@ -399,9 +401,9 @@ export default function GenericPaginatedPage({
           node?: (row: GenericItem) => React.ReactNode;
         } = {
           key: f.name,
-          isImage: fieldType === "image",
-          isDate: fieldType === "date",
-          isBoolean: fieldType === "boolean" || fieldType === "bool",
+          isImage: fieldType === Types.Image,
+          isDate: fieldType === Types.Date,
+          isBoolean: fieldType === Types.Boolean || fieldType === "bool",
         };
 
         if (rowKey.isBoolean) {
@@ -425,7 +427,7 @@ export default function GenericPaginatedPage({
             return <span>{String(value || "")}</span>;
           };
         } else if (
-          (fieldType === "objectid" || fieldType === "autoincrementid") &&
+          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
           f.populationSettings &&
           f.populationSettings.displayFields &&
           f.populationSettings.displayFields.length > 0
@@ -464,13 +466,16 @@ export default function GenericPaginatedPage({
 
   const { inputs, formKeys } = useMemo(() => {
     const ins = displayFields.map((f) => {
+      // Skip fields with equation
+      if (f.equation) return null;
+
       const m = fieldToInput(f);
       const label = t(getFieldLabel(f));
       const fieldType = (f.type || "").toLowerCase();
 
       // Check if field has populationSettings (objectId/autoIncrementId with selection data)
       if (
-        (fieldType === "objectid" || fieldType === "autoincrementid") &&
+        (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
         f.populationSettings &&
         f.objectSchemaName
       ) {
@@ -536,11 +541,14 @@ export default function GenericPaginatedPage({
         placeholder: label,
         required: false,
       };
-    });
+    }).filter((i): i is NonNullable<typeof i> => i !== null);
+
     const fks = displayFields.map((f) => {
+      if (f.equation) return null;
       const m = fieldToInput(f);
       return { key: f.name, type: m.formKeyType };
-    });
+    }).filter((k): k is NonNullable<typeof k> => k !== null);
+
     return { inputs: ins, formKeys: fks };
   }, [displayFields, t, selectionDataMap]);
 
@@ -662,7 +670,7 @@ export default function GenericPaginatedPage({
           displayFields.forEach((f) => {
             const fieldType = (f.type || "").toLowerCase();
             if (
-              (fieldType === "objectid" || fieldType === "autoincrementid") &&
+              (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
               f.populationSettings &&
               normalizedUpdates[f.name] &&
               typeof normalizedUpdates[f.name] === "object"
@@ -715,7 +723,8 @@ export default function GenericPaginatedPage({
       displayFields
         .filter((f) => {
           const fieldType = (f.type || "").toLowerCase();
-          return fieldType !== "image" && fieldType !== "img";
+          if (fieldType === Types.Image || fieldType === Types.Image) return false;
+          return !f.equation;
         })
         .map((f) => ({
           value: f.name,
@@ -762,7 +771,7 @@ export default function GenericPaginatedPage({
 
         // Check if field has populationSettings (objectId/autoIncrementId with selection data)
         if (
-          (fieldType === "objectid" || fieldType === "autoincrementid") &&
+          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
           f.populationSettings &&
           f.objectSchemaName
         ) {
@@ -791,17 +800,17 @@ export default function GenericPaginatedPage({
 
           // Check if it's an array type
           const isStringArray =
-            fieldType === "stringarray" ||
+            fieldType === Types.StringArray ||
             originalType === "stringArray" ||
             fieldType === "string[]" ||
             fieldType === "array<string>";
           const isIntArray =
-            fieldType === "intarray" ||
+            fieldType === Types.IntArray ||
             originalType === "intArray" ||
             fieldType === "int[]" ||
             fieldType === "array<int>";
           const isNumberArray =
-            fieldType === "numberarray" ||
+            fieldType === Types.NumberArray ||
             originalType === "numberArray" ||
             fieldType === "number[]" ||
             fieldType === "array<number>";
@@ -1002,7 +1011,7 @@ export default function GenericPaginatedPage({
         // Exclude id, image fields from filters
         return (
           !["_id", "id"].includes(f.name) &&
-          fieldType !== "image" &&
+          fieldType !== Types.Image &&
           fieldType !== "img"
         );
       })
@@ -1013,7 +1022,7 @@ export default function GenericPaginatedPage({
 
         // Check if field is objectId/autoIncrementId with populationSettings
         if (
-          (fieldType === "objectid" || fieldType === "autoincrementid") &&
+          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
           f.populationSettings &&
           f.populationSettings.inputSelectionField &&
           selectionDataMap.has(f.name)
@@ -1041,17 +1050,17 @@ export default function GenericPaginatedPage({
 
           // Check if it's an array type
           const isStringArray =
-            fieldType === "stringarray" ||
+            fieldType === Types.StringArray ||
             originalType === "stringArray" ||
             fieldType === "string[]" ||
             fieldType === "array<string>";
           const isIntArray =
-            fieldType === "intarray" ||
+            fieldType === Types.IntArray ||
             originalType === "intArray" ||
             fieldType === "int[]" ||
             fieldType === "array<int>";
           const isNumberArray =
-            fieldType === "numberarray" ||
+            fieldType === Types.NumberArray ||
             originalType === "numberArray" ||
             fieldType === "number[]" ||
             fieldType === "array<number>";
