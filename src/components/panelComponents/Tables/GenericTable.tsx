@@ -81,6 +81,7 @@ type Props<T> = {
   filters?: FilterType[];
   isRowsPerPage?: boolean;
   rowClassNameFunction?: (row: T) => string;
+  rowStyleFunction?: (row: T) => React.CSSProperties;
   isSearch?: boolean;
   isPagination?: boolean;
   isActionsAtFront?: boolean;
@@ -130,6 +131,7 @@ const GenericTable = <T,>({
   searchRowKeys,
   tooltipLimit = 40,
   rowClassNameFunction,
+  rowStyleFunction,
   excelFileName,
   rowsPerPageOptions = [
     RowPerPageEnum.FIRST,
@@ -697,6 +699,7 @@ const GenericTable = <T,>({
               ? "border-b "
               : ""
           }  ${rowClassNameFunction?.(row) ?? ""}`}
+          style={rowStyleFunction?.(row)}
         >
           {selectionActions && isSelectionActive && (
             <td className="w-6 h-6 mx-auto p-1 ">

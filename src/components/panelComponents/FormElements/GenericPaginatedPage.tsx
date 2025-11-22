@@ -73,6 +73,10 @@ type RawField = {
   };
   Frontend?: {
     DisplayName?: string;
+    RowClassName?: {
+      Condition: string;
+      ClassName: string;
+    }[];
   };
   populationSettings?: RawPopulationSettings;
   PopulationSettings?: RawPopulationSettings;
@@ -103,6 +107,20 @@ type RawContainer = {
   PopulationArray?: unknown[];
   populatedRoutes?: string[];
   PopulatedRoutes?: string[];
+  frontend?: {
+    displayName?: string;
+    rowClassName?: {
+      condition: string;
+      className: string;
+    }[];
+  };
+  Frontend?: {
+    DisplayName?: string;
+    RowClassName?: {
+      Condition: string;
+      ClassName: string;
+    }[];
+  };
 };
 
 const humanize = (key: string) =>
@@ -115,7 +133,7 @@ const humanize = (key: string) =>
 
 // Helper to get display label - uses Frontend.DisplayName if available, otherwise humanizes the field name
 const getFieldLabel = (field: Field): string => {
-  return field.frontend?.displayName ?? humanize(field.name);
+  return field.frontend?.displayName || humanize(field.name);
 };
 
 const normalizeField = (f: RawField): Field => {
@@ -139,6 +157,10 @@ const normalizeField = (f: RawField): Field => {
       (f.Frontend
         ? {
             displayName: f.Frontend.DisplayName,
+            rowClassName: f.Frontend.RowClassName?.map((rc) => ({
+              condition: rc.Condition,
+              className: rc.ClassName,
+            })),
           }
         : undefined),
     populationSettings: rawPopSettings
@@ -176,7 +198,171 @@ const normalizeContainer = (c: RawContainer): ContainerModel => ({
     c.PopulationArray ??
     []) as ContainerModel["populationArray"],
   populatedRoutes: c.populatedRoutes ?? c.PopulatedRoutes ?? [],
+  frontend:
+    c.frontend ??
+    (c.Frontend
+      ? {
+          displayName: c.Frontend.DisplayName,
+          rowClassName: c.Frontend.RowClassName?.map((rc) => ({
+            condition: rc.Condition,
+            className: rc.ClassName,
+          })),
+        }
+      : undefined),
 });
+
+// Helper to convert Tailwind bg classes to inline styles
+const tailwindBgToStyle = (className: string): React.CSSProperties => {
+  const bgColorMap: Record<string, string> = {
+    'bg-red-50': '#fef2f2', 'bg-red-100': '#fee2e2', 'bg-red-200': '#fecaca',
+    'bg-red-300': '#fca5a5', 'bg-red-400': '#f87171', 'bg-red-500': '#ef4444',
+    'bg-red-600': '#dc2626', 'bg-red-700': '#b91c1c', 'bg-red-800': '#991b1b',
+    'bg-red-900': '#7f1d1d',
+    'bg-blue-50': '#eff6ff', 'bg-blue-100': '#dbeafe', 'bg-blue-200': '#bfdbfe',
+    'bg-blue-300': '#93c5fd', 'bg-blue-400': '#60a5fa', 'bg-blue-500': '#3b82f6',
+    'bg-blue-600': '#2563eb', 'bg-blue-700': '#1d4ed8', 'bg-blue-800': '#1e40af',
+    'bg-blue-900': '#1e3a8a',
+    'bg-green-50': '#f0fdf4', 'bg-green-100': '#dcfce7', 'bg-green-200': '#bbf7d0',
+    'bg-green-300': '#86efac', 'bg-green-400': '#4ade80', 'bg-green-500': '#22c55e',
+    'bg-green-600': '#16a34a', 'bg-green-700': '#15803d', 'bg-green-800': '#166534',
+    'bg-green-900': '#14532d',
+    'bg-yellow-50': '#fefce8', 'bg-yellow-100': '#fef9c3', 'bg-yellow-200': '#fef08a',
+    'bg-yellow-300': '#fde047', 'bg-yellow-400': '#facc15', 'bg-yellow-500': '#eab308',
+    'bg-yellow-600': '#ca8a04', 'bg-yellow-700': '#a16207', 'bg-yellow-800': '#854d0e',
+    'bg-yellow-900': '#713f12',
+    'bg-purple-50': '#faf5ff', 'bg-purple-100': '#f3e8ff', 'bg-purple-200': '#e9d5ff',
+    'bg-purple-300': '#d8b4fe', 'bg-purple-400': '#c084fc', 'bg-purple-500': '#a855f7',
+    'bg-purple-600': '#9333ea', 'bg-purple-700': '#7e22ce', 'bg-purple-800': '#6b21a8',
+    'bg-purple-900': '#581c87',
+    'bg-pink-50': '#fdf2f8', 'bg-pink-100': '#fce7f3', 'bg-pink-200': '#fbcfe8',
+    'bg-pink-300': '#f9a8d4', 'bg-pink-400': '#f472b6', 'bg-pink-500': '#ec4899',
+    'bg-pink-600': '#db2777', 'bg-pink-700': '#be185d', 'bg-pink-800': '#9d174d',
+    'bg-pink-900': '#831843',
+    'bg-gray-50': '#f9fafb', 'bg-gray-100': '#f3f4f6', 'bg-gray-200': '#e5e7eb',
+    'bg-gray-300': '#d1d5db', 'bg-gray-400': '#9ca3af', 'bg-gray-500': '#6b7280',
+    'bg-gray-600': '#4b5563', 'bg-gray-700': '#374151', 'bg-gray-800': '#1f2937',
+    'bg-gray-900': '#111827',
+    'bg-orange-50': '#fff7ed', 'bg-orange-100': '#ffedd5', 'bg-orange-200': '#fed7aa',
+    'bg-orange-300': '#fdba74', 'bg-orange-400': '#fb923c', 'bg-orange-500': '#f97316',
+    'bg-orange-600': '#ea580c', 'bg-orange-700': '#c2410c', 'bg-orange-800': '#9a3412',
+    'bg-orange-900': '#7c2d12',
+  };
+
+  const classes = className.split(' ');
+  const style: React.CSSProperties = {};
+
+  classes.forEach((cls) => {
+    if (bgColorMap[cls]) {
+      style.backgroundColor = bgColorMap[cls];
+    }
+  });
+
+  return style;
+};
+
+const parseValue = (row: GenericItem, value: string): any => {
+  // console.log("Parsing value:", value, "Row:", row);
+  if (!value) return value;
+  value = value.trim();
+
+  // Check for row(field) syntax
+  const rowMatch = value.match(/^row\((.+)\)$/);
+  if (rowMatch) {
+    const field = rowMatch[1];
+    // console.log("Parsed row field:", field, "Value:", row[field]);
+    return row[field];
+  }
+
+  // Check for quoted strings
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+
+  // Check for booleans
+  if (value === "true") return true;
+  if (value === "false") return false;
+
+  // Check for numbers
+  if (!isNaN(Number(value))) return Number(value);
+
+  // Fallback: Check if value is a key in row
+  if (value in row) {
+    return row[value];
+  }
+
+  return value;
+};
+
+const evaluateRowCondition = (row: GenericItem, condition: string): boolean => {
+  // console.log("Evaluating condition:", condition, "Row:", row);
+  if (!condition) return false;
+
+  // Handle inequality (!=)
+  if (condition.includes("!=")) {
+    const [lhs, rhs] = condition.split("!=");
+    if (!lhs || rhs === undefined) return false;
+    const result = parseValue(row, lhs) != parseValue(row, rhs);
+    // console.log("Inequality result:", result);
+    return result;
+  }
+
+  // Handle >=
+  if (condition.includes(">=")) {
+    const [lhs, rhs] = condition.split(">=");
+    if (!lhs || rhs === undefined) return false;
+    const result = parseValue(row, lhs) >= parseValue(row, rhs);
+    // console.log(">= result:", result);
+    return result;
+  }
+
+  // Handle <=
+  if (condition.includes("<=")) {
+    const [lhs, rhs] = condition.split("<=");
+    if (!lhs || rhs === undefined) return false;
+    const result = parseValue(row, lhs) <= parseValue(row, rhs);
+    // console.log("<= result:", result);
+    return result;
+  }
+
+  // Handle >
+  if (condition.includes(">")) {
+    const [lhs, rhs] = condition.split(">");
+    if (!lhs || rhs === undefined) return false;
+    const result = parseValue(row, lhs) > parseValue(row, rhs);
+    console.log("Condition:", condition, "LHS:", parseValue(row, lhs), "RHS:", parseValue(row, rhs), "Result:", result);
+    return result;
+  }
+
+  // Handle <
+  if (condition.includes("<")) {
+    const [lhs, rhs] = condition.split("<");
+    if (!lhs || rhs === undefined) return false;
+    const result = parseValue(row, lhs) < parseValue(row, rhs);
+    // console.log("< result:", result);
+    return result;
+  }
+
+  // Handle equality (=)
+  if (condition.includes("=")) {
+    const [lhs, rhs] = condition.split("=");
+    if (!lhs || rhs === undefined) return false;
+    const result = parseValue(row, lhs) == parseValue(row, rhs);
+    // console.log("Equality result:", result);
+    return result;
+  }
+
+  // Handle falsy check (!)
+  if (condition.startsWith("!")) {
+    const key = condition.substring(1).trim();
+    return !parseValue(row, key);
+  }
+
+  // Handle truthy check (just field name)
+  return !!parseValue(row, condition);
+};
 
 const isDisplayablePrimitive = (f: Field) => {
   const t = (f.type || "").toLowerCase();
@@ -619,6 +805,41 @@ export default function GenericPaginatedPage({
     () => ({ t, filterPanelFormElements, setFilterPanelFormElements }),
     [t, filterPanelFormElements]
   );
+
+  const rowStyleFunction = useCallback(
+    (row: GenericItem): React.CSSProperties => {
+      const styles: React.CSSProperties = {};
+
+      // Container level configs
+      if (container?.frontend?.rowClassName) {
+        console.log("Container RowClassName Configs:", container.frontend.rowClassName);
+        container.frontend.rowClassName.forEach((config) => {
+          if (evaluateRowCondition(row, config.condition)) {
+            console.log("Applied container class:", config.className);
+            Object.assign(styles, tailwindBgToStyle(config.className));
+          }
+        });
+      }
+
+      // Field level configs
+      container?.fields.forEach((field) => {
+        if (field.frontend?.rowClassName) {
+          console.log("Field RowClassName Configs:", field.name, field.frontend.rowClassName);
+          field.frontend.rowClassName.forEach((config) => {
+            if (evaluateRowCondition(row, config.condition)) {
+              console.log("Applied field class:", config.className);
+              Object.assign(styles, tailwindBgToStyle(config.className));
+            }
+          });
+        }
+      });
+
+      return styles;
+    },
+    [container]
+  );
+
+  console.log("rowStyleFunction defined:", !!rowStyleFunction);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1270,6 +1491,7 @@ export default function GenericPaginatedPage({
           actions={actions}
           columns={columns}
           rows={rows}
+          rowStyleFunction={rowStyleFunction}
           title={t(humanize(schemaName))}
           addButton={addButton}
           isCollapsible={false}

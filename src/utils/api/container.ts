@@ -13,6 +13,16 @@ export interface PopulationSettings {
   displayLabel: string;
 }
 
+export interface RowClassConfig {
+  condition: string;
+  className: string;
+}
+
+export interface Frontend {
+  displayName?: string;
+  rowClassName?: RowClassConfig[];
+}
+
 export interface Field {
   name: string;
   type: string;
@@ -25,9 +35,7 @@ export interface Field {
   isLoginCredential?: boolean;
   isSearchable?: boolean;
   children?: Field[];
-  frontend?: {
-    displayName?: string;
-  };
+  frontend?: Frontend;
   populationSettings?: PopulationSettings;
   equation?: string;
 }
@@ -123,6 +131,7 @@ export interface ContainerModel {
   isAuthContainer?: boolean;
   populationArray?: Population[];
   populatedRoutes: string[];
+  frontend?: Frontend;
 }
 
 /** Helper used in some responses/utilities */
