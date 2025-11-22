@@ -26,7 +26,7 @@ export function useSelectionData(
       fields.filter((f) => {
         const fieldType = (f.type || "").toLowerCase();
         return (
-          (fieldType === "objectid" || fieldType === "autoincrementid") &&
+          (fieldType === "objectid" || fieldType === "autoincrementid" || fieldType === "objectidarray") &&
           f.populationSettings &&
           f.objectSchemaName &&
           f.populationSettings.inputSelectionField

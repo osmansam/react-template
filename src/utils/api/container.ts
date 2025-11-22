@@ -153,6 +153,7 @@ export const Types = {
   Image: "image",
   ObjectId: "objectid",
   AutoIncrementId: "autoincrementid",
+  ObjectIdArray: "objectidarray",
   StringArray: "stringarray",
   NumberArray: "numberarray",
   IntArray: "intarray",

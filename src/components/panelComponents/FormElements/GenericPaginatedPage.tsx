@@ -11,10 +11,10 @@ import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
 import {
-    ContainerModel,
-    Field,
-    Types,
-    useGetContainers,
+  ContainerModel,
+  Field,
+  Types,
+  useGetContainers,
 } from "../../../utils/api/container";
 import { useDynamicCrud, useGetPaginatedItems } from "../../../utils/dynamic";
 import SwitchButton from "../common/SwitchButton";
@@ -209,6 +209,7 @@ const isDisplayablePrimitive = (f: Field) => {
     "img",
     Types.ObjectId,
     Types.AutoIncrementId,
+    Types.ObjectIdArray,
   ].includes(t);
 
   return isPrimitive || isArrayType;
@@ -446,11 +447,47 @@ export default function GenericPaginatedPage({
             }
             return <span>{String(value || "")}</span>;
           };
+        } else if (
+          fieldType === Types.ObjectIdArray &&
+          f.populationSettings &&
+          f.populationSettings.displayFields &&
+          f.populationSettings.displayFields.length > 0
+        ) {
+          // Handle populated objectIdArray fields
+          rowKey.node = (row: GenericItem) => {
+            const value = row[f.name];
+            if (Array.isArray(value) && value.length > 0) {
+              // Map over array of populated objects
+              const displayItems = value.map((item) => {
+                if (item && typeof item === "object") {
+                  const itemObj = item as Record<string, unknown>;
+                  const displayValues = f.populationSettings!.displayFields
+                    .map((fieldName) => itemObj[fieldName])
+                    .filter(Boolean)
+                    .map(String);
+                  return displayValues.join(" - ") || String(itemObj._id || "");
+                } else if (typeof item === "string") {
+                  // Handle ID strings by looking up in selectionDataMap
+                  const selectionOptions = selectionDataMap.get(f.name) || [];
+                  const foundOption = selectionOptions.find((opt) => opt._id === item);
+                  if (foundOption) {
+                    return String(
+                      foundOption[f.populationSettings!.inputSelectionField] || item
+                    );
+                  }
+                  return item;
+                }
+                return String(item || "");
+              });
+              return <span>{displayItems.join(", ")}</span>;
+            }
+            return <span>{String(value || "")}</span>;
+          };
         }
 
         return rowKey;
       }),
-    [displayFields, updateDynamicItem]
+    [displayFields, updateDynamicItem, selectionDataMap, t]
   );
 
   const columns = useMemo(() => {
@@ -473,9 +510,9 @@ export default function GenericPaginatedPage({
       const label = t(getFieldLabel(f));
       const fieldType = (f.type || "").toLowerCase();
 
-      // Check if field has populationSettings (objectId/autoIncrementId with selection data)
+      // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
       if (
-        (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
+        (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId || fieldType === Types.ObjectIdArray) &&
         f.populationSettings &&
         f.objectSchemaName
       ) {
@@ -488,6 +525,7 @@ export default function GenericPaginatedPage({
           label: t(displayLabel),
           placeholder: t(displayLabel),
           required: false,
+          isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
           options: selectionData.map((item) => ({
             value: String(item._id || ""),
             label: String(
@@ -678,6 +716,17 @@ export default function GenericPaginatedPage({
               // Extract the _id from the populated object
               const populatedValue = normalizedUpdates[f.name] as Record<string, unknown>;
               normalizedUpdates[f.name] = populatedValue._id;
+            } else if (
+              fieldType === Types.ObjectIdArray &&
+              f.populationSettings &&
+              normalizedUpdates[f.name] &&
+              Array.isArray(normalizedUpdates[f.name])
+            ) {
+              // Extract array of _ids from populated objects
+              const populatedArray = normalizedUpdates[f.name] as Array<Record<string, unknown>>;
+              normalizedUpdates[f.name] = populatedArray.map((item) => 
+                item && typeof item === "object" ? item._id : item
+              );
             }
           });
           
@@ -769,9 +818,9 @@ export default function GenericPaginatedPage({
         const label = t(getFieldLabel(f));
         const fieldType = (f.type || "").toLowerCase();
 
-        // Check if field has populationSettings (objectId/autoIncrementId with selection data)
+        // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
         if (
-          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
+          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId || fieldType === Types.ObjectIdArray) &&
           f.populationSettings &&
           f.objectSchemaName
         ) {
@@ -785,6 +834,7 @@ export default function GenericPaginatedPage({
             placeholder: t(displayLabel),
             required: false,
             isDisabled: !isBulkStepTwo,
+            isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
             options: selectionData.map((item) => ({
               value: String(item._id || ""),
               label: String(
@@ -1020,9 +1070,9 @@ export default function GenericPaginatedPage({
         const label = t(getFieldLabel(f));
         const fieldType = (f.type || "").toLowerCase();
 
-        // Check if field is objectId/autoIncrementId with populationSettings
+        // Check if field is objectId/autoIncrementId/objectIdArray with populationSettings
         if (
-          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
+          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId || fieldType === Types.ObjectIdArray) &&
           f.populationSettings &&
           f.populationSettings.inputSelectionField &&
           selectionDataMap.has(f.name)
@@ -1034,6 +1084,7 @@ export default function GenericPaginatedPage({
             label,
             placeholder: label,
             required: false,
+            isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
             options: selectionOptions.map((item) => ({
               value: String(item._id || ""),
               label: String(
