@@ -70,10 +70,22 @@ type RawField = {
   Children?: RawField[];
   frontend?: {
     displayName?: string;
+    rowClassName?: {
+      condition: string;
+      className: string;
+    }[];
+    rowKeyClassName?: {
+      condition: string;
+      className: string;
+    }[];
   };
   Frontend?: {
     DisplayName?: string;
     RowClassName?: {
+      Condition: string;
+      ClassName: string;
+    }[];
+    RowKeyClassName?: {
       Condition: string;
       ClassName: string;
     }[];
@@ -158,6 +170,10 @@ const normalizeField = (f: RawField): Field => {
         ? {
             displayName: f.Frontend.DisplayName,
             rowClassName: f.Frontend.RowClassName?.map((rc) => ({
+              condition: rc.Condition,
+              className: rc.ClassName,
+            })),
+            rowKeyClassName: f.Frontend.RowKeyClassName?.map((rc) => ({
               condition: rc.Condition,
               className: rc.ClassName,
             })),
@@ -585,6 +601,7 @@ export default function GenericPaginatedPage({
           isImage?: boolean;
           isDate?: boolean;
           isBoolean?: boolean;
+          className?: string;
           node?: (row: GenericItem) => React.ReactNode;
         } = {
           key: f.name,
@@ -592,6 +609,19 @@ export default function GenericPaginatedPage({
           isDate: fieldType === Types.Date,
           isBoolean: fieldType === Types.Boolean || fieldType === "bool",
         };
+
+        // Compute className based on rowKeyClassName conditions
+        if (f.frontend?.rowKeyClassName) {
+          rowKey.className = (row: GenericItem) => {
+            let classNames = "";
+            f.frontend!.rowKeyClassName!.forEach((config) => {
+              if (evaluateRowCondition(row, config.condition)) {
+                classNames += ` ${config.className}`;
+              }
+            });
+            return classNames.trim();
+          };
+        }
 
         if (rowKey.isBoolean) {
           rowKey.node = (row: GenericItem) => (

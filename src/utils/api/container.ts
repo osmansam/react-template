@@ -21,6 +21,7 @@ export interface RowClassConfig {
 export interface Frontend {
   displayName?: string;
   rowClassName?: RowClassConfig[];
+  rowKeyClassName?: RowClassConfig[];
 }
 
 export interface Field {

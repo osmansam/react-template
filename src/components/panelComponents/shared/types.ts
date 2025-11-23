@@ -49,7 +49,7 @@ export interface RowKeyType<T> {
   isImage?: boolean;
   isDate?: boolean;
   isBoolean?: boolean;
-  className?: string;
+  className?: string | ((row: T) => string);
   options?: {
     label: string;
     bgColor: string; // must be css color

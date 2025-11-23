@@ -741,13 +741,16 @@ const GenericTable = <T,>({
             <td>{renderActionButtons(row, actions)}</td>
           )}
           {usedRowKeys?.map((rowKey, keyIndex) => {
+            // Compute className - handle both string and function
+            const computedClassName = typeof rowKey?.className === 'function' 
+              ? rowKey.className(row) 
+              : (rowKey?.className || '');
+            
             if (rowKey.node) {
               return (
                 <td
                   key={keyIndex}
-                  className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20 ${
-                    rowKey?.className
-                  } `}
+                  className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20`}
                 >
                   {rowKey.node(row)}
                 </td>
@@ -762,11 +765,9 @@ const GenericTable = <T,>({
               return (
                 <td
                   key={keyIndex}
-                  className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20 ${
-                    rowKey?.className
-                  } `}
+                  className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20`}
                 >
-                  -
+                  <span className={computedClassName}>-</span>
                 </td>
               );
             }
@@ -779,11 +780,9 @@ const GenericTable = <T,>({
               return (
                 <td
                   key={keyIndex}
-                  className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20 ${
-                    rowKey?.className
-                  }`}
+                  className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20`}
                 >
-                  <P1>{formattedValue} ₺</P1>
+                  <P1 className={computedClassName}>{formattedValue} ₺</P1>
                 </td>
               );
             }
@@ -799,23 +798,24 @@ const GenericTable = <T,>({
                 ? `${cellValue.substring(0, tooltipLimit)}...`
                 : cellValue;
             let style: React.CSSProperties = {};
+            
             if (rowKey.isOptional && rowKey.options) {
               const matchedOption = rowKey.options.find(
                 (option) => option.label === String(row[rowKey.key as keyof T])
               );
               style = {
+                ...style,
                 color: matchedOption?.textColor,
                 backgroundColor: matchedOption?.bgColor,
               };
               return (
                 <td
                   key={keyIndex}
-                  className={`${keyIndex === 0 ? "pl-3" : ""}  py-3  ${
-                    rowKey?.className
-                  } min-w-32 md:min-w-0 `}
+                  className={`${keyIndex === 0 ? "pl-3" : ""}  py-3 min-w-32 md:min-w-0`}
+                  style={style}
                 >
                   <P1
-                    className="w-fit px-2 py-1 rounded-md font-semibold"
+                    className={`w-fit px-2 py-1 rounded-md font-semibold ${computedClassName}`}
                     style={style}
                   >
                     {matchedOption?.label}
@@ -826,9 +826,8 @@ const GenericTable = <T,>({
             return (
               <td
                 key={keyIndex}
-                className={`${keyIndex === 0 ? "pl-3" : ""} py-3 ${
-                  rowKey?.className
-                } min-w-20 md:min-w-0 `}
+                className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20 md:min-w-0 `}
+                style={style}
               >
                 {rowKey.isImage ? (
                   <img
@@ -844,10 +843,10 @@ const GenericTable = <T,>({
                   />
                 ) : cellValue.length > tooltipLimit && isToolTipEnabled ? (
                   <CustomTooltip content={cellValue}>
-                    <P1>{displayValue}</P1>
+                    <P1 className={computedClassName}>{displayValue}</P1>
                   </CustomTooltip>
                 ) : (
-                  <P1 style={style}>{displayValue}</P1>
+                  <P1 className={computedClassName} style={style}>{displayValue}</P1>
                 )}
               </td>
             );
@@ -925,18 +924,18 @@ const GenericTable = <T,>({
                               const cellValue = rowKey.isDate
                                 ? formatDate(rawValue) || `${rawValue}`
                                 : `${rawValue}`;
+                              
+                              const computedClassName = typeof rowKey?.className === 'function' 
+                                ? rowKey.className(collapsibleRow) 
+                                : (rowKey?.className || '');
 
                               if (rowKey.node) {
                                 return (
                                   <td
                                     key={keyIndex}
-                                    className={`${
-                                      keyIndex === 0 ? "pl-3" : ""
-                                    } py-3 min-w-20 ${
-                                      rowKey?.className
-                                    } border-b`}
+                                    className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20 border-b`}
                                   >
-                                    {rowKey.node(collapsibleRow)}
+                                    <P1 className={computedClassName}>{rowKey.node(collapsibleRow)}</P1>
                                   </td>
                                 );
                               }

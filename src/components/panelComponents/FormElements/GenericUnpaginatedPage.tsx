@@ -70,10 +70,22 @@ type RawField = {
   Children?: RawField[];
   frontend?: {
     displayName?: string;
+    rowClassName?: {
+      condition: string;
+      className: string;
+    }[];
+    rowKeyClassName?: {
+      condition: string;
+      className: string;
+    }[];
   };
   Frontend?: {
     DisplayName?: string;
     RowClassName?: {
+      Condition: string;
+      ClassName: string;
+    }[];
+    RowKeyClassName?: {
       Condition: string;
       ClassName: string;
     }[];
@@ -159,6 +171,10 @@ const normalizeField = (f: RawField): Field => {
         ? {
             displayName: f.Frontend.DisplayName,
             rowClassName: f.Frontend.RowClassName?.map((rc) => ({
+              condition: rc.Condition,
+              className: rc.ClassName,
+            })),
+            rowKeyClassName: f.Frontend.RowKeyClassName?.map((rc) => ({
               condition: rc.Condition,
               className: rc.ClassName,
             })),
@@ -600,13 +616,27 @@ export default function GenericUnpaginatedPage({
           isImage?: boolean;
           isDate?: boolean;
           isBoolean?: boolean;
+          className?: string | ((row: GenericItem) => string);
           node?: (row: GenericItem) => React.ReactNode;
         } = {
           key: f.name,
           isImage: fieldType === Types.Image,
           isDate: fieldType === Types.Date,
-          isBoolean: fieldType === Types.Boolean || fieldType === Types.Boolean,
+          isBoolean: fieldType === Types.Boolean || fieldType === "bool",
         };
+
+        // Compute className based on rowKeyClassName conditions
+        if (f.frontend?.rowKeyClassName) {
+          rowKey.className = (row: GenericItem) => {
+            let classNames = "";
+            f.frontend!.rowKeyClassName!.forEach((config) => {
+              if (evaluateRowCondition(row, config.condition)) {
+                classNames += ` ${config.className}`;
+              }
+            });
+            return classNames.trim();
+          };
+        }
 
         // Add node function for boolean fields
         if (rowKey.isBoolean) {
