@@ -56,6 +56,7 @@ export interface RowKeyType<T> {
     textColor: string; // must be css color
   }[];
 }
+
 export interface ColumnType {
   key: string;
   isSortable: boolean;

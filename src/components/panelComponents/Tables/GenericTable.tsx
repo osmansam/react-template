@@ -9,8 +9,8 @@ import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { GoPlusCircle } from "react-icons/go";
 import {
-  MdOutlineCheckBox,
-  MdOutlineCheckBoxOutlineBlank,
+    MdOutlineCheckBox,
+    MdOutlineCheckBoxOutlineBlank,
 } from "react-icons/md";
 import { PiFadersHorizontal } from "react-icons/pi";
 import { RiFilter3Line } from "react-icons/ri";
@@ -19,15 +19,15 @@ import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import { useGeneralContext } from "../../../context/General.context";
 import {
-  DateFormatEnum,
-  DEFAULT_DATE_FORMAT,
-  FormElementsState,
-  RowPerPageEnum,
+    DateFormatEnum,
+    DEFAULT_DATE_FORMAT,
+    FormElementsState,
+    RowPerPageEnum,
 } from "../../../types";
 import { Field } from "../../../utils/api/container";
 import {
-  outsideSearch,
-  OutsideSearchProps,
+    outsideSearch,
+    OutsideSearchProps,
 } from "../../../utils/outsideSearch";
 import { outsideSort } from "../../../utils/outsideSort";
 import { GenericButton } from "../FormElements/GenericButton";
@@ -36,11 +36,11 @@ import { OrientationToggle } from "../TabPanel/OrientationToggle";
 import { useTabPanelContext } from "../TabPanel/UnifiedTabPanel";
 import { Caption, H4, H5, P1 } from "../Typography";
 import {
-  ActionType,
-  ColumnType,
-  FilterType,
-  PanelFilterType,
-  RowKeyType,
+    ActionType,
+    ColumnType,
+    FilterType,
+    PanelFilterType,
+    RowKeyType,
 } from "../shared/types";
 import ButtonTooltip from "./ButtonTooltip";
 import ColumnActiveModal from "./ColumnActiveModal";
@@ -98,6 +98,7 @@ type Props<T> = {
   onExcelUpload?: (items: Partial<T>[]) => void;
   dateFormat?: DateFormatEnum;
   containerFields?: Field[]; // Add container fields for type conversion
+  onExcelExport?: () => void;
 };
 
 const GenericTable = <T,>({
@@ -144,6 +145,7 @@ const GenericTable = <T,>({
   onExcelUpload,
   dateFormat = DEFAULT_DATE_FORMAT,
   containerFields,
+  onExcelExport,
 }: Props<T>) => {
   const { t } = useTranslation();
 
@@ -633,29 +635,6 @@ const GenericTable = <T,>({
     pdfMake.createPdf(documentDefinition).open();
   };
 
-  const generateExcel = () => {
-    const workbook = XLSX.utils.book_new();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const excelRows: any[] = [];
-    const headers = usedColumns
-      .filter((column) => column.correspondingKey)
-      .map((column) => column.key);
-    excelRows.push(headers);
-    const excelAllRows = !isEmtpyExcel ? sortedRows : [];
-    excelAllRows.forEach((row) => {
-      const rowData = usedColumns
-        .filter((column) => column.correspondingKey)
-        .map((column) => {
-          const value = row[column.correspondingKey as keyof T];
-          return value === undefined || value === null ? "" : String(value);
-        });
-      excelRows.push(rowData);
-    });
-    const worksheet = XLSX.utils.aoa_to_sheet(excelRows);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
-    XLSX.writeFile(workbook, excelFileName ?? "ExportedData.xlsx");
-  };
-
   const renderActionButtons = (row: T, actions: ActionType<T>[]) => (
     <div className="flex flex-row my-auto h-full gap-3 justify-center items-center">
       {actions?.map((action, index) => {
@@ -1141,10 +1120,10 @@ const GenericTable = <T,>({
                       </Tooltip>
                       {isExcelMenuOpen && (
                         <div className="absolute top-10 right-0 flex flex-col gap-2 bg-white rounded-md py-2 px-2 max-w-fit border border-gray-200 drop-shadow-lg z-[60] min-w-48">
-                          {isExcel && (
+                          {onExcelExport && (
                             <div
                               onClick={() => {
-                                generateExcel();
+                                onExcelExport();
                                 setIsExcelMenuOpen(false);
                               }}
                               className="flex flex-row items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-md cursor-pointer transition-colors"

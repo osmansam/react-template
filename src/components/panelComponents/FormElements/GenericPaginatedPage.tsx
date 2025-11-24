@@ -16,8 +16,9 @@ import {
   Types,
   useGetContainers,
 } from "../../../utils/api/container";
-import { useDynamicCrud, useGetPaginatedItems } from "../../../utils/dynamic";
+import { useDynamicCrud, useExportDynamicItems, useGetPaginatedItems } from "../../../utils/dynamic";
 import SwitchButton from "../common/SwitchButton";
+import ExportModal from "../Modals/ExportModal";
 import { FormKeyTypeEnum, InputTypes } from "../shared/types";
 import GenericTable from "../Tables/GenericTable";
 import GenericAddEditPanel from "./GenericAddEditPanel";
@@ -601,7 +602,7 @@ export default function GenericPaginatedPage({
           isImage?: boolean;
           isDate?: boolean;
           isBoolean?: boolean;
-          className?: string;
+          className?: string | ((row: GenericItem) => string);
           node?: (row: GenericItem) => React.ReactNode;
         } = {
           key: f.name,
@@ -1512,6 +1513,44 @@ export default function GenericPaginatedPage({
     ]
   );
 
+  const { exportDynamicItems } = useExportDynamicItems();
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  const handleExport = (
+    selectedFields: string[],
+    includeSearch: boolean,
+    includeFilters: boolean,
+    exportScope: "all" | "currentPage" | "numberOfPages",
+    pageCount?: number
+  ) => {
+    let calculatedLimit = rowsPerPage;
+    let calculatedPage = currentPage;
+
+    if (exportScope === "all") {
+      // For "all", we don't send limit/page, backend should handle it
+      calculatedLimit = 0; // 0 means all
+      calculatedPage = 1;
+    } else if (exportScope === "numberOfPages" && pageCount) {
+      // Calculate limit as rowsPerPage * pageCount
+      calculatedLimit = rowsPerPage * pageCount;
+      calculatedPage = 1; // Always start from page 1
+    } else if (exportScope === "currentPage") {
+      // Keep current page and limit
+      calculatedLimit = rowsPerPage;
+      calculatedPage = currentPage;
+    }
+
+    const payload = {
+      schemaName,
+      fields: selectedFields,
+      filters: includeFilters ? filterPanelFormElements : {},
+      search: includeSearch ? String(filterPanelFormElements.search || "") : "",
+      limit: calculatedLimit,
+      page: calculatedPage,
+    };
+    exportDynamicItems(payload);
+  };
+
   return (
     <>
       {isHeader && <Header />}
@@ -1531,11 +1570,21 @@ export default function GenericPaginatedPage({
           {...(pagination && { pagination })}
           outsideSearchProps={outsideSearchProps}
           selectionActions={selectionActions}
-          isExcel={!hasImageField}
+          isExcel={true}
           onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
+          onExcelExport={() => setIsExportModalOpen(true)}
           filters={filters}
           filterPanel={filterPanel}
           containerFields={container?.fields}
+        />
+        <ExportModal
+          isOpen={isExportModalOpen}
+          close={() => setIsExportModalOpen(false)}
+          fields={displayFields}
+          onExport={handleExport}
+          schemaName={schemaName}
+          currentPage={currentPage}
+          totalPages={pagination?.totalPages || 1}
         />
       </div>
     </>

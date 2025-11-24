@@ -302,6 +302,43 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   };
 }
 
+export function useExportDynamicItems() {
+  const { t } = useTranslation();
+
+  async function exportRequest(payload: {
+    schemaName: string;
+    fields: string[];
+    filters: Record<string, unknown>;
+    search: string;
+    limit: number;
+    page: number;
+  }) {
+    const response = await axiosClient.post(`${BASE}/export`, payload, {
+      responseType: "blob",
+    });
+    return response.data;
+  }
+
+  const exportMutation = useMutation({
+    mutationFn: exportRequest,
+    onSuccess: (data) => {
+      const url = window.URL.createObjectURL(new Blob([data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "export.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success(t("Export successful"));
+    },
+    onError: () => {
+      toast.error(t("Export failed"));
+    },
+  });
+
+  return { exportDynamicItems: exportMutation.mutate };
+}
+
 export function useGetDynamicItems<T>(
   schemaName: string,
   filters?: FormElementsState
