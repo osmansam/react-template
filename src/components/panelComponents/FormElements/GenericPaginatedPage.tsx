@@ -1582,7 +1582,7 @@ export default function GenericPaginatedPage({
           close={() => setIsExportModalOpen(false)}
           fields={displayFields}
           onExport={handleExport}
-          schemaName={schemaName}
+          schemaName={humanize(schemaName)}
           currentPage={currentPage}
           totalPages={pagination?.totalPages || 1}
         />
