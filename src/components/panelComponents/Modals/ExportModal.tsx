@@ -5,6 +5,18 @@ import { CheckSwitch } from "../../../common/CheckSwitch";
 import { Field } from "../../../utils/api/container";
 import { GenericButton } from "../FormElements/GenericButton";
 
+const humanize = (key: string) =>
+  key
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (c) => c.toUpperCase());
+
+const getFieldLabel = (field: Field): string => {
+  return field.frontend?.displayName || humanize(field.name);
+};
+
 type Props = {
   isOpen: boolean;
   close: () => void;
@@ -121,10 +133,10 @@ export default function ExportModal({
                 />
                 <span 
                   className="text-sm truncate cursor-pointer" 
-                  title={field.frontend?.displayName || field.name}
+                  title={getFieldLabel(field)}
                   onClick={() => handleToggleField(field.name)}
                 >
-                  {t(field.frontend?.displayName || field.name)}
+                  {t(getFieldLabel(field))}
                 </span>
               </div>
             ))}
