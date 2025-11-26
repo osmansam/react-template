@@ -354,13 +354,15 @@ export function useGetDynamicItems<T>(
           // This creates: age=gt-32&age=lt-123
           value.forEach((item) => {
             if (item !== undefined && item !== null && item !== "") {
-              parts.push(`${key}=${encodeURIComponent(String(item))}`);
+              const trimmedItem = typeof item === "string" ? item.trim() : String(item);
+              parts.push(`${key}=${encodeURIComponent(trimmedItem)}`);
             }
           });
         } else if (value instanceof Date) {
           parts.push(`${key}=${value.toISOString()}`);
         } else {
-          parts.push(`${key}=${encodeURIComponent(String(value))}`);
+          const trimmedValue = typeof value === "string" ? value.trim() : String(value);
+          parts.push(`${key}=${encodeURIComponent(trimmedValue)}`);
         }
       }
     });
@@ -416,13 +418,15 @@ export function useGetPaginatedItems<T>(
         // This creates: age=gt-32&age=lt-123
         value.forEach((item) => {
           if (item !== undefined && item !== null && item !== "") {
-            parts.push(`${key}=${encodeURIComponent(String(item))}`);
+            const trimmedItem = typeof item === "string" ? item.trim() : String(item);
+            parts.push(`${key}=${encodeURIComponent(trimmedItem)}`);
           }
         });
       } else if (value instanceof Date) {
         parts.push(`${key}=${value.toISOString()}`);
       } else {
-        parts.push(`${key}=${encodeURIComponent(String(value))}`);
+        const trimmedValue = typeof value === "string" ? value.trim() : String(value);
+        parts.push(`${key}=${encodeURIComponent(trimmedValue)}`);
       }
     }
   });
