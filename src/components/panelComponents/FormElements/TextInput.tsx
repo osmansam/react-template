@@ -5,8 +5,8 @@ import { FiMinusCircle } from "react-icons/fi";
 import { GoPlusCircle } from "react-icons/go";
 import { IoIosClose } from "react-icons/io";
 import {
-  MdOutlineCheckBox,
-  MdOutlineCheckBoxOutlineBlank,
+    MdOutlineCheckBox,
+    MdOutlineCheckBoxOutlineBlank,
 } from "react-icons/md";
 import { H6 } from "../Typography";
 import { GenericButton } from "./GenericButton";
@@ -34,6 +34,7 @@ type TextInputProps = {
   isDebounce?: boolean;
   isDatePickerLabel?: boolean;
   isReadOnly?: boolean;
+  error?: string; // Validation error message
 };
 
 const TextInput = ({
@@ -53,6 +54,7 @@ const TextInput = ({
   requiredField = false,
   isDebounce = false,
   isReadOnly = false,
+  error,
   className = "px-4 py-2.5 border rounded-md __className_a182b8",
 }: TextInputProps) => {
   const [localValue, setLocalValue] = useState(value);
@@ -147,7 +149,9 @@ const TextInput = ({
     inputWidth ? "border-gray-200" : ""
   } w-full text-sm ${
     type === "number" ? "inputHideNumberArrows" : ""
-  } text-base`;
+  } text-base ${
+    error ? "border-red-500 border-2" : ""
+  }`;
 
   const handleWheel = () => {
     if (document.activeElement instanceof HTMLElement) {
@@ -280,6 +284,9 @@ const TextInput = ({
           </GenericButton>
         )}
       </div>
+      {error && (
+        <p className="text-red-500 text-sm mt-1">{error}</p>
+      )}
     </div>
   );
 };

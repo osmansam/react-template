@@ -148,6 +148,14 @@ export interface GenericInputType {
       | Array<string>
       | Array<number>;
   }[];
+  // Validation properties
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  pattern?: string;
+  validationMessage?: string;
+  error?: string; // Validation error message to display
 }
 
 export interface FormKeyType {
