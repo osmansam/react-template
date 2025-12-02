@@ -6,6 +6,7 @@ import GenericTabPage from "../components/panelComponents/FormElements/GenericTa
 export enum PublicRoutes {
   NotFound = "*",
   Login = "/login",
+  GoogleCallback = "/auth/google/callback",
 }
 
 export enum Routes {

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { SketchPicker } from "react-color";
 import "react-day-picker/dist/style.css";
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import { FiMinusCircle } from "react-icons/fi";
 import { GoPlusCircle } from "react-icons/go";
 import { IoIosClose } from "react-icons/io";
 import {
-    MdOutlineCheckBox,
-    MdOutlineCheckBoxOutlineBlank,
+  MdOutlineCheckBox,
+  MdOutlineCheckBoxOutlineBlank,
 } from "react-icons/md";
 import { H6 } from "../Typography";
 import { GenericButton } from "./GenericButton";
@@ -62,6 +63,8 @@ const TextInput = ({
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<
     typeof setTimeout
   > | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
@@ -242,12 +245,12 @@ const TextInput = ({
       <div
         className={`flex items-center justify-end ${
           isNumberButtonsActive ? "gap-4" : "gap-2"
-        } ${inputWidth ? inputWidth : "w-full"}`}
+        } ${inputWidth ? inputWidth : "w-full"} relative`}
       >
         <input
           id={"number-input"}
           ref={inputRef}
-          type={type}
+          type={type === "password" && !showPassword ? "password" : type === "password" ? "text" : type}
           style={{
             fontSize: "16px",
           }}
@@ -259,6 +262,19 @@ const TextInput = ({
           {...(isMinNumber && (type === "number" ? { min: minNumber } : {}))}
           onWheel={type === "number" ? handleWheel : undefined}
         />
+        {type === "password" && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 text-gray-500 hover:text-gray-700 focus:outline-none"
+          >
+            {showPassword ? (
+              <AiOutlineEyeInvisible size={20} />
+            ) : (
+              <AiOutlineEye size={20} />
+            )}
+          </button>
+        )}
         {isNumberButtonsActive && (
           <FiMinusCircle
             className="w-8 h-8 flex-shrink-0 text-red-500 hover:text-red-800 cursor-pointer focus:outline-none"

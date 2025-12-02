@@ -1,130 +1,202 @@
-import React, { useEffect } from "react";
-import { useLocation } from "react-router-dom";
-import { LoginCredentials, useLogin } from "../utils/api/auth";
-// import { ACCESS_TOKEN } from "../utils/api/axiosClient";
-// import { Paths } from "../utils/api/factory";
-// import { getUserWithToken } from "../utils/api/user";
-
-interface FormElements extends HTMLFormControlsCollection {
-  username: HTMLInputElement;
-  password: HTMLInputElement;
-}
-
-interface LoginFormElement extends HTMLFormElement {
-  readonly elements: FormElements;
-}
-
-type RedirectLocationState = {
-  from: Location;
-};
+import Cookies from "js-cookie";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { FcGoogle } from "react-icons/fc";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { GenericButton } from "../components/panelComponents/FormElements/GenericButton";
+import TextInput from "../components/panelComponents/FormElements/TextInput";
+import { H1, H5 } from "../components/panelComponents/Typography";
+import { useLogin } from "../utils/api/auth";
+import { ContainerModel, useGetContainers } from "../utils/api/container";
+import { getFieldLabel } from "../utils/genericPageHelpers";
 
 const Login = () => {
-  const { state: locationState } = useLocation();
-  //   const navigate = useNavigate();
-  const from = locationState
-    ? (locationState as RedirectLocationState).from
-    : undefined;
-  const onError = (error: unknown) => {
-    console.log({ error });
-    setError(true);
-  };
-  const { login } = useLogin(from, onError);
-  const [error, setError] = React.useState(false);
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const containers = useGetContainers();
+  const [authContainer, setAuthContainer] = useState<ContainerModel | null>(
+    null
+  );
+  const [formData, setFormData] = useState<Record<string, string>>({});
 
-  const handleSubmit = async (event: React.FormEvent<LoginFormElement>) => {
-    event.preventDefault();
+  const { login } = useLogin(location.state?.from || "/");
 
-    const { username, password } = (event.target as LoginFormElement).elements;
-    const payload: LoginCredentials = {
-      username: username.value,
-      password: password.value,
-    };
-
-    setError(false);
-    login(payload);
-  };
   useEffect(() => {
-    const checkAuthentication = async () => {
-      try {
-        // const token = localStorage.getItem(ACCESS_TOKEN);
-        // if (token && localStorage.getItem("loggedIn")) {
-        //   const loggedInUser = await getUserWithToken();
-        //   if (loggedInUser) {
-        //     navigate(Paths.Tables, { replace: true });
-        //   }
-        // }
-      } catch (error) {
-        return;
+    if (containers) {
+      const auth = containers.find((c) => c.isAuthContainer);
+      if (auth) {
+        setAuthContainer(auth);
+      }
+    }
+  }, [containers]);
+
+  const handleInputChange = (fieldName: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [fieldName]: value }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    login(formData);
+  };
+
+  const handleGoogleLogin = () => {
+    // Open Google OAuth in a popup window
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    const popup = window.open(
+      `${import.meta.env.VITE_API_URL}auth/google/login`,
+      'Google Login',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    // Listen for messages from the popup
+    const handleMessage = (event: MessageEvent) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+        const { accessToken, refreshToken } = event.data;
+        
+        // Store tokens
+        Cookies.set('jwt', accessToken);
+        localStorage.setItem('jwt', accessToken);
+        localStorage.setItem('loggedIn', 'true');
+        
+        if (refreshToken) {
+          localStorage.setItem('refreshToken', refreshToken);
+        }
+        
+        toast.success(t('Logged in successfully'));
+        navigate(location.state?.from || '/');
+        
+        // Close popup
+        if (popup) popup.close();
+      } else if (event.data.type === 'GOOGLE_AUTH_ERROR') {
+        toast.error(t('Google login failed'));
+        if (popup) popup.close();
       }
     };
 
-    checkAuthentication();
-  }, []);
+    window.addEventListener('message', handleMessage);
+    
+    // Clean up listener when component unmounts or popup closes
+    const checkPopupClosed = setInterval(() => {
+      if (popup?.closed) {
+        window.removeEventListener('message', handleMessage);
+        clearInterval(checkPopupClosed);
+      }
+    }, 500);
+  };
+
+  if (!authContainer) {
+    if (containers && containers.length > 0) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-gray-50">
+          <div className="text-center p-8 bg-white rounded-lg shadow-md">
+            <h2 className="text-xl font-bold text-red-600 mb-2">
+              Configuration Error
+            </h2>
+            <p className="text-gray-600">
+              No authentication container found. Please set{" "}
+              <code className="bg-gray-100 px-1 rounded">
+                IsAuthContainer: true
+              </code>{" "}
+              for one of your containers in the backend.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 bg-gray-200 rounded-full mb-4"></div>
+          <div className="h-4 w-32 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  const loginFields = authContainer.fields.filter((f) => f.isLoginCredential);
 
   return (
-    <div>
-      <section className="bg-white dark:bg-gray-900 {-- h-screen --}">
-        <div className="mx-auto flex justify-center md:items-center relative md:h-full">
-          <form
-            id="login"
-            className="w-full sm:w-4/6 md:w-3/6 lg:w-4/12 xl:w-3/12 text-gray-800 mb-32 sm:mb-0 my-40 sm:my-12 px-2 sm:px-0"
-            onSubmit={handleSubmit}
-          >
-            <div className="px-2 flex flex-col items-center justify-center mt-8 sm:mt-0">
-              <h2 className="text-4xl dark:text-gray-100 leading-tight pt-8">
-                Da Vinci Panel
-              </h2>
-            </div>
-            <div className="mt-12 w-full px-2 sm:px-6">
-              <div className="flex flex-col mt-5">
-                <label
-                  htmlFor="username"
-                  className="text-lg font-semibold dark:text-gray-100 leading-tight"
-                >
-                  Username
-                </label>
-                <input
-                  required
-                  name="username"
-                  id="username"
-                  className={`h-10 px-2 w-full rounded mt-2 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 dark:border-gray-700 dark:focus:border-indigo-600 focus:outline-none focus:border focus:border-indigo-700 ${
-                    error ? "border-red-300" : "border-gray-300"
-                  } border shadow`}
-                  type="text"
-                />
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="p-8">
+          <div className="text-center mb-10">
+            <H1 className="text-3xl font-bold text-gray-900 mb-2">
+              {t("Welcome Back")}
+            </H1>
+            <H5 className="text-gray-500 font-normal">
+              {t("Please sign in to continue")}
+            </H5>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {loginFields.map((field) => (
+              <TextInput
+                key={field.name}
+                label={getFieldLabel(field)}
+                type={field.isHashed ? "password" : "text"}
+                value={formData[field.name] || ""}
+                onChange={(val) => handleInputChange(field.name, val)}
+                placeholder={t(`Enter your ${field.name}`)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+              />
+            ))}
+
+            <GenericButton
+              type="submit"
+              variant="primary"
+              className="w-full py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+            >
+              {t("Sign In")}
+            </GenericButton>
+          </form>
+
+          <div className="mt-8">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
               </div>
-              <div className="flex flex-col mt-5">
-                <label
-                  htmlFor="password"
-                  className="text-lg font-semibold dark:text-gray-100 fleading-tight"
-                >
-                  Password
-                </label>
-                <input
-                  required
-                  name="password"
-                  id="password"
-                  className={`h-10 px-2 w-full rounded mt-2 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 dark:border-gray-700 dark:focus:border-indigo-600 focus:outline-none focus:border focus:border-indigo-700  border shadow ${
-                    error ? "border-red-300" : "border-gray-300"
-                  }`}
-                  type="password"
-                />
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">
+                  {t("Or continue with")}
+                </span>
               </div>
-              {error && (
-                <div className="flex text-red-600 text-sm">
-                  <h5>Username or password is invalid</h5>
-                </div>
-              )}
             </div>
-            <div className="px-2 mb-16 sm:mb-56 md:mb-16 sm:px-6">
-              <button className="focus:outline-none w-full bg-gray-800 transition duration-150 ease-in-out hover:bg-gray-600 rounded text-white px-8 py-3 text-sm mt-6">
-                Login
+
+            <div className="mt-6">
+              <button
+                onClick={handleGoogleLogin}
+                className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+              >
+                <FcGoogle className="h-6 w-6 mr-2" />
+                <span>{t("Sign in with Google")}</span>
               </button>
             </div>
-          </form>
+          </div>
         </div>
-      </section>
+        <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
+          <p className="text-sm text-gray-600">
+            {t("Don't have an account?")}{" "}
+            <a
+              href="#"
+              className="font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              {t("Contact support")}
+            </a>
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
+
 export default Login;

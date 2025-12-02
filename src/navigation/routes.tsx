@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { Route, Routes } from "react-router-dom";
-import GenericPaginatedPage from "../components/panelComponents/FormElements/GenericPaginatedPage";
 import { useDynamicPages } from "../hooks/useDynamicPages";
+import GoogleCallback from "../pages/GoogleCallback";
+import Login from "../pages/Login";
 import { allRoutes, PublicRoutes } from "./constants";
 import { PrivateRoutes } from "./PrivateRoutes";
 
@@ -54,16 +55,12 @@ const RouterContainer = () => {
         ))}
       </Route>
 
-      <Route
-        path={PublicRoutes.Login}
-        element={<GenericPaginatedPage schemaName="can" />}
-      />
-      <Route
-        path={PublicRoutes.NotFound}
-        element={<GenericPaginatedPage schemaName="can" />}
-      />
+      <Route path={PublicRoutes.Login} element={<Login />} />
+      <Route path={PublicRoutes.GoogleCallback} element={<GoogleCallback />} />
+  
     </Routes>
   );
 };
 
 export default RouterContainer;
+

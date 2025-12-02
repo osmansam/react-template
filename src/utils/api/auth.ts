@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import Cookies from "js-cookie";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { Location, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 // import { Routes } from "../../navigation/constants";
 import { post } from "./index";
@@ -15,10 +15,7 @@ interface LoginError {
   };
 }
 
-export interface LoginCredentials {
-  username: string;
-  password: string;
-}
+export type LoginCredentials = Record<string, any>;
 
 export interface LoginResponse {
   token: string;

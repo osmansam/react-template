@@ -1,5 +1,22 @@
 import axios, { AxiosHeaders } from "axios";
 import Cookies from "js-cookie";
+import { camelCase, isArray, isPlainObject, transform } from "lodash";
+
+// Recursively convert all keys in an object from PascalCase to camelCase
+function toCamelCase(obj: any): any {
+  if (isArray(obj)) {
+    return obj.map((item) => toCamelCase(item));
+  }
+  
+  if (isPlainObject(obj)) {
+    return transform(obj, (result: any, value: any, key: string) => {
+      const camelKey = camelCase(key);
+      result[camelKey] = toCamelCase(value);
+    });
+  }
+  
+  return obj;
+}
 
 export const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -27,6 +44,10 @@ axiosClient.interceptors.request.use(
 
 axiosClient.interceptors.response.use(
   (response) => {
+    // Transform response data from PascalCase to camelCase
+    if (response.data) {
+      response.data = toCamelCase(response.data);
+    }
     return response;
   },
   (error) => {
