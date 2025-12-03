@@ -3,6 +3,7 @@ import Cookies from "js-cookie";
 import { camelCase, isArray, isPlainObject, transform } from "lodash";
 
 // Recursively convert all keys in an object from PascalCase to camelCase
+// Special handling: preserve _id fields (don't convert to id)
 function toCamelCase(obj: any): any {
   if (isArray(obj)) {
     return obj.map((item) => toCamelCase(item));
@@ -10,7 +11,8 @@ function toCamelCase(obj: any): any {
   
   if (isPlainObject(obj)) {
     return transform(obj, (result: any, value: any, key: string) => {
-      const camelKey = camelCase(key);
+      // Preserve _id as-is (don't convert to id)
+      const camelKey = key === '_id' ? '_id' : camelCase(key);
       result[camelKey] = toCamelCase(value);
     });
   }
