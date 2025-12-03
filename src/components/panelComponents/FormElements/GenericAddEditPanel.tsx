@@ -264,10 +264,8 @@ const GenericAddEditPanel = <T,>({
   }, [isEditMode, additionalCancelFunction, handleClose]);
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>, input: GenericInputType) => {
-      console.log("File change triggered for input:", input.formKey);
       if (event.target.files?.[0]) {
         const file = event.target.files[0];
-        console.log("File selected:", file.name, "for key:", input.formKey);
         // Store the File object directly in formElements
         setFormElements((prev) => ({ ...prev, [input.formKey]: file }));
       }
@@ -505,12 +503,7 @@ const GenericAddEditPanel = <T,>({
             <div>
               {/* Image inputs */}
               {imageInputs.map((input) => {
-                const value = formElements[input.formKey];
-                console.log(
-                  `Rendering image input for ${input.formKey}, value:`,
-                  value
-                );
-
+                const value = formElements[input.formKey]
                 // If value is a File object, create a preview URL
                 const imageSrc =
                   value instanceof File

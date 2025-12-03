@@ -333,7 +333,6 @@ export const evaluateRowCondition = (row: GenericItem, condition: string): boole
     const [lhs, rhs] = condition.split(">");
     if (!lhs || rhs === undefined) return false;
     const result = parseValue(row, lhs) > parseValue(row, rhs);
-    console.log("Condition:", condition, "LHS:", parseValue(row, lhs), "RHS:", parseValue(row, rhs), "Result:", result);
     return result;
   }
 
