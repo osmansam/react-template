@@ -22,6 +22,10 @@ export interface Frontend {
   displayName?: string;
   rowClassName?: RowClassConfig[];
   rowKeyClassName?: RowClassConfig[];
+  invalidateKeys?: {
+    key: string;
+    defaultValue: string | boolean | number | undefined | string[] | number[]|undefined
+  }[]
 }
 
 export interface Field {

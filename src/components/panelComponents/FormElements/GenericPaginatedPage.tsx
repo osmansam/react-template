@@ -288,7 +288,6 @@ export default function GenericPaginatedPage({
       // Parse validation rules from tag
       const validationRules = parseValidationRules(f.tag);
       const isRequired = isFieldRequired(f.tag);
-
       // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
       if (
         (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId || fieldType === Types.ObjectIdArray) &&
@@ -311,6 +310,10 @@ export default function GenericPaginatedPage({
               item[f.populationSettings!.inputSelectionField] || item._id || ""
             ),
           })),
+          invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
+            key: String(key),
+            defaultValue: undefined,
+          }))??[]
         };
       }
 
@@ -348,6 +351,10 @@ export default function GenericPaginatedPage({
             value: item,
             label: String(item),
           })),
+invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
+            key: String(key),
+            defaultValue: undefined,
+          }))??[]
         };
       }
 
@@ -362,6 +369,10 @@ export default function GenericPaginatedPage({
         min: validationRules.min,
         max: validationRules.max,
         pattern: validationRules.pattern,
+invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
+            key: String(key),
+            defaultValue: undefined,
+          }))??[]
       };
     }).filter((i): i is NonNullable<typeof i> => i !== null);
 
@@ -410,10 +421,8 @@ export default function GenericPaginatedPage({
 
       // Container level configs
       if (container?.frontend?.rowClassName) {
-        console.log("Container RowClassName Configs:", container.frontend.rowClassName);
         container.frontend.rowClassName.forEach((config) => {
           if (evaluateRowCondition(row, config.condition)) {
-            console.log("Applied container class:", config.className);
             Object.assign(styles, tailwindBgToStyle(config.className));
           }
         });
@@ -422,10 +431,8 @@ export default function GenericPaginatedPage({
       // Field level configs
       container?.fields.forEach((field) => {
         if (field.frontend?.rowClassName) {
-          console.log("Field RowClassName Configs:", field.name, field.frontend.rowClassName);
           field.frontend.rowClassName.forEach((config) => {
             if (evaluateRowCondition(row, config.condition)) {
-              console.log("Applied field class:", config.className);
               Object.assign(styles, tailwindBgToStyle(config.className));
             }
           });
@@ -436,8 +443,6 @@ export default function GenericPaginatedPage({
     },
     [container]
   );
-
-  console.log("rowStyleFunction defined:", !!rowStyleFunction);
 
   useEffect(() => {
     setCurrentPage(1);

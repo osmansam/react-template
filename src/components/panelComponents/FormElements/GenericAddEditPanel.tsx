@@ -390,7 +390,7 @@ const GenericAddEditPanel = <T,>({
       input.invalidateKeys.forEach((key) => {
         setFormElements((prev) => ({
           ...prev,
-          [key.key]: initialState[key.key],
+          [key.key]: initialState[key.key] ?? "",
         }));
       });
     }
@@ -570,7 +570,7 @@ const GenericAddEditPanel = <T,>({
                     changedInput.invalidateKeys.forEach((key) => {
                       setFormElements((prev) => ({
                         ...prev,
-                        [key.key]: key.defaultValue,
+                        [key.key]: initialState[key.key] ?? "",
                       }));
                     });
                   }
@@ -609,7 +609,7 @@ const GenericAddEditPanel = <T,>({
                       changedInput.invalidateKeys.forEach((key) => {
                         setFormElements((prev) => ({
                           ...prev,
-                          [key.key]: key.defaultValue,
+                          [key.key]: initialState[key.key] ?? "",
                         }));
                       });
                     }

@@ -9,22 +9,22 @@ import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
 import {
-    ContainerModel,
-    Field,
-    Types,
-    useGetContainers,
+  ContainerModel,
+  Field,
+  Types,
+  useGetContainers,
 } from "../../../utils/api/container";
 import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
 import {
-    RawContainer,
-    evaluateRowCondition,
-    fieldToInput,
-    getFieldLabel,
-    humanize,
-    isDisplayablePrimitive,
-    normalizeContainer,
-    normalizeField,
-    tailwindBgToStyle
+  RawContainer,
+  evaluateRowCondition,
+  fieldToInput,
+  getFieldLabel,
+  humanize,
+  isDisplayablePrimitive,
+  normalizeContainer,
+  normalizeField,
+  tailwindBgToStyle
 } from "../../../utils/genericPageHelpers";
 import { isFieldRequired, parseValidationRules } from "../../../utils/validationHelper";
 import { Header } from "../../header/Header";
@@ -329,6 +329,10 @@ export default function GenericUnpaginatedPage({
               item[f.populationSettings!.inputSelectionField] || item._id || ""
             ),
           })),
+          invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
+            key: String(key),
+            defaultValue: undefined,
+          }))??[]
         };
       }
 
@@ -366,6 +370,10 @@ export default function GenericUnpaginatedPage({
             value: item,
             label: String(item),
           })),
+          invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
+            key: String(key),
+            defaultValue: undefined,
+          }))??[]
         };
       }
 
@@ -380,6 +388,10 @@ export default function GenericUnpaginatedPage({
         min: validationRules.min,
         max: validationRules.max,
         pattern: validationRules.pattern,
+        invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
+            key: String(key),
+            defaultValue: undefined,
+          }))??[]
       };
     }).filter((i): i is NonNullable<typeof i> => i !== null);
 

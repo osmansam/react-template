@@ -50,6 +50,10 @@ export type RawField = {
       condition: string;
       className: string;
     }[];
+    invalidateKeys?: {
+      key: string;
+      defaultValue: string | boolean | number | undefined | string[] | number[];
+    }[];
   };
   Frontend?: {
     DisplayName?: string;
@@ -61,10 +65,15 @@ export type RawField = {
       Condition: string;
       ClassName: string;
     }[];
+    invalidateKeys?: {
+      key: string;
+      defaultValue: string | boolean | number | undefined | string[] | number[];
+    }[];
   };
   populationSettings?: RawPopulationSettings;
   PopulationSettings?: RawPopulationSettings;
   equation?: string;
+ 
   Equation?: string;
 };
 
@@ -97,12 +106,20 @@ export type RawContainer = {
       condition: string;
       className: string;
     }[];
+    invalidateKeys?: {
+      key: string;
+      defaultValue: string | boolean | number | undefined | string[] | number[];
+    }[];
   };
   Frontend?: {
     DisplayName?: string;
     RowClassName?: {
       Condition: string;
       ClassName: string;
+    }[];
+    invalidateKeys?: {
+      key: string;
+      defaultValue: string | boolean | number | undefined | string[] | number[];
     }[];
   };
 };
@@ -157,6 +174,10 @@ export const normalizeField = (f: RawField): Field => {
               condition: rc.Condition,
               className: rc.ClassName,
             })),
+            invalidateKeys: f.Frontend.invalidateKeys?.map((key) => ({
+              key:String(key),
+              defaultValue: undefined,
+            })) ?? [],
           }
         : undefined),
     populationSettings: rawPopSettings
@@ -169,6 +190,7 @@ export const normalizeField = (f: RawField): Field => {
         }
       : undefined,
     equation: f.equation ?? f.Equation,
+   
   };
 };
 
