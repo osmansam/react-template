@@ -13,14 +13,16 @@ import { UserContextProvider } from "./context/User.context";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { PublicRoutes } from "./navigation/constants";
 import RouterContainer from "./navigation/routes";
+import { ACCESS_TOKEN } from "./utils/api/axiosClient";
 
 function App() {
   const isMutating = useIsMutating();
   const location = useLocation();
   useWebSocket();
 
-  // Don't show sidebar on login page
-  const showSidebar = location.pathname !== PublicRoutes.Login;
+  // Don't show sidebar on login page or if user is not authenticated
+  const token = localStorage.getItem(ACCESS_TOKEN);
+  const showSidebar = location.pathname !== PublicRoutes.Login && !!token;
 
   return (
     <div className="App">
