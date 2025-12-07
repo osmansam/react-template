@@ -69,6 +69,9 @@ export type RawField = {
       key: string;
       defaultValue: string | boolean | number | undefined | string[] | number[];
     }[];
+    linkTemplate?: string;
+    linkLabelField?: string;
+    linkType?: string;
   };
   populationSettings?: RawPopulationSettings;
   PopulationSettings?: RawPopulationSettings;
@@ -178,6 +181,9 @@ export const normalizeField = (f: RawField): Field => {
               key:String(key),
               defaultValue: undefined,
             })) ?? [],
+            linkTemplate: f.Frontend.linkTemplate,
+            linkLabelField: f.Frontend.linkLabelField,
+            linkType: f.Frontend.linkType as "external" | "internal" | "email" | "phone" | "file" | undefined,
           }
         : undefined),
     populationSettings: rawPopSettings

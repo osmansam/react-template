@@ -18,6 +18,8 @@ export interface RowClassConfig {
   className: string;
 }
 
+export type LinkType = "external" | "internal" | "email" | "phone" | "file";
+
 export interface Frontend {
   displayName?: string;
   rowClassName?: RowClassConfig[];
@@ -25,7 +27,10 @@ export interface Frontend {
   invalidateKeys?: {
     key: string;
     defaultValue: string | boolean | number | undefined | string[] | number[]|undefined
-  }[]
+  }[];
+  linkTemplate?: string;
+  linkLabelField?: string;
+  linkType?: LinkType;
 }
 
 export interface Field {

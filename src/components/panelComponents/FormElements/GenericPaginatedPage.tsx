@@ -6,6 +6,7 @@ import { HiOutlineTrash } from "react-icons/hi2";
 import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { Header } from "../../../components/header/Header";
+import { LinkCell } from "../../../components/LinkCell";
 import { useGeneralContext } from "../../../context/General.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
@@ -197,10 +198,12 @@ export default function GenericPaginatedPage({
           // Handle array types - display as comma-separated values
           rowKey.node = (row: GenericItem) => {
             const value = row[f.name];
-            if (Array.isArray(value)) {
-              return <span>{value.join(", ")}</span>;
-            }
-            return <span>{String(value || "")}</span>;
+            const content = Array.isArray(value) ? value.join(", ") : String(value || "");
+            return f.frontend?.linkTemplate ? (
+              <LinkCell field={f} row={row} />
+            ) : (
+              <span>{content}</span>
+            );
           };
         } else if (
           (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
@@ -211,6 +214,7 @@ export default function GenericPaginatedPage({
           // Handle populated objectId/autoIncrementId fields
           rowKey.node = (row: GenericItem) => {
             const value = row[f.name];
+            let content = "";
             if (value && typeof value === "object") {
               // Display the fields specified in displayFields
               const valueObj = value as Record<string, unknown>;
@@ -218,9 +222,15 @@ export default function GenericPaginatedPage({
                 .map((fieldName) => valueObj[fieldName])
                 .filter(Boolean)
                 .map(String);
-              return <span>{displayValues.join(" - ") || String(valueObj._id || "")}</span>;
+              content = displayValues.join(" - ") || String(valueObj._id || "");
+            } else {
+              content = String(value || "");
             }
-            return <span>{String(value || "")}</span>;
+            return f.frontend?.linkTemplate ? (
+              <LinkCell field={f} row={row} />
+            ) : (
+              <span>{content}</span>
+            );
           };
         } else if (
           fieldType === Types.ObjectIdArray &&
@@ -231,6 +241,7 @@ export default function GenericPaginatedPage({
           // Handle populated objectIdArray fields
           rowKey.node = (row: GenericItem) => {
             const value = row[f.name];
+            let content = "";
             if (Array.isArray(value) && value.length > 0) {
               // Map over array of populated objects
               const displayItems = value.map((item) => {
@@ -254,10 +265,19 @@ export default function GenericPaginatedPage({
                 }
                 return String(item || "");
               });
-              return <span>{displayItems.join(", ")}</span>;
+              content = displayItems.join(", ");
+            } else {
+              content = String(value || "");
             }
-            return <span>{String(value || "")}</span>;
+            return f.frontend?.linkTemplate ? (
+              <LinkCell field={f} row={row} />
+            ) : (
+              <span>{content}</span>
+            );
           };
+        } else if (f.frontend?.linkTemplate) {
+          // Handle all other field types with linkTemplate (e.g., regular strings, numbers)
+          rowKey.node = (row: GenericItem) => <LinkCell field={f} row={row} />;
         }
 
         return rowKey;
