@@ -48,6 +48,8 @@ export interface Field {
   frontend?: Frontend;
   populationSettings?: PopulationSettings;
   equation?: string;
+  authorizeRole?: string[];
+  isAuthorized?: boolean;
 }
 
 /** Per-route auth/availability spec */

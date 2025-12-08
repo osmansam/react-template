@@ -40,6 +40,10 @@ export type RawField = {
   IsSearchable?: boolean;
   children?: RawField[];
   Children?: RawField[];
+  authorizeRole?: string[];
+  AuthorizeRole?: string[];
+  isAuthorized?: boolean;
+  IsAuthorized?: boolean;
   frontend?: {
     displayName?: string;
     rowClassName?: {
@@ -196,7 +200,8 @@ export const normalizeField = (f: RawField): Field => {
         }
       : undefined,
     equation: f.equation ?? f.Equation,
-   
+    authorizeRole: f.authorizeRole ?? f.AuthorizeRole,
+    isAuthorized: f.isAuthorized ?? f.IsAuthorized,
   };
 };
 

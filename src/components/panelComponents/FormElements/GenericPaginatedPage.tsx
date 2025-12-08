@@ -8,6 +8,7 @@ import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { Header } from "../../../components/header/Header";
 import { LinkCell } from "../../../components/LinkCell";
 import { useGeneralContext } from "../../../context/General.context";
+import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
@@ -62,7 +63,7 @@ export default function GenericPaginatedPage({
     setSelectedRows,
     setIsSelectionActive,
   } = useGeneralContext();
-
+const { user } = useUserContext();
   const rawContainers = useGetContainers();
 
   const container: ContainerModel | undefined = useMemo(() => {
@@ -126,8 +127,22 @@ export default function GenericPaginatedPage({
         !uniq.has(f.name) &&
         (uniq.add(f.name), true)
     );
+
+    // Filter by authorizeRole if isAuthorized is true
+    fields = fields.filter((f) => {
+      // If not authorized, show it
+      if (!f.isAuthorized) return true;
+
+      // If authorized, user must exist and have a matching role
+      if (!user?.role) return false;
+
+      // Check if authorizeRole exists and includes user role
+      if (!f.authorizeRole || f.authorizeRole.length === 0) return false;
+      return f.authorizeRole.includes(user.role);
+    });
+
     return fields;
-  }, [container, includeFields, excludeFields]);
+  }, [container, includeFields, excludeFields, user]);
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);

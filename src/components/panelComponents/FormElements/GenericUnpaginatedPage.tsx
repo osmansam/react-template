@@ -6,26 +6,27 @@ import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { LinkCell } from "../../../components/LinkCell";
 import { useGeneralContext } from "../../../context/General.context";
+import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
 import {
-    ContainerModel,
-    Field,
-    Types,
-    useGetContainers,
+  ContainerModel,
+  Field,
+  Types,
+  useGetContainers,
 } from "../../../utils/api/container";
 import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
 import {
-    RawContainer,
-    evaluateRowCondition,
-    fieldToInput,
-    getFieldLabel,
-    humanize,
-    isDisplayablePrimitive,
-    normalizeContainer,
-    normalizeField,
-    tailwindBgToStyle
+  RawContainer,
+  evaluateRowCondition,
+  fieldToInput,
+  getFieldLabel,
+  humanize,
+  isDisplayablePrimitive,
+  normalizeContainer,
+  normalizeField,
+  tailwindBgToStyle
 } from "../../../utils/genericPageHelpers";
 import { isFieldRequired, parseValidationRules } from "../../../utils/validationHelper";
 import { Header } from "../../header/Header";
@@ -54,6 +55,7 @@ export default function GenericUnpaginatedPage({
   const { t } = useTranslation();
   const { selectedRows, setSelectedRows, setIsSelectionActive } =
     useGeneralContext();
+  const { user } = useUserContext();
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -144,8 +146,22 @@ export default function GenericUnpaginatedPage({
       fields = fields.filter((f) => !ex.has(f.name));
     }
     fields = fields.filter((f) => f.name !== "_id" && f.name !== "id");
+
+    // Filter by authorizeRole if isAuthorized is true
+    fields = fields.filter((f) => {
+      // If not authorized, show it
+      if (!f.isAuthorized) return true;
+
+      // If authorized, user must exist and have a matching role
+      if (!user?.role) return false;
+
+      // Check if authorizeRole exists and includes user role
+      if (!f.authorizeRole || f.authorizeRole.length === 0) return false;
+      return f.authorizeRole.includes(user.role);
+    });
+
     return fields;
-  }, [container, includeFields, excludeFields]);
+  }, [container, includeFields, excludeFields, user]);
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);

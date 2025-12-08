@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import { GenericButton } from "../components/panelComponents/FormElements/GenericButton";
 import TextInput from "../components/panelComponents/FormElements/TextInput";
 import { H1, H5 } from "../components/panelComponents/Typography";
+import { useUserContext } from "../context/User.context";
 import { useLogin } from "../utils/api/auth";
 import { ContainerModel, useGetContainers } from "../utils/api/container";
 import { getFieldLabel } from "../utils/genericPageHelpers";
@@ -20,6 +21,7 @@ const Login = () => {
     null
   );
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const { setUser } = useUserContext();
 
   const { login } = useLogin(location.state?.from || "/");
 
@@ -60,8 +62,7 @@ const Login = () => {
       if (event.origin !== window.location.origin) return;
       
       if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
-        const { accessToken, refreshToken } = event.data;
-        
+        const { accessToken, refreshToken, user } = event.data;
         // Store tokens
         Cookies.set('jwt', accessToken);
         localStorage.setItem('jwt', accessToken);
@@ -69,6 +70,11 @@ const Login = () => {
         
         if (refreshToken) {
           localStorage.setItem('refreshToken', refreshToken);
+        }
+
+        if (user) {
+          localStorage.setItem("user", JSON.stringify(user));
+          setUser(user);
         }
         
         toast.success(t('Logged in successfully'));

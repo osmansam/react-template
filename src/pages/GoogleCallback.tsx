@@ -37,9 +37,10 @@ const GoogleCallback = () => {
           return;
         }
 
-        // Case 1: We got tokens directly (Backend redirected with tokens)
         if (accessToken) {
-          handleLoginSuccess(accessToken, refreshToken, isPopup);
+          const userStr = searchParams.get("user");
+          const user = userStr ? JSON.parse(userStr) : undefined;
+          handleLoginSuccess(accessToken, refreshToken, user, isPopup);
           return;
         }
 
@@ -60,7 +61,7 @@ const GoogleCallback = () => {
             const data = await response.json();
             
             if (data.status === 200 && data.data?.accessToken) {
-              handleLoginSuccess(data.data.accessToken, data.data.refreshToken, isPopup);
+              handleLoginSuccess(data.data.accessToken, data.data.refreshToken, data.data.user, isPopup);
               return;
             } else {
               throw new Error(data.message || "Failed to exchange token");
@@ -80,7 +81,7 @@ const GoogleCallback = () => {
           if (jsonMatch) {
             const data = JSON.parse(jsonMatch[0]);
             if (data.status === 200 && data.data?.accessToken) {
-              handleLoginSuccess(data.data.accessToken, data.data.refreshToken, isPopup);
+              handleLoginSuccess(data.data.accessToken, data.data.refreshToken, data.data.user, isPopup);
               return;
             }
           }
@@ -114,7 +115,7 @@ const GoogleCallback = () => {
       }
     };
 
-    const handleLoginSuccess = (accessToken: string, refreshToken: string | null | undefined, isPopup: boolean | null) => {
+    const handleLoginSuccess = (accessToken: string, refreshToken: string | null | undefined, user: any, isPopup: boolean | null) => {
       setStatus("success");
       setMessage("Login successful!");
       
@@ -127,6 +128,10 @@ const GoogleCallback = () => {
         localStorage.setItem("refreshToken", refreshToken);
       }
 
+      if (user) {
+        localStorage.setItem("user", JSON.stringify(user));
+      }
+
       toast.success(t("Logged in successfully"));
 
       if (isPopup) {
@@ -135,6 +140,7 @@ const GoogleCallback = () => {
             type: "GOOGLE_AUTH_SUCCESS",
             accessToken,
             refreshToken,
+            user,
           },
           window.location.origin
         );

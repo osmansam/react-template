@@ -3,6 +3,7 @@ import Cookies from "js-cookie";
 import { useTranslation } from "react-i18next";
 import { Location, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { useUserContext } from "../../context/User.context";
 // import { Routes } from "../../navigation/constants";
 import { post } from "./index";
 
@@ -17,8 +18,11 @@ interface LoginError {
 
 export type LoginCredentials = Record<string, any>;
 
+import { User } from "../../types";
+
 export interface LoginResponse {
   token: string;
+  user: User;
 }
 
 async function loginMethod(payload: LoginCredentials) {
@@ -34,6 +38,7 @@ export function useLogin(
 ) {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { setUser } = useUserContext();
   const { mutate: login } = useMutation<
     LoginResponse,
     LoginError,
@@ -42,11 +47,15 @@ export function useLogin(
     mutationFn: loginMethod,
     // We are updating tables query data with new item
     onSuccess: async (response: LoginResponse) => {
-      const { token } = response;
+      const { token, user } = response;
       Cookies.set("jwt", token);
       toast.success(t("Logged in successfully"));
       localStorage.setItem("jwt", token);
       localStorage.setItem("loggedIn", "true");
+      if (user) {
+        localStorage.setItem("user", JSON.stringify(user));
+        setUser(user);
+      }
       const target = location
         ? `${location.pathname}${location.search}`
         : // : Routes.HOME; // If no location is provided, redirect to home page

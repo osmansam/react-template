@@ -1,7 +1,8 @@
 export type User = {
   _id: string;
-  username: string;
+  email: string;
   role: string;
+  [key: string]: any;
 };
 
 export enum RowPerPageEnum {
