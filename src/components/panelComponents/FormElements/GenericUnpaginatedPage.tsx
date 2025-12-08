@@ -85,10 +85,8 @@ export default function GenericUnpaginatedPage({
 
       // Container level configs
       if (container?.frontend?.rowClassName) {
-        console.log("Container RowClassName Configs:", container.frontend.rowClassName);
         container.frontend.rowClassName.forEach((config) => {
           if (evaluateRowCondition(row, config.condition)) {
-            console.log("Applied container class:", config.className);
             Object.assign(styles, tailwindBgToStyle(config.className));
           }
         });
@@ -97,10 +95,8 @@ export default function GenericUnpaginatedPage({
       // Field level configs
       container?.fields.forEach((field) => {
         if (field.frontend?.rowClassName) {
-          console.log("Field RowClassName Configs:", field.name, field.frontend.rowClassName);
           field.frontend.rowClassName.forEach((config) => {
             if (evaluateRowCondition(row, config.condition)) {
-              console.log("Applied field class:", config.className);
               Object.assign(styles, tailwindBgToStyle(config.className));
             }
           });

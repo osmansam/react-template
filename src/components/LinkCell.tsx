@@ -13,7 +13,6 @@ interface LinkCellProps {
  */
 export function LinkCell({ field, row }: LinkCellProps) {
   const navigate = useNavigate();
-  const { user } = useUserContext();
   const fieldValue = row?.[field.name];
   
   // Confirmed available user info:
