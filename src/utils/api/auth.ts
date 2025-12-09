@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Cookies from "js-cookie";
 import { useTranslation } from "react-i18next";
 import { Location, useNavigate } from "react-router-dom";
@@ -66,4 +66,32 @@ export function useLogin(
     onError,
   });
   return { login };
+}
+
+async function logoutMethod() {
+  return post<undefined, { success: boolean }>({
+    path: "/auth/logout",
+    payload: undefined,
+  });
+}
+
+export function useLogout(onError?: (error: unknown) => void) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { setUser } = useUserContext();
+  const { mutateAsync: logout } = useMutation({
+    mutationFn: logoutMethod,
+    onSuccess: () => {
+      localStorage.clear();
+      localStorage.setItem("loggedOut", "true");
+      setTimeout(() => localStorage.removeItem("loggedOut"), 500);
+      Cookies.remove("jwt");
+      setUser(undefined);
+      queryClient.clear();
+      navigate("/login");
+    },
+    onError,
+  });
+
+  return { logout };
 }
