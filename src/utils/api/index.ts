@@ -72,3 +72,6 @@ export async function remove<R>({ path }: BaseRequest): Promise<R> {
 
 // Export page API
 export * from "./page";
+
+// Export audit logs API
+export * from "./auditLogs";
