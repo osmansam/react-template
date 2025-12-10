@@ -313,9 +313,13 @@ export function useExportDynamicItems() {
     limit: number;
     page: number;
   }) {
-    const response = await axiosClient.post(`${BASE}/export`, payload, {
-      responseType: "blob",
-    });
+    const response = await axiosClient.post(
+      `${BASE}/export?schemaName=${payload.schemaName}`,
+      payload,
+      {
+        responseType: "blob",
+      }
+    );
     return response.data;
   }
 
@@ -354,14 +358,16 @@ export function useGetDynamicItems<T>(
           // This creates: age=gt-32&age=lt-123
           value.forEach((item) => {
             if (item !== undefined && item !== null && item !== "") {
-              const trimmedItem = typeof item === "string" ? item.trim() : String(item);
+              const trimmedItem =
+                typeof item === "string" ? item.trim() : String(item);
               parts.push(`${key}=${encodeURIComponent(trimmedItem)}`);
             }
           });
         } else if (value instanceof Date) {
           parts.push(`${key}=${value.toISOString()}`);
         } else {
-          const trimmedValue = typeof value === "string" ? value.trim() : String(value);
+          const trimmedValue =
+            typeof value === "string" ? value.trim() : String(value);
           parts.push(`${key}=${encodeURIComponent(trimmedValue)}`);
         }
       }
@@ -418,14 +424,16 @@ export function useGetPaginatedItems<T>(
         // This creates: age=gt-32&age=lt-123
         value.forEach((item) => {
           if (item !== undefined && item !== null && item !== "") {
-            const trimmedItem = typeof item === "string" ? item.trim() : String(item);
+            const trimmedItem =
+              typeof item === "string" ? item.trim() : String(item);
             parts.push(`${key}=${encodeURIComponent(trimmedItem)}`);
           }
         });
       } else if (value instanceof Date) {
         parts.push(`${key}=${value.toISOString()}`);
       } else {
-        const trimmedValue = typeof value === "string" ? value.trim() : String(value);
+        const trimmedValue =
+          typeof value === "string" ? value.trim() : String(value);
         parts.push(`${key}=${encodeURIComponent(trimmedValue)}`);
       }
     }
@@ -441,7 +449,6 @@ export function useGetPaginatedItems<T>(
 export function useGetSelection<T>(schemaName: string, fieldName: string) {
   const hasParams = Boolean(schemaName && fieldName);
   const path = `${BASE}/selection?${qs({ schemaName, fieldName })}`;
-   
 
   const queryKey = [
     "dynamic",
@@ -453,7 +460,6 @@ export function useGetSelection<T>(schemaName: string, fieldName: string) {
   const enabled = hasParams;
 
   const data = useGet<T>(path, queryKey, enabled);
-
 
   return (data ?? ([] as T)) as T;
 }

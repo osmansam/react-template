@@ -9,8 +9,8 @@ import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { GoPlusCircle } from "react-icons/go";
 import {
-    MdOutlineCheckBox,
-    MdOutlineCheckBoxOutlineBlank,
+  MdOutlineCheckBox,
+  MdOutlineCheckBoxOutlineBlank,
 } from "react-icons/md";
 import { PiFadersHorizontal } from "react-icons/pi";
 import { RiFilter3Line } from "react-icons/ri";
@@ -19,15 +19,15 @@ import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import { useGeneralContext } from "../../../context/General.context";
 import {
-    DateFormatEnum,
-    DEFAULT_DATE_FORMAT,
-    FormElementsState,
-    RowPerPageEnum,
+  DateFormatEnum,
+  DEFAULT_DATE_FORMAT,
+  FormElementsState,
+  RowPerPageEnum,
 } from "../../../types";
 import { Field } from "../../../utils/api/container";
 import {
-    outsideSearch,
-    OutsideSearchProps,
+  outsideSearch,
+  OutsideSearchProps,
 } from "../../../utils/outsideSearch";
 import { outsideSort } from "../../../utils/outsideSort";
 import { GenericButton } from "../FormElements/GenericButton";
@@ -36,11 +36,11 @@ import { OrientationToggle } from "../TabPanel/OrientationToggle";
 import { useTabPanelContext } from "../TabPanel/UnifiedTabPanel";
 import { Caption, H4, H5, P1 } from "../Typography";
 import {
-    ActionType,
-    ColumnType,
-    FilterType,
-    PanelFilterType,
-    RowKeyType,
+  ActionType,
+  ColumnType,
+  FilterType,
+  PanelFilterType,
+  RowKeyType,
 } from "../shared/types";
 import ButtonTooltip from "./ButtonTooltip";
 import ColumnActiveModal from "./ColumnActiveModal";
@@ -128,17 +128,15 @@ const GenericTable = <T,>({
   isRowsPerPage = true,
   isActionsAtFront = false,
   isCollapsibleCheckActive = true,
-  isEmtpyExcel = false,
-  searchRowKeys,
-  tooltipLimit = 40,
-  rowClassNameFunction,
-  rowStyleFunction,
-  excelFileName,
   rowsPerPageOptions = [
     RowPerPageEnum.FIRST,
     RowPerPageEnum.SECOND,
     RowPerPageEnum.THIRD,
   ],
+  searchRowKeys,
+  tooltipLimit = 40,
+  rowClassNameFunction,
+  rowStyleFunction,
   pagination,
   selectionActions,
   showOrientationToggle,
@@ -721,10 +719,11 @@ const GenericTable = <T,>({
           )}
           {usedRowKeys?.map((rowKey, keyIndex) => {
             // Compute className - handle both string and function
-            const computedClassName = typeof rowKey?.className === 'function' 
-              ? rowKey.className(row) 
-              : (rowKey?.className || '');
-            
+            const computedClassName =
+              typeof rowKey?.className === "function"
+                ? rowKey.className(row)
+                : rowKey?.className || "";
+
             if (rowKey.node) {
               return (
                 <td
@@ -777,7 +776,7 @@ const GenericTable = <T,>({
                 ? `${cellValue.substring(0, tooltipLimit)}...`
                 : cellValue;
             let style: React.CSSProperties = {};
-            
+
             if (rowKey.isOptional && rowKey.options) {
               const matchedOption = rowKey.options.find(
                 (option) => option.label === String(row[rowKey.key as keyof T])
@@ -790,7 +789,9 @@ const GenericTable = <T,>({
               return (
                 <td
                   key={keyIndex}
-                  className={`${keyIndex === 0 ? "pl-3" : ""}  py-3 min-w-32 md:min-w-0`}
+                  className={`${
+                    keyIndex === 0 ? "pl-3" : ""
+                  }  py-3 min-w-32 md:min-w-0`}
                   style={style}
                 >
                   <P1
@@ -805,7 +806,9 @@ const GenericTable = <T,>({
             return (
               <td
                 key={keyIndex}
-                className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20 md:min-w-0 `}
+                className={`${
+                  keyIndex === 0 ? "pl-3" : ""
+                } py-3 min-w-20 md:min-w-0 `}
                 style={style}
               >
                 {rowKey.isImage ? (
@@ -825,7 +828,9 @@ const GenericTable = <T,>({
                     <P1 className={computedClassName}>{displayValue}</P1>
                   </CustomTooltip>
                 ) : (
-                  <P1 className={computedClassName} style={style}>{displayValue}</P1>
+                  <P1 className={computedClassName} style={style}>
+                    {displayValue}
+                  </P1>
                 )}
               </td>
             );
@@ -903,18 +908,23 @@ const GenericTable = <T,>({
                               const cellValue = rowKey.isDate
                                 ? formatDate(rawValue) || `${rawValue}`
                                 : `${rawValue}`;
-                              
-                              const computedClassName = typeof rowKey?.className === 'function' 
-                                ? rowKey.className(collapsibleRow) 
-                                : (rowKey?.className || '');
+
+                              const computedClassName =
+                                typeof rowKey?.className === "function"
+                                  ? rowKey.className(collapsibleRow)
+                                  : rowKey?.className || "";
 
                               if (rowKey.node) {
                                 return (
                                   <td
                                     key={keyIndex}
-                                    className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20 border-b`}
+                                    className={`${
+                                      keyIndex === 0 ? "pl-3" : ""
+                                    } py-3 min-w-20 border-b`}
                                   >
-                                    <P1 className={computedClassName}>{rowKey.node(collapsibleRow)}</P1>
+                                    <P1 className={computedClassName}>
+                                      {rowKey.node(collapsibleRow)}
+                                    </P1>
                                   </td>
                                 );
                               }

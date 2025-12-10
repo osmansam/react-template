@@ -8,7 +8,10 @@ import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { useGeneralContext } from "../../../context/General.context";
 import { FormElementsState, NO_IMAGE_URL, OptionType } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
-import { validateField, ValidationRules } from "../../../utils/validationHelper";
+import {
+  validateField,
+  ValidationRules,
+} from "../../../utils/validationHelper";
 import { H6 } from "../Typography";
 import {
   FormKeyType,
@@ -201,34 +204,45 @@ const GenericAddEditPanel = <T,>({
 
   // Validation function
   const validateFieldValue = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (input: GenericInputType, value: any) => {
-      const fieldType = formKeys.find((fk) => fk.key === input.formKey)?.type || "string";
-      
+      const fieldType =
+        formKeys.find((fk) => fk.key === input.formKey)?.type || "string";
+
       // Build validation rules from input properties
       const rules: ValidationRules = {};
-      
+
       if (input.required) rules.required = true;
       if (input.minLength) rules.minlength = input.minLength;
       if (input.maxLength) rules.maxlength = input.maxLength;
       if (input.min !== undefined) rules.min = input.min;
       if (input.max !== undefined) rules.max = input.max;
       if (input.pattern) rules.pattern = input.pattern;
-      
+
       // Check if it's an email field based on additionalType or formKey
-      if (input.additionalType === "email" || input.formKey.toLowerCase().includes("email")) {
+      if (
+        input.additionalType === "email" ||
+        input.formKey.toLowerCase().includes("email")
+      ) {
         rules.email = true;
       }
-      
+
       // Check if it's a phone field
-      if (input.additionalType === "phone" || input.formKey.toLowerCase().includes("phone")) {
+      if (
+        input.additionalType === "phone" ||
+        input.formKey.toLowerCase().includes("phone")
+      ) {
         rules.phone = true;
       }
-      
+
       // Check if it's a url field
-      if (input.additionalType === "url" || input.formKey.toLowerCase().includes("url")) {
+      if (
+        input.additionalType === "url" ||
+        input.formKey.toLowerCase().includes("url")
+      ) {
         rules.url = true;
       }
-      
+
       const error = validateField(value, rules, fieldType);
       return error;
     },
@@ -401,7 +415,7 @@ const GenericAddEditPanel = <T,>({
   };
   const handleCreateButtonClick = () => {
     setAttemptedSubmit(true);
-    
+
     // Validate all fields
     const errors: Record<string, string> = {};
     inputs.forEach((input) => {
@@ -411,15 +425,15 @@ const GenericAddEditPanel = <T,>({
         errors[input.formKey] = error;
       }
     });
-    
+
     setFieldErrors(errors);
-    
+
     // If there are validation errors, show error and return
     if (Object.keys(errors).length > 0) {
       toast.error(t("Please fix the errors in the form"));
       return;
     }
-    
+
     if (!allRequiredFilled && !optionalCreateButtonActive) {
       toast.error(t("Please fill all required fields"));
       return;
@@ -454,7 +468,9 @@ const GenericAddEditPanel = <T,>({
     }
   };
   const renderGenericAddEditModal = () => {
-    const hasValidationErrors = Object.values(fieldErrors).some((error) => !!error);
+    const hasValidationErrors = Object.values(fieldErrors).some(
+      (error) => !!error
+    );
 
     if (isTabInputScreenOpen) {
       return (
@@ -503,7 +519,7 @@ const GenericAddEditPanel = <T,>({
             <div>
               {/* Image inputs */}
               {imageInputs.map((input) => {
-                const value = formElements[input.formKey]
+                const value = formElements[input.formKey];
                 // If value is a File object, create a preview URL
                 const imageSrc =
                   value instanceof File
@@ -556,7 +572,7 @@ const GenericAddEditPanel = <T,>({
                     (input) => input.formKey === key
                   );
                   setFormElements((prev) => ({ ...prev, [key]: value }));
-                  
+
                   // Validate the field
                   if (changedInput) {
                     const error = validateFieldValue(changedInput, value);
@@ -565,7 +581,7 @@ const GenericAddEditPanel = <T,>({
                       [key]: error || "",
                     }));
                   }
-                  
+
                   if (changedInput?.invalidateKeys) {
                     changedInput.invalidateKeys.forEach((key) => {
                       setFormElements((prev) => ({
@@ -984,11 +1000,15 @@ const GenericAddEditPanel = <T,>({
             {isSubmitButtonActive && (
               <GenericButton
                 variant={
-                  hasValidationErrors || (!allRequiredFilled && !optionalCreateButtonActive)
+                  hasValidationErrors ||
+                  (!allRequiredFilled && !optionalCreateButtonActive)
                     ? "secondary"
                     : "primary"
                 }
-                disabled={hasValidationErrors || (!allRequiredFilled && !optionalCreateButtonActive)}
+                disabled={
+                  hasValidationErrors ||
+                  (!allRequiredFilled && !optionalCreateButtonActive)
+                }
                 size="md"
                 onClick={() => {
                   if (isCreateConfirmationDialogExist) {
