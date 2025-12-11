@@ -5,6 +5,7 @@ import {
   GridSection,
   TabContent,
 } from "../types/page";
+import { useGetSelection } from "../utils/dynamic";
 import "./dynamic-page-renderer.css";
 import { Header } from "./header/Header";
 import GenericPaginatedPage from "./panelComponents/FormElements/GenericPaginatedPage";
@@ -15,7 +16,32 @@ import GenericTabPage from "./panelComponents/FormElements/GenericTabPage";
  */
 const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
   ({ component }) => {
-    const { type, dataBinding, tabs } = component;
+    const { type, dataBinding, tabs, groupBy } = component;
+
+    // Find which tab (if any) has a groupBy configuration
+    const tabWithGroupByIndex =
+      tabs?.findIndex((tab) => tab.components[0]?.groupBy) ?? -1;
+
+    const tabPanelGroupBy =
+      groupBy ||
+      (tabWithGroupByIndex >= 0
+        ? tabs![tabWithGroupByIndex]?.components[0]?.groupBy
+        : undefined);
+
+    // Call useGetSelection unconditionally, but only when groupBy is defined
+    const shouldFetchGrouping =
+      type === "tabPanel" &&
+      Boolean(tabPanelGroupBy?.groupByObjectId) &&
+      Boolean(tabPanelGroupBy?.groupByField) &&
+      tabs &&
+      tabs.length > 0;
+
+    const selectionData = useGetSelection<Array<Record<string, unknown>>>(
+      shouldFetchGrouping && tabPanelGroupBy
+        ? tabPanelGroupBy.groupByObjectId
+        : "",
+      shouldFetchGrouping && tabPanelGroupBy ? tabPanelGroupBy.groupByField : ""
+    );
 
     switch (type) {
       case "table":
@@ -37,7 +63,71 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
         );
 
       case "tabPanel":
-        // Use existing GenericTabPage component
+        // Check if this tabPanel should be dynamically generated from GroupBy
+        if (shouldFetchGrouping && tabWithGroupByIndex >= 0) {
+          if (!selectionData || selectionData.length === 0) {
+            return (
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
+                <p className="text-yellow-800 text-sm">
+                  Loading grouped tabs...
+                </p>
+              </div>
+            );
+          }
+
+          // Get the base component configuration from the tab with groupBy
+          const baseTab = tabs![tabWithGroupByIndex];
+          const baseComponent = baseTab?.components[0];
+          if (!baseComponent?.dataBinding?.schemaName) {
+            return (
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
+                <p className="text-yellow-800 text-sm">
+                  TabPanel with GroupBy requires a table component with schema
+                  binding
+                </p>
+              </div>
+            );
+          }
+
+          // Generate dynamic tabs based on selection data
+          const dynamicTabs = selectionData.map((item) => {
+            const groupValue = item._id; // The ID to filter by
+            const tabLabel = String(
+              item[tabPanelGroupBy!.groupByField] || groupValue
+            ); // Display label
+
+            return {
+              schemaName: baseComponent.dataBinding!.schemaName!,
+              label: tabLabel,
+              isPaginated: true,
+              constantFilter: {
+                [tabPanelGroupBy!.groupByObjectId]: groupValue,
+              },
+            };
+          });
+
+          // Create all tabs: static tabs + dynamic tabs (replacing the groupBy tab)
+          const allTabsConfig = [
+            // All tabs before the groupBy tab
+            ...tabs!.slice(0, tabWithGroupByIndex).map((tab: TabContent) => ({
+              schemaName: tab.components[0]?.dataBinding?.schemaName || "",
+              label: tab.title,
+              isPaginated: true,
+            })),
+            // Dynamic tabs replacing the groupBy tab
+            ...dynamicTabs,
+            // All tabs after the groupBy tab
+            ...tabs!.slice(tabWithGroupByIndex + 1).map((tab: TabContent) => ({
+              schemaName: tab.components[0]?.dataBinding?.schemaName || "",
+              label: tab.title,
+              isPaginated: true,
+            })),
+          ];
+
+          return <GenericTabPage tabs={allTabsConfig} />;
+        }
+
+        // Use existing GenericTabPage component (static tabs)
         if (tabs && Array.isArray(tabs) && tabs.length > 0) {
           // Transform tabs to GenericTabPage format
           const tabsConfig = tabs.map((tab: TabContent) => {

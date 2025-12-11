@@ -14,6 +14,11 @@ export interface DataBinding {
   params?: Record<string, any>;
 }
 
+export interface GroupBy {
+  groupByObjectId: string; // Schema name to group by (e.g., "can")
+  groupByField: string; // Field name to display from grouped object (e.g., "name")
+}
+
 export type ComponentType = "table" | "tabPanel";
 // Future types: "chart" | "form" | "text" | "custom"
 
@@ -28,6 +33,7 @@ export interface ComponentBlock {
   title?: string;
   order: number;
   dataBinding?: DataBinding;
+  groupBy?: GroupBy; // Grouping configuration for table components
   isAuthorized?: boolean;
   authorizeRole?: string[];
   tabs?: TabContent[]; // For tabPanel type

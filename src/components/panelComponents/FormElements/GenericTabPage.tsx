@@ -16,6 +16,7 @@ type TabConfig = {
   excludeFields?: string[];
   actionsEnabled?: boolean;
   isPaginated?: boolean; // Add isPaginated prop, default true
+  constantFilter?: Record<string, unknown>; // Constant filter that won't be editable
 };
 
 type Props = {
@@ -64,6 +65,8 @@ export default function GenericTabPage({
               includeFields={t.includeFields}
               excludeFields={t.excludeFields}
               actionsEnabled={t.actionsEnabled ?? true}
+              constantFilter={t.constantFilter}
+              customTitle={label}
             />
           ) : (
             <GenericUnpaginatedPage

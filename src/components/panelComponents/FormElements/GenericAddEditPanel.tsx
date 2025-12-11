@@ -168,7 +168,7 @@ const GenericAddEditPanel = <T,>({
   );
   const mergedInitialState = { ...initialState, ...constantValues };
   const [formElements, setFormElements] = useState(() => {
-    if (isEditMode && itemToEdit) {
+    if (itemToEdit) {
       const updates = itemToEdit.updates as unknown as FormElementsState;
 
       // Convert arrays to comma-separated strings for editing

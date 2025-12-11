@@ -52,6 +52,8 @@ type Props = {
   excludeFields?: string[];
   actionsEnabled?: boolean;
   isHeader?: boolean;
+  constantFilter?: Record<string, unknown>; // Constant filter that won't be editable
+  customTitle?: string; // Custom title for the table
 };
 
 export default function GenericPaginatedPage({
@@ -60,6 +62,8 @@ export default function GenericPaginatedPage({
   excludeFields,
   actionsEnabled = true,
   isHeader = false,
+  constantFilter,
+  customTitle,
 }: Props) {
   const { t } = useTranslation();
   const {
@@ -154,9 +158,13 @@ export default function GenericPaginatedPage({
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
 
-  const rowKeys = useMemo(
-    () =>
-      displayFields.map((f) => {
+  const rowKeys = useMemo(() => {
+    const constantFilterKeys = constantFilter
+      ? Object.keys(constantFilter)
+      : [];
+    return displayFields
+      .filter((f) => !constantFilterKeys.includes(f.name))
+      .map((f) => {
         const fieldType = (f.type || "").toLowerCase();
         const originalType = f.type || "";
         const isStringArray =
@@ -311,22 +319,30 @@ export default function GenericPaginatedPage({
         }
 
         return rowKey;
-      }),
-    [displayFields, updateDynamicItem, selectionDataMap, t]
-  );
+      });
+  }, [displayFields, updateDynamicItem, selectionDataMap, constantFilter]);
 
   const columns = useMemo(() => {
-    const baseCols = displayFields.map((f) => ({
-      key: t(getFieldLabel(f)),
-      isSortable: true,
-      correspondingKey: f.name,
-    }));
+    const constantFilterKeys = constantFilter
+      ? Object.keys(constantFilter)
+      : [];
+    const baseCols = displayFields
+      .filter((f) => !constantFilterKeys.includes(f.name))
+      .map((f) => ({
+        key: t(getFieldLabel(f)),
+        isSortable: true,
+        correspondingKey: f.name,
+      }));
     return actionsEnabled
       ? [...baseCols, { key: t("Actions"), isSortable: false }]
       : baseCols;
-  }, [displayFields, t, actionsEnabled]);
+  }, [displayFields, t, actionsEnabled, constantFilter]);
 
-  const { inputs, formKeys } = useMemo(() => {
+  const { inputs, formKeys, constantFilterKeys } = useMemo(() => {
+    const constantFilterKeys = constantFilter
+      ? Object.keys(constantFilter)
+      : [];
+
     const ins = displayFields
       .map((f) => {
         // Skip fields with equation
@@ -339,6 +355,7 @@ export default function GenericPaginatedPage({
         // Parse validation rules from tag
         const validationRules = parseValidationRules(f.tag);
         const isRequired = isFieldRequired(f.tag);
+
         // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
         if (
           (fieldType === Types.ObjectId ||
@@ -443,14 +460,21 @@ export default function GenericPaginatedPage({
       })
       .filter((k): k is NonNullable<typeof k> => k !== null);
 
-    return { inputs: ins, formKeys: fks };
-  }, [displayFields, t, selectionDataMap]);
+    return { inputs: ins, formKeys: fks, constantFilterKeys };
+  }, [displayFields, t, selectionDataMap, constantFilter]);
+
+  // Merge constantFilter with filterPanelFormElements for querying
+  const mergedFilters = useMemo(() => {
+    return constantFilter
+      ? ({ ...filterPanelFormElements, ...constantFilter } as FormElementsState)
+      : filterPanelFormElements;
+  }, [filterPanelFormElements, constantFilter]);
 
   const itemsPayload = useGetPaginatedItems(
     currentPage,
     rowsPerPage,
     schemaName,
-    filterPanelFormElements
+    mergedFilters
   );
 
   const rows = useMemo(() => itemsPayload?.items || [], [itemsPayload?.items]);
@@ -522,15 +546,28 @@ export default function GenericPaginatedPage({
   const handleSubmitItem = useCallback(
     (item: GenericItem | UpdatePayload<GenericItem>) => {
       if ("id" in item && "updates" in item) {
+        // Update operation - EXCLUDE constantFilter fields to prevent ObjectId to string conversion
+        const updates = item.updates as Record<string, unknown>;
+        const filteredUpdates = constantFilter
+          ? Object.fromEntries(
+              Object.entries(updates).filter(
+                ([key]) => !constantFilterKeys.includes(key)
+              )
+            )
+          : updates;
         updateDynamicItem(
           item.id as string | number,
-          item.updates as Partial<GenericItem>
+          filteredUpdates as Partial<GenericItem>
         );
       } else {
-        createDynamicItem(item as GenericItem);
+        // Create operation - merge constantFilter into new item
+        const mergedItem = constantFilter
+          ? { ...(item as Record<string, unknown>), ...constantFilter }
+          : item;
+        createDynamicItem(mergedItem as GenericItem);
       }
     },
-    [updateDynamicItem, createDynamicItem]
+    [updateDynamicItem, createDynamicItem, constantFilter, constantFilterKeys]
   );
 
   const addButton = useMemo(
@@ -545,6 +582,14 @@ export default function GenericPaginatedPage({
           formKeys={formKeys}
           submitItem={handleSubmitItem}
           topClassName="flex flex-col gap-2"
+          itemToEdit={
+            constantFilter
+              ? {
+                  id: "",
+                  updates: { ...constantFilter, _id: "" } as GenericItem,
+                }
+              : undefined
+          }
         />
       ),
       isModalOpen: isAddOpen,
@@ -553,7 +598,7 @@ export default function GenericPaginatedPage({
       icon: null,
       className: "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
     }),
-    [t, isAddOpen, inputs, formKeys, handleSubmitItem]
+    [t, isAddOpen, inputs, formKeys, handleSubmitItem, constantFilter]
   );
 
   const actions = useMemo(() => {
@@ -651,9 +696,10 @@ export default function GenericPaginatedPage({
     isEditOpen,
     deleteDynamicItem,
     handleSubmitItem,
-    inputs,
     formKeys,
     actionsEnabled,
+    displayFields,
+    inputs,
   ]);
 
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -794,7 +840,14 @@ export default function GenericPaginatedPage({
       });
 
     return [selectInput, ...valueInputs];
-  }, [t, bulkFieldOptions, isBulkStepTwo, displayFields, bulkSelectedKeys]);
+  }, [
+    t,
+    bulkFieldOptions,
+    isBulkStepTwo,
+    displayFields,
+    bulkSelectedKeys,
+    selectionDataMap,
+  ]);
 
   // Memoize handlers to prevent recreating selection actions
   const handleBulkEditSubmit = useCallback(() => {
@@ -956,14 +1009,19 @@ export default function GenericPaginatedPage({
   ]);
 
   const filterPanelInputs = useMemo(() => {
+    const constantFilterKeys = constantFilter
+      ? Object.keys(constantFilter)
+      : [];
+
     return displayFields
       .filter((f) => {
         const fieldType = (f.type || "").toLowerCase();
-        // Exclude id, image fields from filters
+        // Exclude id, image fields, and constantFilter fields from filters
         return (
           !["_id", "id"].includes(f.name) &&
           fieldType !== Types.Image &&
-          fieldType !== "img"
+          fieldType !== "img" &&
+          !constantFilterKeys.includes(f.name)
         );
       })
       .map((f) => {
@@ -1060,7 +1118,7 @@ export default function GenericPaginatedPage({
           required: false,
         };
       });
-  }, [displayFields, t, selectionDataMap]);
+  }, [displayFields, t, selectionDataMap, constantFilter]);
 
   const filters = useMemo(
     () => [
@@ -1214,7 +1272,7 @@ export default function GenericPaginatedPage({
           columns={columns}
           rows={rows}
           rowStyleFunction={rowStyleFunction}
-          title={t(humanize(schemaName))}
+          title={customTitle || t(humanize(schemaName))}
           addButton={addButton}
           isCollapsible={false}
           isActionsActive={actionsEnabled}
