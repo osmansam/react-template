@@ -25,7 +25,7 @@ export interface PaginatedAuditLogsResponse {
   limit: number;
 }
 
-const AUDIT_BASE = "/api/v1/audit-logs";
+const AUDIT_BASE = "/audit-logs";
 
 /**
  * Hook to fetch audit logs with optional filters

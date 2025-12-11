@@ -1,6 +1,7 @@
 // import { Tab } from "../components/panelComponents/shared/types";
 
 import GenericTabPage from "../components/panelComponents/FormElements/GenericTabPage";
+import AuditLogs from "../pages/AuditLogs";
 
 // Removed all missing page imports - only keeping existing pages
 export enum PublicRoutes {
@@ -12,6 +13,7 @@ export enum PublicRoutes {
 export enum Routes {
   Kest = "/kest",
   Mest = "/mest",
+  AuditLogs = "/audit-logs",
 }
 
 // Static/hardcoded routes (you can keep these or move them to dynamic pages)
@@ -58,6 +60,12 @@ export const staticRoutes: {
         ]}
       />
     ),
+    isOnSidebar: true,
+  },
+  {
+    name: "Audit Logs",
+    path: Routes.AuditLogs,
+    element: AuditLogs,
     isOnSidebar: true,
   },
 ];
