@@ -1,36 +1,22 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
+import { PageModel } from "../../types/page";
 import { axiosClient } from "./axiosClient";
-import { useGet, useMutationApi } from "./factory";
+import { useGet } from "./factory";
 
 const BASE = "/page";
 const PAGE_QUERY_KEY = ["page", "all"] as const;
 
-export interface PageSchema {
-  schemaName: string;
-  label?: string;
-  isPaginated?: boolean;
-  icon?: string;
-}
-
-export interface Page {
-  _id: string;
-  name: string;
-  icon?: string;
-  schemas?: PageSchema[];
-  page?: Page;
-}
-
 // Get all pages
 export function useGetAllPages() {
-  return useGet<Page[]>(BASE, PAGE_QUERY_KEY);
+  return useGet<PageModel[]>(BASE, PAGE_QUERY_KEY);
 }
 
 // Get single page by ID
 export function useGetPage(id: string) {
   const queryKey = ["page", id] as const;
-  return useGet<Page>(`${BASE}/${id}`, queryKey);
+  return useGet<PageModel>(`${BASE}/${id}`, queryKey);
 }
 
 // CRUD operations
@@ -40,20 +26,23 @@ export function usePageCrud() {
 
   // Create page
   const createMutation = useMutation({
-    mutationFn: async (payload: Partial<Page>) => {
-      const response = await axiosClient.post<Page>(BASE, payload);
+    mutationFn: async (payload: Partial<PageModel>) => {
+      const response = await axiosClient.post<PageModel>(BASE, payload);
       return response.data;
     },
-    onMutate: async (newPage: Partial<Page>) => {
+    onMutate: async (newPage: Partial<PageModel>) => {
       await queryClient.cancelQueries({ queryKey: PAGE_QUERY_KEY });
       const previousPages =
-        queryClient.getQueryData<Page[]>(PAGE_QUERY_KEY) || [];
+        queryClient.getQueryData<PageModel[]>(PAGE_QUERY_KEY) || [];
       queryClient.setQueryData(PAGE_QUERY_KEY, [...previousPages, newPage]);
       return { previousPages };
     },
     onError: (_err: Error, _newPage, context) => {
       if (context?.previousPages) {
-        queryClient.setQueryData<Page[]>(PAGE_QUERY_KEY, context.previousPages);
+        queryClient.setQueryData<PageModel[]>(
+          PAGE_QUERY_KEY,
+          context.previousPages
+        );
       }
       const errorMessage =
         (_err as { response?: { data?: { message?: string } } })?.response?.data
@@ -72,24 +61,30 @@ export function usePageCrud() {
       updates,
     }: {
       id: string;
-      updates: Partial<Page>;
+      updates: Partial<PageModel>;
     }) => {
-      const response = await axiosClient.patch<Page>(`${BASE}/${id}`, updates);
+      const response = await axiosClient.patch<PageModel>(
+        `${BASE}/${id}`,
+        updates
+      );
       return response.data;
     },
     onMutate: async ({ id, updates }) => {
       await queryClient.cancelQueries({ queryKey: PAGE_QUERY_KEY });
       const previousPages =
-        queryClient.getQueryData<Page[]>(PAGE_QUERY_KEY) || [];
+        queryClient.getQueryData<PageModel[]>(PAGE_QUERY_KEY) || [];
       const updatedPages = previousPages.map((page) =>
-        page._id === id ? { ...page, ...updates } : page
+        page.id === id ? { ...page, ...updates } : page
       );
       queryClient.setQueryData(PAGE_QUERY_KEY, updatedPages);
       return { previousPages };
     },
     onError: (_err: Error, _vars, context) => {
       if (context?.previousPages) {
-        queryClient.setQueryData<Page[]>(PAGE_QUERY_KEY, context.previousPages);
+        queryClient.setQueryData<PageModel[]>(
+          PAGE_QUERY_KEY,
+          context.previousPages
+        );
       }
       const errorMessage =
         (_err as { response?: { data?: { message?: string } } })?.response?.data
@@ -101,18 +96,19 @@ export function usePageCrud() {
     },
   });
 
-  // Delete page
-  const { deleteItem } = useMutationApi<Page>({
-    baseQuery: BASE,
-    queryKey: PAGE_QUERY_KEY,
-    isInvalidate: true,
-  });
+  // Delete page - Note: This requires the backend to use 'id' field
+  // If backend uses '_id', you'll need to transform the data
+  const deletePage = async (id: string) => {
+    const response = await axiosClient.delete(`${BASE}/${id}`);
+    await queryClient.invalidateQueries({ queryKey: PAGE_QUERY_KEY });
+    return response.data;
+  };
 
   return {
-    createPage: (payload: Partial<Page>) => createMutation.mutate(payload),
-    updatePage: (id: string, updates: Partial<Page>) =>
+    createPage: (payload: Partial<PageModel>) => createMutation.mutate(payload),
+    updatePage: (id: string, updates: Partial<PageModel>) =>
       updateMutation.mutate({ id, updates }),
-    deletePage: (id: string) => deleteItem(id),
+    deletePage,
     createMutation,
     updateMutation,
   };

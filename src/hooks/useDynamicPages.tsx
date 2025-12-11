@@ -1,87 +1,81 @@
-import { useMemo } from "react";
-import GenericPaginatedPage from "../components/panelComponents/FormElements/GenericPaginatedPage";
-import GenericTabPage from "../components/panelComponents/FormElements/GenericTabPage";
-import GenericUnpaginatedPage from "../components/panelComponents/FormElements/GenericUnpaginatedPage";
-import { Page, PageSchema, useGetAllPages } from "../utils/api/page";
+import { useCallback, useMemo } from "react";
+import { DynamicPageRenderer } from "../components/DynamicPageRenderer";
+import { GridSection, PageModel } from "../types/page";
+import { useGetAllPages } from "../utils/api/page";
 
 interface DynamicRoute {
   name: string;
   path?: string;
   isOnSidebar: boolean;
-  icon?: string; // Icon name from page data
+  icon?: string;
   element?: () => JSX.Element;
-  children?: DynamicRoute[]; // Support nested routes
-  link?: string; // External link (optional)
+  children?: DynamicRoute[];
+  link?: string;
 }
 
 export const useDynamicPages = () => {
   // Fetch all pages from the page API
   const pages = useGetAllPages();
 
-  // Helper function to create a route from a page's schemas
-  const createRouteFromSchemas = (
-    name: string,
-    schemas: PageSchema[],
-    basePath: string,
-    icon?: string,
-    showHeader: boolean = true // Add parameter to control header display
-  ): DynamicRoute => {
-    const path = basePath;
+  // Memoize element factory to prevent function recreation
+  const createPageElement = useCallback((sections: GridSection[]) => {
+    return () => <DynamicPageRenderer sections={sections} />;
+  }, []);
 
-    // If multiple schemas, use GenericTabPage
-    if (schemas.length > 1) {
-      return {
-        name,
-        path,
-        isOnSidebar: true,
-        icon,
-        element: () => (
-          <GenericTabPage
-            tabs={schemas.map((schema: PageSchema) => ({
-              schemaName: schema.schemaName,
-              label: schema.label,
-              isPaginated: schema.isPaginated ?? true, // Default to true
-              iconName: schema.icon, // Pass icon name from schema
-            }))}
-          />
-        ),
+  // Helper to build hierarchical structure
+  const buildRouteHierarchy = useCallback(
+    (allPages: PageModel[]): DynamicRoute[] => {
+      // Helper to convert PageModel to DynamicRoute
+      const createRoute = (
+        page: PageModel,
+        isSubPage = false
+      ): DynamicRoute => {
+        const route: DynamicRoute = {
+          name: page.name,
+          path: page.isGroupOnly
+            ? undefined
+            : `/${page.slug || page.name.toLowerCase().replace(/\s+/g, "-")}`,
+          isOnSidebar: true,
+          icon: page.icon,
+        };
+
+        // If page has subPage (nested page), create children array with both parent and subpage
+        if (page.subPage && !isSubPage) {
+          route.children = [
+            // First child: the parent page itself (if not group-only)
+            ...(page.isGroupOnly
+              ? []
+              : [
+                  {
+                    name: page.name,
+                    path: route.path,
+                    isOnSidebar: true,
+                    icon: page.icon,
+                    element: createPageElement(page.sections),
+                  },
+                ]),
+            // Second child: the subpage
+            createRoute(page.subPage, true),
+          ];
+          // Make parent a group (no direct path when expanded)
+          if (!page.isGroupOnly) {
+            delete route.element;
+          }
+        } else if (!page.isGroupOnly && route.path) {
+          // If page is not group-only and has no subpage, add element to render
+          route.element = createPageElement(page.sections);
+        }
+
+        return route;
       };
-    }
 
-    // If single schema, use GenericPaginatedPage or GenericUnpaginatedPage based on isPaginated
-    if (schemas.length === 1) {
-      const schema = schemas[0];
-      const isPaginated = schema.isPaginated ?? true; // Default to true
-
-      return {
-        name,
-        path,
-        isOnSidebar: true,
-        icon,
-        element: () =>
-          isPaginated ? (
-            <GenericPaginatedPage
-              schemaName={schema.schemaName}
-              isHeader={showHeader}
-            />
-          ) : (
-            <GenericUnpaginatedPage
-              schemaName={schema.schemaName}
-              isHeader={showHeader}
-            />
-          ),
-      };
-    }
-
-    // Fallback for empty schemas
-    return {
-      name,
-      path,
-      isOnSidebar: false,
-      icon,
-      element: () => <div>No schemas configured for this page</div>,
-    };
-  };
+      // Build routes from all pages (all are treated as root level)
+      return allPages
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        .map((page) => createRoute(page));
+    },
+    [createPageElement]
+  );
 
   // Generate routes from pages
   const dynamicRoutes = useMemo<DynamicRoute[]>(() => {
@@ -89,86 +83,8 @@ export const useDynamicPages = () => {
       return [];
     }
 
-    return pages.map((page: Page) => {
-      const basePath = `/${page.name.toLowerCase().replace(/\s+/g, "-")}`;
-
-      // Handle nested page (singular 'page' property)
-      const nestedPages: Page[] = [];
-      if (page.page) {
-        nestedPages.push(page.page);
-      }
-
-      // If page has nested page, create a parent route with children
-      if (nestedPages.length > 0) {
-        const children: DynamicRoute[] = nestedPages.map((childPage: Page) => {
-          const childPath = `${basePath}/${childPage.name
-            .toLowerCase()
-            .replace(/\s+/g, "-")}`;
-
-          // Create route from child page's schemas
-          if (childPage.schemas && childPage.schemas.length > 0) {
-            return createRouteFromSchemas(
-              childPage.name,
-              childPage.schemas,
-              childPath,
-              childPage.icon,
-              true // Show header for nested pages
-            );
-          }
-
-          // Fallback for child page without schemas
-          return {
-            name: childPage.name,
-            path: childPath,
-            isOnSidebar: false,
-            icon: childPage.icon,
-            element: () => <div>No schemas configured for this page</div>,
-          };
-        });
-
-        // If parent page also has schemas, add them as a child route
-        if (page.schemas && page.schemas.length > 0) {
-          children.unshift(
-            createRouteFromSchemas(
-              page.name,
-              page.schemas,
-              basePath,
-              page.icon,
-              true
-            )
-          );
-        }
-
-        // Return parent route with children
-        return {
-          name: page.name,
-          isOnSidebar: true,
-          icon: page.icon,
-          children,
-        };
-      }
-
-      // If page has only schemas (no nested pages), create a simple route
-      if (page.schemas && page.schemas.length > 0) {
-        return createRouteFromSchemas(
-          page.name,
-          page.schemas,
-          basePath,
-          page.icon,
-          true // Explicitly show header for standalone pages
-        );
-      }
-
-      // Fallback for pages with no schemas and no nested pages
-      return {
-        name: page.name,
-        path: basePath,
-        isOnSidebar: false,
-        icon: page.icon,
-        element: () => <div>No schemas configured for this page</div>,
-      };
-    });
-  }, [pages]);
+    return buildRouteHierarchy(pages);
+  }, [pages, buildRouteHierarchy]);
 
   // Generate route enum entries
   const routeEnums = useMemo(() => {
@@ -176,12 +92,14 @@ export const useDynamicPages = () => {
       return {};
     }
 
-    return pages.reduce((acc: Record<string, string>, page: Page) => {
-      const enumKey = page.name
-        .replace(/\s+/g, "")
-        .replace(/^./, (c: string) => c.toUpperCase()); // PascalCase
-      const path = `/${page.name.toLowerCase().replace(/\s+/g, "-")}`;
-      acc[enumKey] = path;
+    return pages.reduce((acc: Record<string, string>, page: PageModel) => {
+      if (!page.isGroupOnly) {
+        const enumKey = page.name
+          .replace(/\s+/g, "")
+          .replace(/^./, (c: string) => c.toUpperCase());
+        const slug = page.slug || page.name.toLowerCase().replace(/\s+/g, "-");
+        acc[enumKey] = `/${slug}`;
+      }
       return acc;
     }, {} as Record<string, string>);
   }, [pages]);
@@ -189,7 +107,7 @@ export const useDynamicPages = () => {
   return {
     dynamicRoutes,
     routeEnums,
-    isLoading: !pages, // Simple loading check
+    isLoading: !pages,
     pages: pages || [],
   };
 };

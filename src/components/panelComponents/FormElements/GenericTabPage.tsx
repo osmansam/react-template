@@ -3,7 +3,6 @@ import { IconType } from "react-icons";
 // import { GiGreatPyramid } from "react-icons/gi";
 import { useGeneralContext } from "../../../context/General.context";
 import { getIconByName } from "../../../utils/menuIcons";
-import { Header } from "../../header/Header";
 import UnifiedTabPanel from "../TabPanel/UnifiedTabPanel";
 import GenericPaginatedPage from "./GenericPaginatedPage";
 import GenericUnpaginatedPage from "./GenericUnpaginatedPage";
@@ -81,7 +80,6 @@ export default function GenericTabPage({
 
   return (
     <>
-      <Header />
       <div className="flex flex-col gap-2 mt-5">
         <UnifiedTabPanel
           tabs={builtTabs}

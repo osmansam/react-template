@@ -18,7 +18,11 @@ import {
   Types,
   useGetContainers,
 } from "../../../utils/api/container";
-import { useDynamicCrud, useExportDynamicItems, useGetPaginatedItems } from "../../../utils/dynamic";
+import {
+  useDynamicCrud,
+  useExportDynamicItems,
+  useGetPaginatedItems,
+} from "../../../utils/dynamic";
 import {
   RawContainer,
   evaluateRowCondition,
@@ -28,9 +32,12 @@ import {
   isDisplayablePrimitive,
   normalizeContainer,
   normalizeField,
-  tailwindBgToStyle
+  tailwindBgToStyle,
 } from "../../../utils/genericPageHelpers";
-import { isFieldRequired, parseValidationRules } from "../../../utils/validationHelper";
+import {
+  isFieldRequired,
+  parseValidationRules,
+} from "../../../utils/validationHelper";
 import SwitchButton from "../common/SwitchButton";
 import ExportModal from "../Modals/ExportModal";
 import { FormKeyTypeEnum, InputTypes } from "../shared/types";
@@ -63,7 +70,7 @@ export default function GenericPaginatedPage({
     setSelectedRows,
     setIsSelectionActive,
   } = useGeneralContext();
-const { user } = useUserContext();
+  const { user } = useUserContext();
   const rawContainers = useGetContainers();
 
   const container: ContainerModel | undefined = useMemo(() => {
@@ -169,8 +176,6 @@ const { user } = useUserContext();
           fieldType === "array<number>";
         const isArray = isStringArray || isIntArray || isNumberArray;
 
-
-
         const rowKey: {
           key: string;
           isImage?: boolean;
@@ -213,7 +218,9 @@ const { user } = useUserContext();
           // Handle array types - display as comma-separated values
           rowKey.node = (row: GenericItem) => {
             const value = row[f.name];
-            const content = Array.isArray(value) ? value.join(", ") : String(value || "");
+            const content = Array.isArray(value)
+              ? value.join(", ")
+              : String(value || "");
             return f.frontend?.linkTemplate ? (
               <LinkCell field={f} row={row} />
             ) : (
@@ -221,7 +228,8 @@ const { user } = useUserContext();
             );
           };
         } else if (
-          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
+          (fieldType === Types.ObjectId ||
+            fieldType === Types.AutoIncrementId) &&
           f.populationSettings &&
           f.populationSettings.displayFields &&
           f.populationSettings.displayFields.length > 0
@@ -233,8 +241,10 @@ const { user } = useUserContext();
             if (value && typeof value === "object") {
               // Display the fields specified in displayFields
               const valueObj = value as Record<string, unknown>;
-              const displayValues = f.populationSettings!.displayFields
-                .map((fieldName) => valueObj[fieldName])
+              const displayValues = f
+                .populationSettings!.displayFields.map(
+                  (fieldName) => valueObj[fieldName]
+                )
                 .filter(Boolean)
                 .map(String);
               content = displayValues.join(" - ") || String(valueObj._id || "");
@@ -262,18 +272,23 @@ const { user } = useUserContext();
               const displayItems = value.map((item) => {
                 if (item && typeof item === "object") {
                   const itemObj = item as Record<string, unknown>;
-                  const displayValues = f.populationSettings!.displayFields
-                    .map((fieldName) => itemObj[fieldName])
+                  const displayValues = f
+                    .populationSettings!.displayFields.map(
+                      (fieldName) => itemObj[fieldName]
+                    )
                     .filter(Boolean)
                     .map(String);
                   return displayValues.join(" - ") || String(itemObj._id || "");
                 } else if (typeof item === "string") {
                   // Handle ID strings by looking up in selectionDataMap
                   const selectionOptions = selectionDataMap.get(f.name) || [];
-                  const foundOption = selectionOptions.find((opt) => opt._id === item);
+                  const foundOption = selectionOptions.find(
+                    (opt) => opt._id === item
+                  );
                   if (foundOption) {
                     return String(
-                      foundOption[f.populationSettings!.inputSelectionField] || item
+                      foundOption[f.populationSettings!.inputSelectionField] ||
+                        item
                     );
                   }
                   return item;
@@ -312,110 +327,121 @@ const { user } = useUserContext();
   }, [displayFields, t, actionsEnabled]);
 
   const { inputs, formKeys } = useMemo(() => {
-    const ins = displayFields.map((f) => {
-      // Skip fields with equation
-      if (f.equation) return null;
+    const ins = displayFields
+      .map((f) => {
+        // Skip fields with equation
+        if (f.equation) return null;
 
-      const m = fieldToInput(f);
-      const label = t(getFieldLabel(f));
-      const fieldType = (f.type || "").toLowerCase();
-      
-      // Parse validation rules from tag
-      const validationRules = parseValidationRules(f.tag);
-      const isRequired = isFieldRequired(f.tag);
-      // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
-      if (
-        (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId || fieldType === Types.ObjectIdArray) &&
-        f.populationSettings &&
-        f.objectSchemaName
-      ) {
-        const selectionData = selectionDataMap.get(f.name) || [];
-        const displayLabel = f.populationSettings.displayLabel || label;
-        
+        const m = fieldToInput(f);
+        const label = t(getFieldLabel(f));
+        const fieldType = (f.type || "").toLowerCase();
+
+        // Parse validation rules from tag
+        const validationRules = parseValidationRules(f.tag);
+        const isRequired = isFieldRequired(f.tag);
+        // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
+        if (
+          (fieldType === Types.ObjectId ||
+            fieldType === Types.AutoIncrementId ||
+            fieldType === Types.ObjectIdArray) &&
+          f.populationSettings &&
+          f.objectSchemaName
+        ) {
+          const selectionData = selectionDataMap.get(f.name) || [];
+          const displayLabel = f.populationSettings.displayLabel || label;
+
+          return {
+            type: InputTypes.SELECT,
+            formKey: f.name,
+            label: t(displayLabel),
+            placeholder: t(displayLabel),
+            required: isRequired,
+            isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
+            options: selectionData.map((item) => ({
+              value: String(item._id || ""),
+              label: String(
+                item[f.populationSettings!.inputSelectionField] ||
+                  item._id ||
+                  ""
+              ),
+            })),
+            invalidateKeys:
+              f.frontend?.invalidateKeys?.map((key) => ({
+                key: String(key),
+                defaultValue: undefined,
+              })) ?? [],
+          };
+        }
+
+        // Check if field has enumList
+        if (f.enumList && f.enumList.length > 0) {
+          const originalType = f.type || "";
+
+          // Check if it's an array type
+          const isStringArray =
+            fieldType === "stringarray" ||
+            originalType === "stringArray" ||
+            fieldType === "string[]" ||
+            fieldType === "array<string>";
+          const isIntArray =
+            fieldType === "intarray" ||
+            originalType === "intArray" ||
+            fieldType === "int[]" ||
+            fieldType === "array<int>";
+          const isNumberArray =
+            fieldType === "numberarray" ||
+            originalType === "numberArray" ||
+            fieldType === "number[]" ||
+            fieldType === "array<number>";
+
+          const isArrayType = isStringArray || isIntArray || isNumberArray;
+
+          return {
+            type: InputTypes.SELECT,
+            formKey: f.name,
+            label,
+            placeholder: label,
+            required: isRequired,
+            isMultiple: isArrayType,
+            options: f.enumList.map((item) => ({
+              value: item,
+              label: String(item),
+            })),
+            invalidateKeys:
+              f.frontend?.invalidateKeys?.map((key) => ({
+                key: String(key),
+                defaultValue: undefined,
+              })) ?? [],
+          };
+        }
+
         return {
-          type: InputTypes.SELECT,
-          formKey: f.name,
-          label: t(displayLabel),
-          placeholder: t(displayLabel),
-          required: isRequired,
-          isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
-          options: selectionData.map((item) => ({
-            value: String(item._id || ""),
-            label: String(
-              item[f.populationSettings!.inputSelectionField] || item._id || ""
-            ),
-          })),
-          invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
-            key: String(key),
-            defaultValue: undefined,
-          }))??[]
-        };
-      }
-
-      // Check if field has enumList
-      if (f.enumList && f.enumList.length > 0) {
-        const originalType = f.type || "";
-
-        // Check if it's an array type
-        const isStringArray =
-          fieldType === "stringarray" ||
-          originalType === "stringArray" ||
-          fieldType === "string[]" ||
-          fieldType === "array<string>";
-        const isIntArray =
-          fieldType === "intarray" ||
-          originalType === "intArray" ||
-          fieldType === "int[]" ||
-          fieldType === "array<int>";
-        const isNumberArray =
-          fieldType === "numberarray" ||
-          originalType === "numberArray" ||
-          fieldType === "number[]" ||
-          fieldType === "array<number>";
-
-        const isArrayType = isStringArray || isIntArray || isNumberArray;
-
-        return {
-          type: InputTypes.SELECT,
+          type: m.inputType,
           formKey: f.name,
           label,
           placeholder: label,
           required: isRequired,
-          isMultiple: isArrayType,
-          options: f.enumList.map((item) => ({
-            value: item,
-            label: String(item),
-          })),
-invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
-            key: String(key),
-            defaultValue: undefined,
-          }))??[]
+          minLength: validationRules.minlength,
+          maxLength: validationRules.maxlength,
+          min: validationRules.min,
+          max: validationRules.max,
+          pattern: validationRules.pattern,
+          invalidateKeys:
+            f.frontend?.invalidateKeys?.map((key) => ({
+              key: String(key),
+              defaultValue: undefined,
+            })) ?? [],
         };
-      }
+      })
+      .filter((i): i is NonNullable<typeof i> => i !== null);
 
-      return {
-        type: m.inputType,
-        formKey: f.name,
-        label,
-        placeholder: label,
-        required: isRequired,
-        minLength: validationRules.minlength,
-        maxLength: validationRules.maxlength,
-        min: validationRules.min,
-        max: validationRules.max,
-        pattern: validationRules.pattern,
-invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
-            key: String(key),
-            defaultValue: undefined,
-          }))??[]
-      };
-    }).filter((i): i is NonNullable<typeof i> => i !== null);
-
-    const fks = displayFields.map((f) => {
-      if (f.equation) return null;
-      const m = fieldToInput(f);
-      return { key: f.name, type: m.formKeyType };
-    }).filter((k): k is NonNullable<typeof k> => k !== null);
+    const fks = displayFields
+      .map((f) => {
+        if (f.equation) return null;
+        const m = fieldToInput(f);
+        return { key: f.name, type: m.formKeyType };
+      })
+      .filter((k): k is NonNullable<typeof k> => k !== null);
 
     return { inputs: ins, formKeys: fks };
   }, [displayFields, t, selectionDataMap]);
@@ -561,47 +587,58 @@ invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
         className: "text-blue-500 cursor-pointer text-xl mr-auto",
         isModal: true,
         setRow: setRowToAction as (value: GenericItem) => void,
-        modal: rowToAction ? (() => {
-          // Normalize the row data to extract IDs from populated fields
-          const normalizedUpdates = { ...rowToAction };
-          displayFields.forEach((f) => {
-            const fieldType = (f.type || "").toLowerCase();
-            if (
-              (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId) &&
-              f.populationSettings &&
-              normalizedUpdates[f.name] &&
-              typeof normalizedUpdates[f.name] === "object"
-            ) {
-              // Extract the _id from the populated object
-              const populatedValue = normalizedUpdates[f.name] as Record<string, unknown>;
-              normalizedUpdates[f.name] = populatedValue._id;
-            } else if (
-              fieldType === Types.ObjectIdArray &&
-              f.populationSettings &&
-              normalizedUpdates[f.name] &&
-              Array.isArray(normalizedUpdates[f.name])
-            ) {
-              // Extract array of _ids from populated objects
-              const populatedArray = normalizedUpdates[f.name] as Array<Record<string, unknown>>;
-              normalizedUpdates[f.name] = populatedArray.map((item) => 
-                item && typeof item === "object" ? item._id : item
+        modal: rowToAction
+          ? (() => {
+              // Normalize the row data to extract IDs from populated fields
+              const normalizedUpdates = { ...rowToAction };
+              displayFields.forEach((f) => {
+                const fieldType = (f.type || "").toLowerCase();
+                if (
+                  (fieldType === Types.ObjectId ||
+                    fieldType === Types.AutoIncrementId) &&
+                  f.populationSettings &&
+                  normalizedUpdates[f.name] &&
+                  typeof normalizedUpdates[f.name] === "object"
+                ) {
+                  // Extract the _id from the populated object
+                  const populatedValue = normalizedUpdates[f.name] as Record<
+                    string,
+                    unknown
+                  >;
+                  normalizedUpdates[f.name] = populatedValue._id;
+                } else if (
+                  fieldType === Types.ObjectIdArray &&
+                  f.populationSettings &&
+                  normalizedUpdates[f.name] &&
+                  Array.isArray(normalizedUpdates[f.name])
+                ) {
+                  // Extract array of _ids from populated objects
+                  const populatedArray = normalizedUpdates[f.name] as Array<
+                    Record<string, unknown>
+                  >;
+                  normalizedUpdates[f.name] = populatedArray.map((item) =>
+                    item && typeof item === "object" ? item._id : item
+                  );
+                }
+              });
+
+              return (
+                <GenericAddEditPanel
+                  isOpen={isEditOpen}
+                  close={() => setIsEditOpen(false)}
+                  inputs={inputs}
+                  formKeys={formKeys}
+                  submitItem={handleSubmitItem}
+                  isEditMode
+                  topClassName="flex flex-col gap-2"
+                  itemToEdit={{
+                    id: rowToAction._id,
+                    updates: normalizedUpdates,
+                  }}
+                />
               );
-            }
-          });
-          
-          return (
-            <GenericAddEditPanel
-              isOpen={isEditOpen}
-              close={() => setIsEditOpen(false)}
-              inputs={inputs}
-              formKeys={formKeys}
-              submitItem={handleSubmitItem}
-              isEditMode
-              topClassName="flex flex-col gap-2"
-              itemToEdit={{ id: rowToAction._id, updates: normalizedUpdates }}
-            />
-          );
-        })() : null,
+            })()
+          : null,
         isModalOpen: isEditOpen,
         setIsModal: setIsEditOpen,
         isPath: false,
@@ -631,7 +668,8 @@ invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
       displayFields
         .filter((f) => {
           const fieldType = (f.type || "").toLowerCase();
-          if (fieldType === Types.Image || fieldType === Types.Image) return false;
+          if (fieldType === Types.Image || fieldType === Types.Image)
+            return false;
           return !f.equation;
         })
         .map((f) => ({
@@ -679,13 +717,15 @@ invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
 
         // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
         if (
-          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId || fieldType === Types.ObjectIdArray) &&
+          (fieldType === Types.ObjectId ||
+            fieldType === Types.AutoIncrementId ||
+            fieldType === Types.ObjectIdArray) &&
           f.populationSettings &&
           f.objectSchemaName
         ) {
           const selectionData = selectionDataMap.get(f.name) || [];
           const displayLabel = f.populationSettings.displayLabel || label;
-          
+
           return {
             type: InputTypes.SELECT,
             formKey: f.name,
@@ -697,7 +737,9 @@ invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
             options: selectionData.map((item) => ({
               value: String(item._id || ""),
               label: String(
-                item[f.populationSettings!.inputSelectionField] || item._id || ""
+                item[f.populationSettings!.inputSelectionField] ||
+                  item._id ||
+                  ""
               ),
             })),
           };
@@ -931,7 +973,9 @@ invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
 
         // Check if field is objectId/autoIncrementId/objectIdArray with populationSettings
         if (
-          (fieldType === Types.ObjectId || fieldType === Types.AutoIncrementId || fieldType === Types.ObjectIdArray) &&
+          (fieldType === Types.ObjectId ||
+            fieldType === Types.AutoIncrementId ||
+            fieldType === Types.ObjectIdArray) &&
           f.populationSettings &&
           f.populationSettings.inputSelectionField &&
           selectionDataMap.has(f.name)
@@ -947,7 +991,9 @@ invalidateKeys: f.frontend?.invalidateKeys?.map((key) => ({
             options: selectionOptions.map((item) => ({
               value: String(item._id || ""),
               label: String(
-                item[f.populationSettings!.inputSelectionField] || item._id || ""
+                item[f.populationSettings!.inputSelectionField] ||
+                  item._id ||
+                  ""
               ),
             })),
           };

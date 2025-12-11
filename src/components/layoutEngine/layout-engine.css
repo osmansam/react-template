@@ -1,0 +1,266 @@
+/**
+ * Layout Engine CSS
+ * 
+ * Core styles for the dynamic grid layout system.
+ * These styles work in conjunction with Tailwind CSS.
+ */
+
+/* ===== Grid Section ===== */
+.grid-section {
+  /* Grid properties are set inline via style attribute */
+  min-height: 100px;
+}
+
+/* Ensure grid cells don't overflow */
+.grid-cell {
+  min-width: 0; /* Prevent grid blowout */
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ===== Primitive Components Base Styles ===== */
+.primitive-component {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Add subtle hover effect for interactive components */
+.primitive-component:hover {
+  transform: translateY(-2px);
+}
+
+/* Prevent hover effect on text blocks */
+.text-block:hover {
+  transform: none;
+}
+
+/* ===== Component Specific Styles ===== */
+
+/* Table View */
+.table-view {
+  overflow-x: auto;
+}
+
+/* Chart View */
+.chart-view canvas,
+.chart-view svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Form View */
+.form-view {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* KPI Block */
+.kpi-block {
+  min-height: 120px;
+}
+
+/* Custom Component */
+.custom-component {
+  position: relative;
+}
+
+/* ===== Responsive Design ===== */
+
+/* Mobile: Stack cells vertically */
+@media (max-width: 768px) {
+  .grid-section {
+    display: flex !important;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .grid-cell {
+    grid-row: auto !important;
+    grid-column: auto !important;
+  }
+}
+
+/* Tablet: Reduce gap sizes */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .grid-section {
+    gap: 12px !important;
+  }
+}
+
+/* ===== Layout Engine Container ===== */
+.layout-engine {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.sections-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.layout-section {
+  width: 100%;
+}
+
+/* ===== Section Headers ===== */
+.section-header {
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+}
+
+/* ===== Empty State ===== */
+.layout-engine-empty {
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 0.5rem;
+}
+
+/* ===== Loading States ===== */
+.component-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background-color: #f9fafb;
+  border-radius: 0.5rem;
+}
+
+.component-loading::after {
+  content: "";
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== Error States ===== */
+.component-error {
+  padding: 1rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  color: #991b1b;
+}
+
+/* ===== Print Styles ===== */
+@media print {
+  .grid-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .grid-cell {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .primitive-component {
+    box-shadow: none !important;
+  }
+}
+
+/* ===== Accessibility ===== */
+
+/* Focus styles for keyboard navigation */
+.primitive-component:focus-within {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .primitive-component {
+    border: 2px solid currentColor;
+  }
+
+  .section-header {
+    border-bottom-width: 3px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .primitive-component {
+    transition: none;
+  }
+
+  .primitive-component:hover {
+    transform: none;
+  }
+
+  .component-loading::after {
+    animation: none;
+  }
+}
+
+/* ===== Dark Mode Support ===== */
+@media (prefers-color-scheme: dark) {
+  .primitive-component {
+    background-color: #1f2937;
+    color: #f9fafb;
+  }
+
+  .section-header {
+    border-bottom-color: #374151;
+  }
+
+  .layout-engine-empty {
+    background-color: #111827;
+    border-color: #374151;
+    color: #9ca3af;
+  }
+
+  .component-loading {
+    background-color: #111827;
+  }
+
+  .component-loading::after {
+    border-color: #374151;
+    border-top-color: #60a5fa;
+  }
+}
+
+/* ===== Utility Classes ===== */
+
+/* Cell alignment helpers */
+.cell-align-top {
+  align-items: flex-start;
+}
+
+.cell-align-center {
+  align-items: center;
+}
+
+.cell-align-bottom {
+  align-items: flex-end;
+}
+
+/* Cell spacing helpers */
+.cell-gap-sm {
+  gap: 0.5rem;
+}
+
+.cell-gap-md {
+  gap: 1rem;
+}
+
+.cell-gap-lg {
+  gap: 1.5rem;
+}

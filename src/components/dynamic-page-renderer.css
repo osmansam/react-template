@@ -1,0 +1,83 @@
+/**
+ * Dynamic Page Renderer CSS
+ * 
+ * Styles for the dynamic grid layout system
+ * Works with header and sidebar from the main app layout
+ */
+
+/* ===== Grid Section ===== */
+.grid-section {
+  width: 100%;
+  min-height: 100px;
+}
+
+/* Prevent grid blowout */
+.grid-cell {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ===== Dynamic Page Renderer ===== */
+.dynamic-page-renderer {
+  width: 100%;
+  max-width: 100%;
+  padding: 1rem;
+}
+
+.sections-container {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Responsive Design ===== */
+
+/* Mobile: Stack grid cells vertically */
+@media (max-width: 768px) {
+  .grid-section {
+    display: flex !important;
+    flex-direction: column;
+    gap: 1rem !important;
+  }
+
+  .grid-cell {
+    grid-row: auto !important;
+    grid-column: auto !important;
+  }
+
+  .dynamic-page-renderer {
+    padding: 0.5rem;
+  }
+}
+
+/* Tablet: Reduce gap sizes */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .grid-section {
+    gap: 12px !important;
+  }
+}
+
+/* Desktop: Full layout */
+@media (min-width: 1025px) {
+  .dynamic-page-renderer {
+    padding: 1.5rem;
+  }
+}
+
+/* ===== Empty State ===== */
+.dynamic-page-renderer p {
+  margin: 0;
+}
+
+/* ===== Print Styles ===== */
+@media print {
+  .grid-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .grid-cell {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

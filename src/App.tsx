@@ -1,7 +1,7 @@
 import {
-    QueryClient,
-    QueryClientProvider,
-    useIsMutating,
+  QueryClient,
+  QueryClientProvider,
+  useIsMutating,
 } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { Slide, ToastContainer } from "react-toastify";
@@ -46,9 +46,11 @@ function App() {
   );
 }
 
+// Create QueryClient once outside component to prevent recreation
+const queryClient = new QueryClient();
+
 // We are wrapping the App component to be able to use isMutating hooks in it
 function Wrapper() {
-  const queryClient = new QueryClient();
   return (
     <QueryClientProvider client={queryClient}>
       <App />
