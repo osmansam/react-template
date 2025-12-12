@@ -463,3 +463,34 @@ export function useGetSelection<T>(schemaName: string, fieldName: string) {
 
   return (data ?? ([] as T)) as T;
 }
+
+export function useGetPipeline<T>(
+  schemaName: string,
+  pipelineName: string,
+  additionalParams?: Record<string, unknown>
+) {
+  const hasParams = Boolean(schemaName && pipelineName);
+
+  const params: Record<string, unknown> = {
+    schemaName,
+    pipelineName,
+    ...additionalParams,
+  };
+
+  const queryString = qs(params);
+  const path = `${BASE}/pipeline?${queryString}`;
+
+  const queryKey = [
+    "dynamic",
+    schemaName || "",
+    "pipeline",
+    pipelineName || "",
+    additionalParams || {},
+  ] as const;
+
+  const enabled = hasParams;
+
+  const data = useGet<T>(path, queryKey, enabled);
+
+  return (data ?? ([] as T)) as T;
+}

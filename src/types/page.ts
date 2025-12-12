@@ -19,8 +19,27 @@ export interface GroupBy {
   groupByField: string; // Field name to display from grouped object (e.g., "name")
 }
 
-export type ComponentType = "table" | "tabPanel";
-// Future types: "chart" | "form" | "text" | "custom"
+export type ComponentType =
+  | "table"
+  | "tabPanel"
+  // Chart types
+  | "barChart"
+  | "lineChart"
+  | "pieChart"
+  | "areaChart"
+  | "radarChart"
+  | "heatmapChart"
+  | "scatterChart"
+  | "funnelChart"
+  | "sankeyChart"
+  | "sunburstChart"
+  | "treemapChart"
+  | "calendarChart"
+  | "bumpChart"
+  | "streamChart"
+  | "waffleChart"
+  | "circlePackingChart";
+// Future types: "form" | "text" | "custom"
 
 export interface TabContent {
   title: string;

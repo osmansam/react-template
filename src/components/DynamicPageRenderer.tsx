@@ -6,17 +6,43 @@ import {
   TabContent,
 } from "../types/page";
 import { useGetSelection } from "../utils/dynamic";
+import DynamicChart, { ChartType } from "./charts/DynamicChart";
 import "./dynamic-page-renderer.css";
 import { Header } from "./header/Header";
 import GenericPaginatedPage from "./panelComponents/FormElements/GenericPaginatedPage";
 import GenericTabPage from "./panelComponents/FormElements/GenericTabPage";
+
+// Map component type to chart type
+const getChartTypeFromComponentType = (
+  componentType: string
+): ChartType | null => {
+  const mapping: Record<string, ChartType> = {
+    barChart: "bar",
+    lineChart: "line",
+    pieChart: "pie",
+    areaChart: "area",
+    radarChart: "radar",
+    heatmapChart: "heatmap",
+    scatterChart: "scatter",
+    funnelChart: "funnel",
+    sankeyChart: "sankey",
+    sunburstChart: "sunburst",
+    treemapChart: "treemap",
+    calendarChart: "calendar",
+    bumpChart: "bump",
+    streamChart: "stream",
+    waffleChart: "waffle",
+    circlePackingChart: "circle-packing",
+  };
+  return mapping[componentType] || null;
+};
 
 /**
  * Renders a single component based on its type
  */
 const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
   ({ component }) => {
-    const { type, dataBinding, tabs, groupBy } = component;
+    const { type, dataBinding, tabs, groupBy, title, props } = component;
 
     // Find which tab (if any) has a groupBy configuration
     const tabWithGroupByIndex =
@@ -149,6 +175,69 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
             </p>
           </div>
         );
+
+      case "barChart":
+      case "lineChart":
+      case "pieChart":
+      case "areaChart":
+      case "radarChart":
+      case "heatmapChart":
+      case "scatterChart":
+      case "funnelChart":
+      case "sankeyChart":
+      case "sunburstChart":
+      case "treemapChart":
+      case "calendarChart":
+      case "bumpChart":
+      case "streamChart":
+      case "waffleChart":
+      case "circlePackingChart": {
+        // Render chart component
+        const chartType = getChartTypeFromComponentType(type);
+        if (!chartType) {
+          return (
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
+              <p className="text-yellow-800 text-sm">
+                Invalid chart type: {type}
+              </p>
+            </div>
+          );
+        }
+
+        if (
+          dataBinding?.kind === "pipeline" &&
+          dataBinding.schemaName &&
+          dataBinding.pipelineName
+        ) {
+          return (
+            <DynamicChart
+              config={{
+                type: chartType,
+                title: title,
+                height: props?.height as number | undefined,
+                width: props?.width as string | undefined,
+                chartOptions: props?.chartOptions as
+                  | Record<string, unknown>
+                  | undefined,
+                dataBinding: {
+                  kind: "pipeline",
+                  schemaName: dataBinding.schemaName,
+                  pipelineName: dataBinding.pipelineName,
+                  params: dataBinding.params,
+                },
+              }}
+            />
+          );
+        }
+        return (
+          <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
+            <p className="text-yellow-800 text-sm">
+              Chart component requires pipeline binding with schemaName and
+              pipelineName
+            </p>
+          </div>
+        );
+      }
 
       default:
         return (
