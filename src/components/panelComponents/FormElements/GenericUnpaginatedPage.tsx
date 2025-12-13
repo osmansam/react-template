@@ -1075,7 +1075,7 @@ export default function GenericUnpaginatedPage({
   return (
     <>
       {isHeader && <Header />}
-      <div className={isHeader ? "w-[98%] mx-auto my-10" : "w-[95%] mx-auto"}>
+      <div className="w-[95%] mx-auto">
         <GenericTable
           rowKeys={rowKeys}
           actions={actions}

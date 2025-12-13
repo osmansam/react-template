@@ -83,7 +83,7 @@ export default function GenericTabPage({
 
   return (
     <>
-      <div className="flex flex-col gap-2 mt-5">
+      <div className="flex flex-col gap-2 h-full">
         <UnifiedTabPanel
           tabs={builtTabs}
           activeTab={activeTab}

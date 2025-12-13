@@ -447,7 +447,9 @@ export function useGetPaginatedItems<T>(
 
 // utils/dynamic.ts (or wherever this lives)
 export function useGetSelection<T>(schemaName: string, fieldName: string) {
-  const hasParams = Boolean(schemaName && fieldName);
+  // Only enable the request if both schemaName and fieldName are provided
+  const enabled = Boolean(schemaName && fieldName);
+
   const path = `${BASE}/selection?${qs({ schemaName, fieldName })}`;
 
   const queryKey = [
@@ -456,8 +458,6 @@ export function useGetSelection<T>(schemaName: string, fieldName: string) {
     "selection",
     fieldName || "",
   ] as const;
-
-  const enabled = hasParams;
 
   const data = useGet<T>(path, queryKey, enabled);
 

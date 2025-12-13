@@ -205,6 +205,28 @@ const getDefaultConfig = (type: ChartType): Record<string, unknown> => {
         axisTop: { tickSize: 5, tickPadding: 5, tickRotation: -90 },
         axisLeft: { tickSize: 5, tickPadding: 5, tickRotation: 0 },
       };
+    case "calendar":
+      return {
+        margin: { top: 40, right: 40, bottom: 40, left: 40 },
+        emptyColor: "#eeeeee",
+        yearSpacing: 40,
+        monthBorderColor: "#ffffff",
+        dayBorderWidth: 2,
+        dayBorderColor: "#ffffff",
+        colors: ["#61cdbb", "#97e3d5", "#e8c1a0", "#f47560"],
+        legends: [
+          {
+            anchor: "bottom-right",
+            direction: "row",
+            translateY: 36,
+            itemCount: 4,
+            itemWidth: 42,
+            itemHeight: 36,
+            itemsSpacing: 14,
+            itemDirection: "right-to-left",
+          },
+        ],
+      };
     default:
       return { margin: commonMargin };
   }
@@ -237,14 +259,35 @@ export default function DynamicChart({ config }: DynamicChartProps) {
   // Merge default config with custom options
   const finalConfig = useMemo(() => {
     const defaultConfig = getDefaultConfig(type);
-    return { ...defaultConfig, ...chartOptions };
-  }, [type, chartOptions]);
+    let config = { ...defaultConfig, ...chartOptions };
+
+    // Special handling for calendar chart - extract date range from data
+    if (type === "calendar" && data && Array.isArray(data) && data.length > 0) {
+      // Extract dates from data if not provided in chartOptions
+      if (!config.from || !config.to) {
+        const dates = data
+          .map((d: any) => d.day || d.date)
+          .filter(Boolean)
+          .sort();
+
+        if (dates.length > 0) {
+          config = {
+            ...config,
+            from: config.from || dates[0],
+            to: config.to || dates[dates.length - 1],
+          };
+        }
+      }
+    }
+
+    return config;
+  }, [type, chartOptions, data]);
 
   if (!data || (Array.isArray(data) && data.length === 0)) {
     return (
       <div className="w-full">
         {title && (
-          <h3 className="text-lg font-semibold mb-4 text-gray-800">{title}</h3>
+          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
         )}
         <div
           className="flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200"
@@ -260,7 +303,7 @@ export default function DynamicChart({ config }: DynamicChartProps) {
     return (
       <div className="w-full">
         {title && (
-          <h3 className="text-lg font-semibold mb-4 text-gray-800">{title}</h3>
+          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
         )}
         <div
           className="flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200"
@@ -275,7 +318,7 @@ export default function DynamicChart({ config }: DynamicChartProps) {
   return (
     <div className="w-full">
       {title && (
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">{title}</h3>
+        <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
       )}
       <div style={{ height, width }}>
         <Suspense

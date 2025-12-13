@@ -268,7 +268,7 @@ const GridCellView: React.FC<{ cell: GridCell }> = React.memo(({ cell }) => {
         gridColumn: `${column} / span ${colSpan}`,
       }}
     >
-      <div className="flex flex-col gap-4 h-full">
+      <div className="flex flex-col h-full">
         {sortedComponents.map((component) => (
           <RenderComponent key={component.id} component={component} />
         ))}
@@ -330,7 +330,7 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
   return (
     <>
       <Header />
-      <div className={`dynamic-page-renderer ${className}`}>
+      <div className={`dynamic-page-renderer mt-10 ${className}`}>
         <div className="sections-container space-y-6">
           {sections.map((section, index) => (
             <GridSectionView

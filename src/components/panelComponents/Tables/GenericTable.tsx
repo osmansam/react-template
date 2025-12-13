@@ -726,10 +726,7 @@ const GenericTable = <T,>({
 
             if (rowKey.node) {
               return (
-                <td
-                  key={keyIndex}
-                  className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20`}
-                >
+                <td key={keyIndex} className="px-4 py-3 min-w-20">
                   {rowKey.node(row)}
                 </td>
               );
@@ -741,10 +738,7 @@ const GenericTable = <T,>({
                 row[rowKey.key as keyof T] === "")
             ) {
               return (
-                <td
-                  key={keyIndex}
-                  className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20`}
-                >
+                <td key={keyIndex} className="px-4 py-3 min-w-20">
                   <span className={computedClassName}>-</span>
                 </td>
               );
@@ -756,10 +750,7 @@ const GenericTable = <T,>({
                 .toFixed(2)
                 .replace(/\.?0*$/, "");
               return (
-                <td
-                  key={keyIndex}
-                  className={`${keyIndex === 0 ? "pl-3" : ""} py-3 min-w-20`}
-                >
+                <td key={keyIndex} className="px-4 py-3 min-w-20">
                   <P1 className={computedClassName}>{formattedValue} ₺</P1>
                 </td>
               );
@@ -789,9 +780,7 @@ const GenericTable = <T,>({
               return (
                 <td
                   key={keyIndex}
-                  className={`${
-                    keyIndex === 0 ? "pl-3" : ""
-                  }  py-3 min-w-32 md:min-w-0`}
+                  className="px-4 py-3 min-w-32 md:min-w-0"
                   style={style}
                 >
                   <P1
@@ -806,9 +795,7 @@ const GenericTable = <T,>({
             return (
               <td
                 key={keyIndex}
-                className={`${
-                  keyIndex === 0 ? "pl-3" : ""
-                } py-3 min-w-20 md:min-w-0 `}
+                className="px-4 py-3 min-w-20 md:min-w-0"
                 style={style}
               >
                 {rowKey.isImage ? (
@@ -918,9 +905,7 @@ const GenericTable = <T,>({
                                 return (
                                   <td
                                     key={keyIndex}
-                                    className={`${
-                                      keyIndex === 0 ? "pl-3" : ""
-                                    } py-3 min-w-20 border-b`}
+                                    className="px-4 py-3 min-w-20 border-b"
                                   >
                                     <P1 className={computedClassName}>
                                       {rowKey.node(collapsibleRow)}
@@ -1276,10 +1261,10 @@ const GenericTable = <T,>({
                 }`}
               >
                 <table className="bg-white w-full">
-                  <thead className="border-b bg-gray-100">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                     <tr>
                       {selectionActions && isSelectionActive && (
-                        <th className="sticky top-0 z-10 bg-gray-100 shadow-sm">
+                        <th className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 shadow-sm px-4 py-3">
                           {selectionActions && isSelectionActive && (
                             <Tooltip content={t("Select All")} placement="top">
                               <div
@@ -1292,9 +1277,9 @@ const GenericTable = <T,>({
                                 }}
                               >
                                 {allVisibleSelected ? (
-                                  <MdOutlineCheckBox className="my-auto mx-auto text-2xl cursor-pointer hover:scale-105" />
+                                  <MdOutlineCheckBox className="mx-auto text-2xl cursor-pointer text-blue-600 hover:text-blue-700 transition-colors hover:scale-110" />
                                 ) : (
-                                  <MdOutlineCheckBoxOutlineBlank className="my-auto mx-auto text-2xl cursor-pointer hover:scale-105" />
+                                  <MdOutlineCheckBoxOutlineBlank className="mx-auto text-2xl cursor-pointer text-gray-500 hover:text-blue-600 transition-colors hover:scale-110" />
                                 )}
                               </div>
                             </Tooltip>
@@ -1302,47 +1287,38 @@ const GenericTable = <T,>({
                         </th>
                       )}
                       {isCollapsible && (
-                        <th className="sticky top-0 z-10 bg-gray-100"></th>
+                        <th className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 w-12"></th>
                       )}
                       {usedColumns?.map((column, index) => {
                         if (column.node) return column.node();
                         return (
                           <th
                             key={index}
-                            className={`sticky top-0 z-10 bg-gray-100 shadow-sm ${
-                              index === 0 &&
-                              !isCollapsible &&
-                              !isSelectionActive
-                                ? "pl-3"
-                                : ""
-                            }  py-3  min-w-8  `}
+                            className={`sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 shadow-sm px-4 py-3.5 min-w-8 group`}
                           >
-                            <h1
-                              className={`text-base font-medium leading-6 w-max flex gap-2  ${
-                                column?.className
-                              }  ${
+                            <div
+                              className={`text-xs uppercase tracking-wider font-semibold text-gray-700 w-max flex items-center gap-2 ${
+                                column?.className || ""
+                              } ${
                                 index === usedColumns?.length - 1 &&
                                 actions &&
                                 isActionsActive
-                                  ? "mx-auto px-4"
+                                  ? "mx-auto justify-center"
                                   : ""
                               }`}
                             >
-                              <span
-                                className={`flex flex-row gap-1 items-center justify-center `}
-                              >
+                              <span className="flex items-center gap-2">
                                 {column?.isAddable && (
                                   <GoPlusCircle
                                     onClick={() => column?.onClick?.()}
-                                    className=" hover:text-blue-500 transition-transform cursor-pointer text-lg"
+                                    className="text-gray-500 hover:text-blue-600 transition-all cursor-pointer text-lg hover:scale-110"
                                   />
                                 )}
-                                {column.key}
+                                <span className="select-none">
+                                  {column.key}
+                                </span>
                               </span>
-                              <div
-                                className="sort-buttons"
-                                style={{ display: "inline-block" }}
-                              >
+                              <div className="inline-flex items-center">
                                 {outsideSortProps &&
                                   column?.correspondingKey &&
                                   outsideSort(
@@ -1355,10 +1331,7 @@ const GenericTable = <T,>({
                                   (sortConfig?.key ===
                                     usedRowKeys[index]?.key &&
                                   sortConfig?.direction === "ascending" ? (
-                                    <GenericButton
-                                      variant="icon"
-                                      size="sm"
-                                      className="p-0"
+                                    <button
                                       onClick={() =>
                                         sortRows(
                                           usedRowKeys[index].key as Extract<
@@ -1368,14 +1341,13 @@ const GenericTable = <T,>({
                                           "descending"
                                         )
                                       }
+                                      className="p-1 rounded hover:bg-gray-200/50 transition-colors"
+                                      aria-label="Sort descending"
                                     >
-                                      ↑
-                                    </GenericButton>
+                                      <FaChevronUp className="text-blue-600 text-sm" />
+                                    </button>
                                   ) : (
-                                    <GenericButton
-                                      variant="icon"
-                                      size="sm"
-                                      className="p-0"
+                                    <button
                                       onClick={() =>
                                         sortRows(
                                           usedRowKeys[index].key as Extract<
@@ -1385,12 +1357,14 @@ const GenericTable = <T,>({
                                           "ascending"
                                         )
                                       }
+                                      className="p-1 rounded hover:bg-gray-200/50 transition-colors opacity-0 group-hover:opacity-100"
+                                      aria-label="Sort ascending"
                                     >
-                                      ↓
-                                    </GenericButton>
+                                      <FaChevronDown className="text-gray-500 hover:text-blue-600 text-sm" />
+                                    </button>
                                   ))}
                               </div>
-                            </h1>
+                            </div>
                           </th>
                         );
                       })}

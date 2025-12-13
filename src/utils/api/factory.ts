@@ -20,13 +20,14 @@ interface Props<T> {
 export function useGet<T>(
   path: string,
   queryKey?: QueryKey,
-  isStaleTimeZero?: boolean
+  enabled: boolean = true
 ) {
   // We are using path as a query key if queryKey is not provided
   const fetchQueryKey = queryKey || [path];
   const { data } = useQuery({
     queryKey: fetchQueryKey,
     queryFn: () => get<T>({ path }),
+    enabled: enabled, // Control whether the query should run
     staleTime: Infinity, // never becomes stale on its own
     gcTime: Infinity, // never garbage-collected
     refetchOnWindowFocus: false, // no auto-refetch
@@ -39,9 +40,9 @@ export function useGet<T>(
 export function useGetList<T>(
   path: string,
   queryKey?: QueryKey,
-  isStaleTimeZero?: boolean
+  enabled: boolean = true
 ) {
-  return useGet<T[]>(path, queryKey, isStaleTimeZero) || [];
+  return useGet<T[]>(path, queryKey, enabled) || [];
 }
 
 export function useMutationApi<T extends { _id: number | string }>({
