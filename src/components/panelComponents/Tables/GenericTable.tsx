@@ -718,9 +718,15 @@ const GenericTable = <T,>({
                 ? rowKey.className(row)
                 : rowKey?.className || "";
 
+            const columnClassName =
+              usedColumns?.[keyIndex]?.generalColumnClassName || "";
+
             if (rowKey.node) {
               return (
-                <td key={keyIndex} className="px-4 py-3 min-w-20">
+                <td
+                  key={keyIndex}
+                  className={`px-4 py-3 min-w-20 ${columnClassName}`}
+                >
                   {rowKey.node(row)}
                 </td>
               );
@@ -732,7 +738,10 @@ const GenericTable = <T,>({
                 row[rowKey.key as keyof T] === "")
             ) {
               return (
-                <td key={keyIndex} className="px-4 py-3 min-w-20">
+                <td
+                  key={keyIndex}
+                  className={`px-4 py-3 min-w-20 ${columnClassName}`}
+                >
                   <span className={computedClassName}>-</span>
                 </td>
               );
@@ -744,7 +753,10 @@ const GenericTable = <T,>({
                 .toFixed(2)
                 .replace(/\.?0*$/, "");
               return (
-                <td key={keyIndex} className="px-4 py-3 min-w-20">
+                <td
+                  key={keyIndex}
+                  className={`px-4 py-3 min-w-20 ${columnClassName}`}
+                >
                   <P1 className={computedClassName}>{formattedValue} ₺</P1>
                 </td>
               );
@@ -774,7 +786,7 @@ const GenericTable = <T,>({
               return (
                 <td
                   key={keyIndex}
-                  className="px-4 py-3 min-w-32 md:min-w-0"
+                  className={`px-4 py-3 min-w-32 md:min-w-0 ${columnClassName}`}
                   style={style}
                 >
                   <P1
@@ -789,7 +801,7 @@ const GenericTable = <T,>({
             return (
               <td
                 key={keyIndex}
-                className="px-4 py-3 min-w-20 md:min-w-0"
+                className={`px-4 py-3 min-w-20 md:min-w-0 ${columnClassName}`}
                 style={style}
               >
                 {rowKey.isImage ? (
@@ -862,7 +874,9 @@ const GenericTable = <T,>({
                         (column: ColumnType, index: number) => (
                           <th
                             key={index}
-                            className={`text-left py-2 px-4 w-fit border-b  ${column?.className}`}
+                            className={`text-left py-2 px-4 w-fit border-b  ${
+                              column?.className || ""
+                            } ${column?.generalColumnClassName || ""}`}
                           >
                             <h2 className="font-semibold text-sm ">
                               {column.key}
@@ -895,11 +909,15 @@ const GenericTable = <T,>({
                                   ? rowKey.className(collapsibleRow)
                                   : rowKey?.className || "";
 
+                              const columnClassName =
+                                row?.collapsible?.collapsibleColumns?.[keyIndex]
+                                  ?.generalColumnClassName || "";
+
                               if (rowKey.node) {
                                 return (
                                   <td
                                     key={keyIndex}
-                                    className="px-4 py-3 min-w-20 border-b"
+                                    className={`px-4 py-3 min-w-20 border-b ${columnClassName}`}
                                   >
                                     <P1 className={computedClassName}>
                                       {rowKey.node(collapsibleRow)}
@@ -910,7 +928,7 @@ const GenericTable = <T,>({
                               return (
                                 <td
                                   key={keyIndex}
-                                  className={`py-2 px-4 text-sm  ${
+                                  className={`py-2 px-4 text-sm ${columnClassName} ${
                                     rowIndex !==
                                       row?.collapsible?.collapsibleRows.length -
                                         1 && "border-b"
@@ -1288,7 +1306,9 @@ const GenericTable = <T,>({
                         return (
                           <th
                             key={index}
-                            className={`sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 shadow-sm px-4 py-3.5 min-w-8 group`}
+                            className={`sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 shadow-sm px-4 py-3.5 min-w-8 group ${
+                              column?.generalColumnClassName || ""
+                            }`}
                           >
                             <div
                               className={`text-xs uppercase tracking-wider font-semibold text-gray-700 w-max flex items-center gap-2 ${

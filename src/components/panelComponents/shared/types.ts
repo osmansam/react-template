@@ -62,6 +62,7 @@ export interface ColumnType {
   isSortable: boolean;
   isAddable?: boolean;
   className?: string;
+  generalColumnClassName?: string;
   isActive?: boolean;
   correspondingKey?: string;
   node?: () => React.ReactNode;
