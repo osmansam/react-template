@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IoIosClose } from "react-icons/io";
 import { CheckSwitch } from "../../../common/CheckSwitch";
@@ -43,22 +43,27 @@ export default function ExportModal({
   totalPages,
 }: Props) {
   const { t } = useTranslation();
+
+  // Initialize with all fields selected using useMemo
+  const defaultSelectedFields = useMemo(
+    () => fields.map((f) => f.name),
+    [fields]
+  );
+
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [includeSearch, setIncludeSearch] = useState(true);
   const [includeFilters, setIncludeFilters] = useState(true);
-  const [exportScope, setExportScope] = useState<"all" | "currentPage" | "numberOfPages">("all");
+  const [exportScope, setExportScope] = useState<
+    "all" | "currentPage" | "numberOfPages"
+  >("all");
   const [pageCount, setPageCount] = useState<number>(1);
 
+  // Reset to defaults when modal opens
   useEffect(() => {
-    if (isOpen) {
-      // Default to all fields selected
-      setSelectedFields(fields.map((f) => f.name));
-      setIncludeSearch(true);
-      setIncludeFilters(true);
-      setExportScope("all");
-      setPageCount(1);
+    if (isOpen && selectedFields.length === 0) {
+      setSelectedFields(defaultSelectedFields);
     }
-  }, [isOpen, fields]);
+  }, [isOpen, selectedFields.length, defaultSelectedFields]);
 
   const handleToggleField = (fieldName: string) => {
     setSelectedFields((prev) =>
@@ -84,6 +89,12 @@ export default function ExportModal({
       exportScope,
       exportScope === "numberOfPages" ? pageCount : undefined
     );
+    // Reset state when closing
+    setSelectedFields(fields.map((f) => f.name));
+    setIncludeSearch(true);
+    setIncludeFilters(true);
+    setExportScope("all");
+    setPageCount(1);
     close();
   };
 
@@ -131,8 +142,8 @@ export default function ExportModal({
                   checked={selectedFields.includes(field.name)}
                   onChange={() => handleToggleField(field.name)}
                 />
-                <span 
-                  className="text-sm truncate cursor-pointer" 
+                <span
+                  className="text-sm truncate cursor-pointer"
                   title={getFieldLabel(field)}
                   onClick={() => handleToggleField(field.name)}
                 >
@@ -190,7 +201,14 @@ export default function ExportModal({
                     min="1"
                     max={totalPages}
                     value={pageCount}
-                    onChange={(e) => setPageCount(Math.max(1, Math.min(totalPages, parseInt(e.target.value) || 1)))}
+                    onChange={(e) =>
+                      setPageCount(
+                        Math.max(
+                          1,
+                          Math.min(totalPages, parseInt(e.target.value) || 1)
+                        )
+                      )
+                    }
                     className="border border-gray-300 rounded px-3 py-1.5 w-20 text-sm focus:outline-none focus:border-blue-500"
                   />
                   <span className="text-sm text-gray-600">

@@ -321,12 +321,16 @@ const GenericTable = <T,>({
   const [showHeaderLeftButton, setShowHeaderLeftButton] = useState(false);
   const [showHeaderRightButton, setShowHeaderRightButton] = useState(false);
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
-  const [sortConfig, setSortConfig] = useState<{
-    key: string;
-    direction: "ascending" | "descending";
-  } | null>(null);
   const [isExcelMenuOpen, setIsExcelMenuOpen] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Derive sortConfig from sortConfigKey instead of maintaining separate state
+  const sortConfig = sortConfigKey
+    ? {
+        key: sortConfigKey.key,
+        direction: sortConfigKey.direction,
+      }
+    : null;
 
   const handleUploadExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
     console.log("File input changed");
@@ -439,15 +443,6 @@ const GenericTable = <T,>({
     }
   }, [title, columns, setTableColumns, tableColumns]);
 
-  useEffect(() => {
-    if (sortConfigKey) {
-      setSortConfig({
-        key: sortConfigKey.key,
-        direction: sortConfigKey.direction,
-      });
-    }
-  }, [sortConfigKey]);
-
   const checkHeaderScrollButtons = () => {
     if (headerScrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = headerScrollRef.current;
@@ -526,7 +521,6 @@ const GenericTable = <T,>({
   }, [sortedRows, isRowsPerPage, pagination, currentPage, rowsPerPage]);
 
   const sortRows = (key: string, direction: "ascending" | "descending") => {
-    setSortConfig({ key, direction });
     setSortConfigKey({ key, direction });
   };
 

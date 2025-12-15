@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Select from "react-select";
 
 type MonthYearInputProps = {
@@ -30,32 +30,23 @@ const MonthYearInput = ({
   requiredField = false,
   isReadOnly = false,
 }: MonthYearInputProps) => {
-  const initialMonth = value?.split("-")[0] ?? new Date().getMonth() + 1;
-  const initialYear =
-    value?.split("-")[1] ?? new Date().getFullYear().toString();
-
-  const [selectedMonth, setSelectedMonth] = useState<string>(
-    String(initialMonth).padStart(2, "0")
-  );
-  const [selectedYear, setSelectedYear] = useState<string>(initialYear);
-
-  const handleChange = (newMonth: string, newYear: string) => {
-    const formatted = `${newMonth}-${newYear}`;
-    setSelectedMonth(newMonth);
-    setSelectedYear(newYear);
-    onChange(formatted);
-  };
-
-  useEffect(() => {
-    // Set initial value if provided
+  const { selectedMonth, selectedYear } = useMemo(() => {
     if (value) {
       const [month, year] = value.split("-");
       if (month && year) {
-        setSelectedMonth(month);
-        setSelectedYear(year);
+        return { selectedMonth: month, selectedYear: year };
       }
     }
+    return {
+      selectedMonth: String(new Date().getMonth() + 1).padStart(2, "0"),
+      selectedYear: new Date().getFullYear().toString(),
+    };
   }, [value]);
+
+  const handleChange = (newMonth: string, newYear: string) => {
+    const formatted = `${newMonth}-${newYear}`;
+    onChange(formatted);
+  };
 
   return (
     <div className="flex flex-col gap-2 w-full">

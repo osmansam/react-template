@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { AxiosHeaders } from "axios";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionMeta, MultiValue, SingleValue } from "react-select";
 import { toast } from "react-toastify";
@@ -62,7 +62,6 @@ const GenericAddComponent = <T,>({
   submitItem,
 }: Props<T>) => {
   const { t } = useTranslation();
-  const [allRequiredFilled, setAllRequiredFilled] = useState(false);
   const [imageFormKey, setImageFormKey] = useState<string>("");
   const [textInputKey, setTextInputKey] = useState<number>(0);
   const imageInputs = inputs.filter((input) => input.type === InputTypes.IMAGE);
@@ -134,7 +133,7 @@ const GenericAddComponent = <T,>({
     },
   });
 
-  const areRequiredFieldsFilled = useCallback(() => {
+  const allRequiredFilled = useMemo(() => {
     return inputs.every((input) => {
       if (!input.required) return true;
       const value = formElements[input.formKey];
@@ -144,22 +143,8 @@ const GenericAddComponent = <T,>({
   }, [inputs, formElements]);
 
   useEffect(() => {
-    setForm && setForm(formElements as T);
-    setAllRequiredFilled(areRequiredFieldsFilled());
-  }, [formElements, inputs, areRequiredFieldsFilled, setForm]);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    // Cleanup function
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
+    setForm?.(formElements as T);
+  }, [formElements, setForm]);
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>, input: GenericInputType) => {

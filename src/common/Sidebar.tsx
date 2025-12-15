@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import Cookies from "js-cookie";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FiChevronDown, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { IoIosLogOut } from "react-icons/io";
@@ -32,12 +32,6 @@ export const Sidebar = () => {
   const toggleGroup = (groupName: string) => {
     setOpenGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
   };
-
-  useEffect(() => {
-    if (!isSidebarOpen) {
-      setOpenGroups({});
-    }
-  }, [isSidebarOpen]);
 
   if (
     // !user ||
@@ -78,7 +72,12 @@ export const Sidebar = () => {
           }`}
         >
           <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            onClick={() => {
+              if (isSidebarOpen) {
+                setOpenGroups({});
+              }
+              setIsSidebarOpen(!isSidebarOpen);
+            }}
             className="flex items-center justify-center w-10 h-10 rounded-lg 
               text-white hover:bg-gray-700 transition-all duration-200"
             aria-label="Toggle Sidebar"

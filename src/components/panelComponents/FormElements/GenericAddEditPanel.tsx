@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FaChevronDown } from "react-icons/fa6";
 import { IoIosClose } from "react-icons/io";
@@ -113,7 +113,6 @@ const GenericAddEditPanel = <T,>({
   nonImageInputsClassName,
 }: Props<T>) => {
   const { t } = useTranslation();
-  const [allRequiredFilled, setAllRequiredFilled] = useState(false);
   const { isTabInputScreenOpen, tabInputScreenOptions } = useGeneralContext();
   const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] =
     useState(false);
@@ -248,7 +247,7 @@ const GenericAddEditPanel = <T,>({
     },
     [formKeys]
   );
-  const areRequiredFieldsFilled = useCallback(() => {
+  const allRequiredFilled = useMemo(() => {
     return inputs.every((input) => {
       if (!input.required) return true;
       return !isValueEmpty(formElements[input.formKey]);
@@ -256,11 +255,8 @@ const GenericAddEditPanel = <T,>({
   }, [inputs, formElements, isValueEmpty]);
 
   useEffect(() => {
-    if (setForm) {
-      setForm(formElements as T);
-    }
-    setAllRequiredFilled(areRequiredFieldsFilled());
-  }, [formElements, inputs, areRequiredFieldsFilled, setForm]);
+    setForm?.(formElements as T);
+  }, [formElements, setForm]);
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {

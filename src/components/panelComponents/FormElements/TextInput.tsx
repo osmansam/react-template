@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { SketchPicker } from "react-color";
 import "react-day-picker/dist/style.css";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
@@ -64,10 +64,6 @@ const TextInput = ({
     typeof setTimeout
   > | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
 
   const handleDivClick = () => {
     if (inputRef.current) {
@@ -152,9 +148,7 @@ const TextInput = ({
     inputWidth ? "border-gray-200" : ""
   } w-full text-sm ${
     type === "number" ? "inputHideNumberArrows" : ""
-  } text-base ${
-    error ? "border-red-500 border-2" : ""
-  }`;
+  } text-base ${error ? "border-red-500 border-2" : ""}`;
 
   const handleWheel = () => {
     if (document.activeElement instanceof HTMLElement) {
@@ -250,7 +244,13 @@ const TextInput = ({
         <input
           id={"number-input"}
           ref={inputRef}
-          type={type === "password" && !showPassword ? "password" : type === "password" ? "text" : type}
+          type={
+            type === "password" && !showPassword
+              ? "password"
+              : type === "password"
+              ? "text"
+              : type
+          }
           style={{
             fontSize: "16px",
           }}
@@ -300,9 +300,7 @@ const TextInput = ({
           </GenericButton>
         )}
       </div>
-      {error && (
-        <p className="text-red-500 text-sm mt-1">{error}</p>
-      )}
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );
 };
