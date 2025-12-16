@@ -3,15 +3,10 @@ import "pdfmake/build/pdfmake";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BsFilePdf } from "react-icons/bs";
-import { CgChevronDownR, CgChevronUpR } from "react-icons/cg";
 import { FaFileExcel, FaFileUpload } from "react-icons/fa";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiSearch } from "react-icons/fi";
 import { GoPlusCircle } from "react-icons/go";
-import {
-  MdOutlineCheckBox,
-  MdOutlineCheckBoxOutlineBlank,
-} from "react-icons/md";
 import { PiFadersHorizontal } from "react-icons/pi";
 import { RiFilter3Line } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
@@ -44,7 +39,11 @@ import {
 } from "../shared/types";
 import ButtonTooltip from "./ButtonTooltip";
 import ColumnActiveModal from "./ColumnActiveModal";
+import EnterpriseCheckbox from "./EnterpriseCheckbox";
+import ExpandCollapseIcon from "./ExpandCollapseIcon";
 import FilterPanel from "./FilterPanel";
+import IconButton from "./IconButton";
+import SelectionToggleButton from "./SelectionToggleButton";
 import CustomTooltip from "./Tooltip";
 import "./table.css";
 
@@ -673,35 +672,34 @@ const GenericTable = <T,>({
           style={rowStyleFunction?.(row)}
         >
           {selectionActions && isSelectionActive && (
-            <td className="w-6 h-6 mx-auto p-1 ">
-              {selectedRows.includes(row) ? (
-                <MdOutlineCheckBox
-                  className="my-auto mx-auto text-2xl cursor-pointer hover:scale-105"
-                  onClick={() => {
-                    setSelectedRows(
-                      selectedRows.filter((selectedRow) => selectedRow !== row)
-                    );
+            <td className="w-6 h-6 mx-auto p-1">
+              <div className="flex items-center justify-center">
+                <EnterpriseCheckbox
+                  checked={selectedRows.includes(row)}
+                  onChange={() => {
+                    if (selectedRows.includes(row)) {
+                      setSelectedRows(
+                        selectedRows.filter(
+                          (selectedRow) => selectedRow !== row
+                        )
+                      );
+                    } else {
+                      setSelectedRows([...selectedRows, row]);
+                    }
                   }}
                 />
-              ) : (
-                <MdOutlineCheckBoxOutlineBlank
-                  className="my-auto mx-auto text-2xl cursor-pointer hover:scale-105"
-                  onClick={() => {
-                    setSelectedRows([...selectedRows, row]);
-                  }}
-                />
-              )}
+              </div>
             </td>
           )}
           {(!isCollapsibleCheckActive ||
             (isCollapsible &&
               row?.collapsible?.collapsibleRows?.length > 0)) && (
-            <td onClick={() => toggleRowExpansion(rowId)}>
-              {isRowExpanded ? (
-                <FaChevronUp className="w-6 h-6 mx-auto p-1 cursor-pointer text-gray-500 hover:bg-gray-50 hover:rounded-full   " />
-              ) : (
-                <FaChevronDown className="w-6 h-6 mx-auto p-1 cursor-pointer text-gray-500 hover:bg-gray-50 hover:rounded-full  " />
-              )}
+            <td className="text-center">
+              <ExpandCollapseIcon
+                isExpanded={isRowExpanded}
+                onClick={() => toggleRowExpansion(rowId)}
+                className="mx-auto"
+              />
             </td>
           )}
           {isCollapsibleCheckActive &&
@@ -984,11 +982,12 @@ const GenericTable = <T,>({
       (filter, index) =>
         filter.isUpperSide === isUpper &&
         !filter.isDisabled && (
-          <div
-            key={index}
-            className="flex flex-row gap-2 justify-between items-center"
-          >
-            {filter.label && <H5 className="w-fit">{filter.label}</H5>}
+          <div key={index} className="flex flex-row gap-2 items-center mr-1">
+            {filter.label && (
+              <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                {filter.label}
+              </span>
+            )}
             {filter.node}
           </div>
         )
@@ -1010,10 +1009,11 @@ const GenericTable = <T,>({
       <div
         className={`mx-auto w-full overflow-scroll no-scrollbar flex flex-col gap-4 __className_a182b8 `}
       >
-        <div className=" flex flex-row gap-4 justify-between items-center ">
-          <div className="flex flex-row gap-2 items-center">
+        <div className="flex flex-row gap-4 justify-between items-center">
+          <div className="flex flex-row gap-3 items-center">
             {isSearch && (
-              <div className="relative w-fit">
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none" />
                 <input
                   id="search"
                   type="text"
@@ -1023,22 +1023,22 @@ const GenericTable = <T,>({
                     setCurrentPage(1);
                   }}
                   placeholder={t("Search")}
-                  className="border border-gray-200 rounded-md py-2 px-3 pr-8 focus:outline-none"
+                  className="h-9 w-56 border border-gray-300 rounded-lg pl-9 pr-8 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 />
                 {searchQuery && (
-                  <GenericButton
+                  <button
                     onClick={() => setSearchQuery("")}
-                    variant="clear"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg font-light"
                     aria-label="Clear search"
                   >
                     ×
-                  </GenericButton>
+                  </button>
                 )}
               </div>
             )}
             {outsideSearchProps && outsideSearch(outsideSearchProps)}
             {(showOrientationToggle ?? allowOrientationToggle) && (
-              <div className="hidden sm:flex">
+              <div className="hidden sm:flex items-center">
                 <OrientationToggle
                   orientation={tabOrientation}
                   onChange={setTabOrientation}
@@ -1047,14 +1047,14 @@ const GenericTable = <T,>({
             )}
           </div>
           {!(selectionActions && isSelectionActive) && (
-            <div className="hidden sm:flex flex-row flex-wrap gap-4 ml-auto">
+            <div className="hidden sm:flex flex-row flex-wrap gap-4 ml-auto relative z-10">
               {renderFilters(true)}
             </div>
           )}
         </div>
-        <div className="flex flex-col bg-white border border-gray-100 shadow-sm rounded-lg   ">
+        <div className="flex flex-col bg-white border border-gray-100 shadow-sm rounded-lg relative z-0">
           <div className="flex flex-col sm:flex-row flex-wrap sm:flex-nowrap justify-between items-start sm:items-center gap-2 sm:gap-4 px-3 sm:px-6 border-b border-gray-200 py-3 sm:py-4">
-            <div className="flex flex-row gap-1 items-center w-full sm:w-auto">
+            <div className="flex flex-row gap-2 items-center w-full sm:w-auto">
               {selectionActions && (
                 <Tooltip
                   content={
@@ -1064,18 +1064,13 @@ const GenericTable = <T,>({
                   }
                   placement="top"
                 >
-                  <div
+                  <SelectionToggleButton
+                    isActive={isSelectionActive}
                     onClick={() => {
                       if (isSelectionActive) setSelectedRows([]);
                       setIsSelectionActive(!isSelectionActive);
                     }}
-                  >
-                    {isSelectionActive ? (
-                      <CgChevronUpR className="my-auto text-xl cursor-pointer hover:scale-105" />
-                    ) : (
-                      <CgChevronDownR className="my-auto text-xl cursor-pointer hover:scale-105" />
-                    )}
-                  </div>
+                  />
                 </Tooltip>
               )}
               {title && (
@@ -1094,12 +1089,9 @@ const GenericTable = <T,>({
                   {renderFilters(false)}
                   {/* PDF Button */}
                   {isPdf && (
-                    <div
-                      className="my-auto items-center text-lg sm:text-xl cursor-pointer border p-1.5 sm:p-2 rounded-md hover:bg-blue-50 bg-opacity-50 hover:scale-105"
-                      onClick={generatePDF}
-                    >
-                      <BsFilePdf />
-                    </div>
+                    <Tooltip content={t("Export PDF")} placement="top">
+                      <IconButton icon={<BsFilePdf />} onClick={generatePDF} />
+                    </Tooltip>
                   )}
                   {/* Excel Button with Dropdown - mobilde de göster */}
                   {(isExcel || onExcelUpload) && (
@@ -1114,16 +1106,15 @@ const GenericTable = <T,>({
                         />
                       )}
                       <Tooltip content={t("Excel")} placement="top">
-                        <div
+                        <IconButton
+                          icon={<FaFileExcel />}
                           onClick={() => {
                             setIsExcelMenuOpen((prev) => !prev);
                             setIsColumnActiveModalOpen(false);
                             setIsFilterModalOpen(false);
                           }}
-                          className="my-auto items-center text-lg sm:text-xl cursor-pointer border px-1.5 py-1 sm:px-2 sm:py-1 rounded-md hover:bg-blue-50 bg-opacity-50 hover:scale-105"
-                        >
-                          <FaFileExcel />
-                        </div>
+                          active={isExcelMenuOpen}
+                        />
                       </Tooltip>
                       {isExcelMenuOpen && (
                         <div className="absolute top-10 right-0 flex flex-col gap-2 bg-white rounded-md py-2 px-2 max-w-fit border border-gray-200 drop-shadow-lg z-[60] min-w-48">
@@ -1164,16 +1155,16 @@ const GenericTable = <T,>({
                     filters.some((f) => f.isUpperSide && !f.isDisabled) && (
                       <>
                         <Tooltip content={t("Filters")} placement="top">
-                          <div
+                          <IconButton
+                            icon={<RiFilter3Line />}
                             onClick={() => {
                               setIsFilterModalOpen((prev) => !prev);
                               setIsExcelMenuOpen(false);
                               setIsColumnActiveModalOpen(false);
                             }}
-                            className="items-center my-auto text-lg sm:text-xl cursor-pointer border p-1.5 sm:p-2 rounded-md hover:bg-blue-50 bg-opacity-50 hover:scale-105 sm:hidden"
-                          >
-                            <RiFilter3Line />
-                          </div>
+                            active={isFilterModalOpen}
+                            className="sm:hidden"
+                          />
                         </Tooltip>
                         {isFilterModalOpen && (
                           <div className="absolute top-10 right-0 flex flex-col gap-2 bg-white rounded-md py-4 px-2 max-w-fit border-t border-gray-200 drop-shadow-lg z-50 min-w-64 sm:hidden">
@@ -1205,16 +1196,15 @@ const GenericTable = <T,>({
                   {isColumnFilter && (
                     <>
                       <Tooltip content={t("Filter Columns")} placement="top">
-                        <div
+                        <IconButton
+                          icon={<PiFadersHorizontal />}
                           onClick={() => {
                             setIsColumnActiveModalOpen((prev) => !prev);
                             setIsExcelMenuOpen(false);
                             setIsFilterModalOpen(false);
                           }}
-                          className="items-center my-auto text-lg sm:text-xl cursor-pointer border p-1.5 sm:p-2 rounded-md hover:bg-blue-50 bg-opacity-50 hover:scale-105"
-                        >
-                          <PiFadersHorizontal />
-                        </div>
+                          active={isColumnActiveModalOpen}
+                        />
                       </Tooltip>
                       {isColumnActiveModalOpen && title && (
                         <div className="absolute top-10 right-0 flex flex-col gap-2 bg-white rounded-md py-4 px-2 max-w-fit border-t border-gray-200  drop-shadow-lg z-50 min-w-64">
@@ -1279,20 +1269,21 @@ const GenericTable = <T,>({
                         <th className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 shadow-sm px-4 py-3">
                           {selectionActions && isSelectionActive && (
                             <Tooltip content={t("Select All")} placement="top">
-                              <div
-                                onClick={() => {
-                                  if (allVisibleSelected) {
-                                    setSelectedRows([]);
-                                  } else {
-                                    setSelectedRows(currentRows);
+                              <div className="flex items-center justify-center">
+                                <EnterpriseCheckbox
+                                  checked={allVisibleSelected}
+                                  indeterminate={
+                                    selectedRows.length > 0 &&
+                                    !allVisibleSelected
                                   }
-                                }}
-                              >
-                                {allVisibleSelected ? (
-                                  <MdOutlineCheckBox className="mx-auto text-2xl cursor-pointer text-blue-600 hover:text-blue-700 transition-colors hover:scale-110" />
-                                ) : (
-                                  <MdOutlineCheckBoxOutlineBlank className="mx-auto text-2xl cursor-pointer text-gray-500 hover:text-blue-600 transition-colors hover:scale-110" />
-                                )}
+                                  onChange={() => {
+                                    if (allVisibleSelected) {
+                                      setSelectedRows([]);
+                                    } else {
+                                      setSelectedRows(currentRows);
+                                    }
+                                  }}
+                                />
                               </div>
                             </Tooltip>
                           )}

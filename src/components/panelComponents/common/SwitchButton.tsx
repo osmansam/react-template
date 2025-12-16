@@ -10,13 +10,15 @@ const SwitchButton = ({ checked, onChange }: Props) => {
     <Switch
       checked={checked}
       onChange={() => onChange((value) => !value)}
-      className={`${checked ? "bg-green-500" : "bg-red-500"}
-          relative inline-flex h-[20px] w-[36px] min-w-[36px] border-[1px] cursor-pointer rounded-full border-transparent transition-colors duration-200 ease-in-out focus:outline-none`}
+      className={`${
+        checked ? "bg-blue-600" : "bg-gray-300"
+      } relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
     >
       <span
         aria-hidden="true"
-        className={`${checked ? "translate-x-4" : "translate-x-0"}
-            pointer-events-none inline-block h-[18px] w-[18px] transform rounded-full bg-white transition duration-200 ease-in-out`}
+        className={`${
+          checked ? "translate-x-6" : "translate-x-1"
+        } inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out`}
       />
     </Switch>
   );
