@@ -285,7 +285,7 @@ export default function DynamicChart({ config }: DynamicChartProps) {
 
   if (!data || (Array.isArray(data) && data.length === 0)) {
     return (
-      <div className="w-full">
+      <div className="w-full px-2">
         {title && (
           <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
         )}
@@ -301,7 +301,7 @@ export default function DynamicChart({ config }: DynamicChartProps) {
 
   if (!ChartComponent) {
     return (
-      <div className="w-full">
+      <div className="w-full px-2">
         {title && (
           <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
         )}
@@ -316,7 +316,7 @@ export default function DynamicChart({ config }: DynamicChartProps) {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full px-2">
       {title && (
         <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
       )}
