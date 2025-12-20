@@ -1,6 +1,5 @@
 // import { Tab } from "../components/panelComponents/shared/types";
 
-import GenericTabPage from "../components/panelComponents/FormElements/GenericTabPage";
 import AuditLogs from "../pages/AuditLogs";
 
 // Removed all missing page imports - only keeping existing pages
@@ -11,8 +10,6 @@ export enum PublicRoutes {
 }
 
 export enum Routes {
-  Kest = "/kest",
-  Mest = "/mest",
   AuditLogs = "/audit-logs",
 }
 
@@ -27,41 +24,6 @@ export const staticRoutes: {
   element?: () => JSX.Element;
   children?: typeof staticRoutes;
 }[] = [
-  {
-    name: "kest",
-    path: Routes.Kest,
-    element: () => (
-      <GenericTabPage
-        tabs={[
-          { schemaName: "can" },
-          { schemaName: "konu" },
-          { schemaName: "pi" },
-          { schemaName: "furkan" },
-          { schemaName: "resim" },
-          { schemaName: "obos" },
-          { schemaName: "demir" },
-          { schemaName: "abc" },
-        ]}
-      />
-    ),
-    isOnSidebar: true,
-  },
-  {
-    name: "mest",
-    path: Routes.Mest,
-    element: () => (
-      <GenericTabPage
-        tabs={[
-          { schemaName: "can" },
-          { schemaName: "konu" },
-          { schemaName: "pi" },
-          { schemaName: "furkan" },
-          { schemaName: "resim" },
-        ]}
-      />
-    ),
-    isOnSidebar: true,
-  },
   {
     name: "Audit Logs",
     path: Routes.AuditLogs,

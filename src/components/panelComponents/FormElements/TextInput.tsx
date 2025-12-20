@@ -73,12 +73,31 @@ const TextInput = ({
 
   // Debounce onChange
   const handleChange = (e: { target: { value: string | number } }) => {
+    const inputValue = e.target.value;
+
+    // Allow empty string for number inputs during editing
+    if (type === "number" && inputValue === "") {
+      setLocalValue("");
+      if (isDebounce) {
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+        const timer = setTimeout(() => {
+          onChange(isMinNumber ? minNumber : "");
+        }, 1000);
+        setDebounceTimer(timer);
+      } else {
+        onChange(isMinNumber ? minNumber : "");
+      }
+      return;
+    }
+
     const newValue =
-      type === "number" && +e.target.value < minNumber && isMinNumber
+      type === "number" && +inputValue < minNumber && isMinNumber
         ? Number(minNumber)
         : type === "number"
-        ? Number(e.target.value)
-        : e.target.value;
+        ? Number(inputValue)
+        : inputValue;
     setLocalValue(newValue);
     if (isDebounce) {
       if (debounceTimer) {
