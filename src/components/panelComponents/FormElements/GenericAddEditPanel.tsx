@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { FaChevronDown } from "react-icons/fa6";
 import { IoIosClose } from "react-icons/io";
@@ -1026,14 +1027,15 @@ const GenericAddEditPanel = <T,>({
       </div>
     );
   };
-  return (
+  
+  if (!isOpen) return null;
+  
+  return createPortal(
     <div
-      className={`__className_a182b8 fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50 ${
-        !isOpen && "hidden"
-      }`}
+      className="__className_a182b8 fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-[99999]"
     >
       {anotherPanel ? (
-        <div className={`${anotherPanelTopClassName} rounded-md bg-white`}>
+        <div className={`${anotherPanelTopClassName} rounded-md bg-white relative z-10`}>
           {anotherPanel}
           {renderGenericAddEditModal()}
         </div>
@@ -1089,7 +1091,8 @@ const GenericAddEditPanel = <T,>({
           }
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 
