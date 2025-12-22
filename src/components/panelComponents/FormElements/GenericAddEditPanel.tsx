@@ -1027,15 +1027,15 @@ const GenericAddEditPanel = <T,>({
       </div>
     );
   };
-  
+
   if (!isOpen) return null;
-  
+
   return createPortal(
-    <div
-      className="__className_a182b8 fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-[99999]"
-    >
+    <div className="__className_a182b8 fixed inset-0 flex items-center justify-center bg-gray-600 bg-opacity-75 z-[99999]">
       {anotherPanel ? (
-        <div className={`${anotherPanelTopClassName} rounded-md bg-white relative z-10`}>
+        <div
+          className={`${anotherPanelTopClassName} rounded-md bg-white relative z-10`}
+        >
           {anotherPanel}
           {renderGenericAddEditModal()}
         </div>

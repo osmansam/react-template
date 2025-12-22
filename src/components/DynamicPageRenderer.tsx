@@ -43,7 +43,7 @@ const getChartTypeFromComponentType = (
  */
 const MixedTabPanel: React.FC<{ tabs: TabContent[] }> = ({ tabs }) => {
   const [activeTab, setActiveTab] = useState(0);
-  
+
   const unifiedTabs = tabs.map((tab: TabContent, idx: number) => ({
     number: idx,
     label: tab.title,
@@ -186,15 +186,16 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
         // Use existing GenericTabPage component (static tabs)
         if (tabs && Array.isArray(tabs) && tabs.length > 0) {
           // Check if all tabs contain only table components
-          const allTabsAreTables = tabs.every((tab: TabContent) => 
-            tab.components.length === 1 && 
-            tab.components[0]?.type === "table"
+          const allTabsAreTables = tabs.every(
+            (tab: TabContent) =>
+              tab.components.length === 1 && tab.components[0]?.type === "table"
           );
 
           // If all tabs are tables, use the optimized GenericTabPage
           if (allTabsAreTables) {
             const tabsConfig = tabs.map((tab: TabContent) => {
-              const schemaName = tab.components[0]?.dataBinding?.schemaName || "";
+              const schemaName =
+                tab.components[0]?.dataBinding?.schemaName || "";
               return {
                 schemaName,
                 label: tab.title,
