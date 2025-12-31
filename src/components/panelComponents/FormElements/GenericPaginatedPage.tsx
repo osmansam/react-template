@@ -66,16 +66,13 @@ export default function GenericPaginatedPage({
   customTitle,
 }: Props) {
   const { t } = useTranslation();
-  const {
-    rowsPerPage,
-    currentPage,
-    setCurrentPage,
-    selectedRows,
-    setSelectedRows,
-    setIsSelectionActive,
-  } = useGeneralContext();
+  const { rowsPerPage, currentPage, setCurrentPage } = useGeneralContext();
   const { user } = useUserContext();
   const rawContainers = useGetContainers();
+
+  // Local selection state for this table instance
+  const [selectedRows, setSelectedRows] = useState<GenericItem[]>([]);
+  const [isSelectionActive, setIsSelectionActive] = useState(false);
 
   const container: ContainerModel | undefined = useMemo(() => {
     if (!rawContainers) return undefined;
@@ -1287,6 +1284,10 @@ export default function GenericPaginatedPage({
           filters={filters}
           filterPanel={filterPanel}
           containerFields={container?.fields}
+          localSelectedRows={selectedRows}
+          localSetSelectedRows={setSelectedRows}
+          localIsSelectionActive={isSelectionActive}
+          localSetIsSelectionActive={setIsSelectionActive}
         />
         <ExportModal
           isOpen={isExportModalOpen}

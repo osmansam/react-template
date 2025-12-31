@@ -98,6 +98,11 @@ type Props<T> = {
   dateFormat?: DateFormatEnum;
   containerFields?: Field[]; // Add container fields for type conversion
   onExcelExport?: () => void;
+  // Local selection state props (optional - falls back to global context)
+  localSelectedRows?: T[];
+  localSetSelectedRows?: (rows: T[]) => void;
+  localIsSelectionActive?: boolean;
+  localSetIsSelectionActive?: (isActive: boolean) => void;
 };
 
 const GenericTable = <T,>({
@@ -143,6 +148,10 @@ const GenericTable = <T,>({
   dateFormat = DEFAULT_DATE_FORMAT,
   containerFields,
   onExcelExport,
+  localSelectedRows,
+  localSetSelectedRows,
+  localIsSelectionActive,
+  localSetIsSelectionActive,
 }: Props<T>) => {
   const { t } = useTranslation();
 
@@ -304,13 +313,27 @@ const GenericTable = <T,>({
     sortConfigKey,
     tableColumns,
     setTableColumns,
-    selectedRows,
-    setSelectedRows,
-    isSelectionActive,
-    setIsSelectionActive,
+    selectedRows: globalSelectedRows,
+    setSelectedRows: globalSetSelectedRows,
+    isSelectionActive: globalIsSelectionActive,
+    setIsSelectionActive: globalSetIsSelectionActive,
     tabOrientation,
     setTabOrientation,
   } = useGeneralContext();
+
+  // Use local selection state if provided, otherwise fall back to global context
+  const selectedRows = (
+    localSelectedRows !== undefined ? localSelectedRows : globalSelectedRows
+  ) as T[];
+  const setSelectedRows = (localSetSelectedRows || globalSetSelectedRows) as (
+    rows: T[]
+  ) => void;
+  const isSelectionActive =
+    localIsSelectionActive !== undefined
+      ? localIsSelectionActive
+      : globalIsSelectionActive;
+  const setIsSelectionActive =
+    localSetIsSelectionActive || globalSetIsSelectionActive;
   const { allowOrientationToggle } = useTabPanelContext();
   const navigate = useNavigate();
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
