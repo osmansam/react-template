@@ -14,7 +14,8 @@ export type GenericButtonVariant =
 
 export type GenericButtonSize = "sm" | "md" | "lg";
 
-export interface GenericButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface GenericButtonProps
+  extends ButtonHTMLAttributes<HTMLButtonElement> {
   /**
    * Visual style variant of the button
    * @default "primary"
@@ -72,39 +73,38 @@ const GenericButton = forwardRef<HTMLButtonElement, GenericButtonProps>(
     },
     ref
   ) => {
-    // Base styles
+    // Base styles - Modern, pixel-perfect
     const baseStyles =
-      "inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed rounded-md";
+      "inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none rounded-lg active:scale-[0.98]";
 
-    // Variant styles
+    // Variant styles - Clean, minimal aesthetic
     const variantStyles: Record<GenericButtonVariant, string> = {
       primary:
-        "bg-blue-500 text-white hover:bg-blue-600 focus-visible:ring-blue-300",
+        "bg-neutral-900 text-white hover:bg-neutral-800 focus-visible:ring-neutral-400 shadow-sm",
       secondary:
-        "bg-gray-500 text-white hover:bg-gray-600 focus-visible:ring-gray-300",
+        "bg-neutral-100 text-neutral-900 hover:bg-neutral-200 focus-visible:ring-neutral-300",
       danger:
-        "bg-red-500 text-white hover:bg-red-600 focus-visible:ring-red-300",
+        "bg-error-500 text-white hover:bg-error-600 focus-visible:ring-error-300 shadow-sm",
       success:
-        "bg-green-500 text-white hover:bg-green-600 focus-visible:ring-green-300",
+        "bg-success-500 text-white hover:bg-success-600 focus-visible:ring-success-300 shadow-sm",
       warning:
-        "bg-yellow-500 text-white hover:bg-yellow-600 focus-visible:ring-yellow-300",
+        "bg-warning-500 text-white hover:bg-warning-600 focus-visible:ring-warning-300 shadow-sm",
       ghost:
-        "bg-transparent text-gray-700 hover:bg-gray-100 focus-visible:ring-gray-300",
+        "bg-transparent text-neutral-700 hover:bg-neutral-100 focus-visible:ring-neutral-300",
       outline:
-        "bg-white text-blue-500 hover:bg-blue-50 focus-visible:ring-blue-300 border border-blue-500",
+        "bg-transparent text-neutral-700 hover:bg-neutral-50 focus-visible:ring-neutral-300 border border-neutral-300 hover:border-neutral-400",
       black:
-        "bg-black text-white hover:bg-white hover:text-black focus-visible:ring-gray-400",
-      icon:
-        "bg-transparent text-gray-500 hover:bg-gray-50 focus-visible:ring-gray-300 p-2",
+        "bg-neutral-950 text-white hover:bg-neutral-900 focus-visible:ring-neutral-400 shadow-sm border border-neutral-900",
+      icon: "bg-transparent text-neutral-600 hover:bg-neutral-100 focus-visible:ring-neutral-300 p-2",
       clear:
-        "absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 text-lg focus-visible:ring-0 focus-visible:ring-offset-0",
+        "absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 text-lg focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors",
     };
 
-    // Size styles
+    // Size styles - Precise spacing
     const sizeStyles: Record<GenericButtonSize, string> = {
-      sm: "px-3 py-1.5 text-sm gap-1.5",
-      md: "px-4 py-2 text-base gap-2",
-      lg: "px-6 py-3 text-lg gap-2.5",
+      sm: "px-3 py-1.5 text-sm gap-1.5 h-8",
+      md: "px-4 py-2 text-sm gap-2 h-9",
+      lg: "px-5 py-2.5 text-base gap-2.5 h-11",
     };
 
     // Width style

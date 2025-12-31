@@ -1061,7 +1061,7 @@ const GenericTable = <T,>({
             )}
             {outsideSearchProps && outsideSearch(outsideSearchProps)}
             {(showOrientationToggle ?? allowOrientationToggle) && (
-              <div className="hidden sm:flex items-center">
+              <div className="hidden sm:flex items-center mt-2">
                 <OrientationToggle
                   orientation={tabOrientation}
                   onChange={setTabOrientation}

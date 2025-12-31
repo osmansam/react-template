@@ -56,7 +56,7 @@ const TextInput = ({
   isDebounce = false,
   isReadOnly = false,
   error,
-  className = "px-4 py-2.5 border rounded-md __className_a182b8",
+  className = "px-3 py-2 border border-neutral-200 rounded-lg __className_a182b8 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 transition-all",
 }: TextInputProps) => {
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -164,10 +164,14 @@ const TextInput = ({
   };
 
   const inputClassName = `${className} ${
-    inputWidth ? "border-gray-200" : ""
+    inputWidth ? "border-neutral-200" : ""
   } w-full text-sm ${
     type === "number" ? "inputHideNumberArrows" : ""
-  } text-base ${error ? "border-red-500 border-2" : ""}`;
+  } placeholder:text-neutral-400 disabled:bg-neutral-50 disabled:text-neutral-500 disabled:cursor-not-allowed ${
+    error
+      ? "border-error-500 focus:border-error-500 focus:ring-error-500/10"
+      : ""
+  }`;
 
   const handleWheel = () => {
     if (document.activeElement instanceof HTMLElement) {
@@ -182,11 +186,11 @@ const TextInput = ({
           isTopFlexRow ? "flex-row sm:flex-col" : "flex-col"
         } gap-2  w-full items-center`}
       >
-        <H6 className="min-w-10">
+        <H6 className="min-w-10 text-sm font-medium text-neutral-700">
           {label}
           {requiredField && (
             <>
-              <span className="text-red-400">* </span>
+              <span className="text-error-500">* </span>
             </>
           )}
         </H6>
@@ -216,9 +220,9 @@ const TextInput = ({
     return (
       <div className="flex justify-between items-center w-full">
         {/* Label on the left */}
-        <H6 className="my-auto">
+        <H6 className="my-auto text-sm font-medium text-neutral-700">
           {label}
-          {requiredField && <span className="text-red-400">*</span>}
+          {requiredField && <span className="text-error-500">*</span>}
         </H6>
 
         {/* Icon on the right */}
@@ -247,11 +251,15 @@ const TextInput = ({
       className={` flex ${isTopFlexRow ? "flex-row gap-4 " : "flex-col gap-2"}`}
       onClick={handleDivClick}
     >
-      <H6 className={`${isTopFlexRow ? "min-w-20 " : "min-w-10"} my-auto`}>
+      <H6
+        className={`${
+          isTopFlexRow ? "min-w-20 " : "min-w-10"
+        } my-auto text-sm font-medium text-neutral-700`}
+      >
         {label}
         {requiredField && (
           <>
-            <span className="text-red-400">* </span>
+            <span className="text-error-500">* </span>
           </>
         )}
       </H6>
@@ -285,24 +293,24 @@ const TextInput = ({
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 text-gray-500 hover:text-gray-700 focus:outline-none"
+            className="absolute right-3 text-neutral-500 hover:text-neutral-700 focus:outline-none transition-colors"
           >
             {showPassword ? (
-              <AiOutlineEyeInvisible size={20} />
+              <AiOutlineEyeInvisible size={18} />
             ) : (
-              <AiOutlineEye size={20} />
+              <AiOutlineEye size={18} />
             )}
           </button>
         )}
         {isNumberButtonsActive && (
           <FiMinusCircle
-            className="w-8 h-8 flex-shrink-0 text-red-500 hover:text-red-800 cursor-pointer focus:outline-none"
+            className="w-7 h-7 flex-shrink-0 text-error-500 hover:text-error-600 cursor-pointer focus:outline-none transition-colors active:scale-95"
             onClick={handleDecrement}
           />
         )}
         {isNumberButtonsActive && (
           <GoPlusCircle
-            className="w-8 h-8 flex-shrink-0 text-green-500 hover:text-green-800 cursor-pointer focus:outline-none"
+            className="w-7 h-7 flex-shrink-0 text-success-500 hover:text-success-600 cursor-pointer focus:outline-none transition-colors active:scale-95"
             onClick={handleIncrement}
           />
         )}
@@ -313,13 +321,13 @@ const TextInput = ({
               onClear();
             }}
             variant="icon"
-            className="w-8 h-8 my-auto text-2xl text-gray-500 hover:text-red-700"
+            className="w-8 h-8 my-auto text-xl text-neutral-400 hover:text-neutral-600"
           >
-            <IoIosClose size={28} />
+            <IoIosClose size={24} />
           </GenericButton>
         )}
       </div>
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {error && <p className="text-error-500 text-xs mt-1.5">{error}</p>}
     </div>
   );
 };

@@ -31,25 +31,27 @@ export function ConfirmationDialog({
         >
           <div
             onClick={close}
-            className="w-full h-full bg-gray-900 bg-opacity-50 z-0 absolute inset-0"
+            className="w-full h-full bg-neutral-900/40 backdrop-blur-sm z-0 absolute inset-0"
           />
           <div className="mx-auto container">
             <div className="flex items-center justify-center h-full w-full">
-              <div className="bg-white rounded-md shadow fixed overflow-y-auto sm:h-auto w-10/12 lg:w-1/5">
-                <div className="bg-gray-100 rounded-tl-md rounded-tr-md px-4 md:px-8 md:py-4 py-7 flex items-center justify-center lg:justify-start">
-                  <p className="text-base font-semibold">{title}</p>
+              <div className="bg-white rounded-xl shadow-xl fixed overflow-hidden sm:h-auto w-10/12 lg:w-1/4 border border-neutral-200">
+                <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-center lg:justify-start">
+                  <p className="text-base font-semibold text-neutral-900">
+                    {title}
+                  </p>
                 </div>
-                <div className="p-4 text-center">
-                  {text}
-                  <div className="flex items-center justify-between mt-9">
+                <div className="p-6 text-center">
+                  <p className="text-sm text-neutral-600">{text}</p>
+                  <div className="flex items-center justify-end gap-3 mt-6">
                     <button
                       onClick={close}
-                      className="px-6 py-3 bg-red-500 hover:bg-gray-500 shadow rounded text-sm text-white"
+                      className="px-4 py-2 bg-transparent hover:bg-neutral-100 rounded-lg text-sm font-medium text-neutral-700 transition-all active:scale-95"
                     >
                       Cancel
                     </button>
                     <button
-                      className="px-6 py-3 bg-blue-500 hover:bg-opacity-80 shadow rounded text-sm text-white"
+                      className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 shadow-sm rounded-lg text-sm font-medium text-white transition-all active:scale-95"
                       onClick={confirm}
                     >
                       Confirm

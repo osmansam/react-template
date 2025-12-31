@@ -140,12 +140,18 @@ const SelectInput = ({
   }, [options, searchInput, isSortDisabled]);
   const customStyles = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    control: (base: any) => ({
+    control: (base: any, state: any) => ({
       ...base,
-      border: "1px solid #E2E8F0",
-      borderRadius: "4px",
-      fontSize: "16px",
+      border: state.isFocused ? "1px solid #171717" : "1px solid #e5e5e5",
+      borderRadius: "0.5rem",
+      fontSize: "0.875rem",
+      minHeight: "36px",
       height: "auto",
+      boxShadow: state.isFocused ? "0 0 0 2px rgba(23, 23, 23, 0.1)" : "none",
+      transition: "all 0.2s",
+      "&:hover": {
+        borderColor: state.isFocused ? "#171717" : "#d4d4d4",
+      },
       ...(customControlBackgroundColor && {
         backgroundColor: customControlBackgroundColor,
       }),
@@ -153,34 +159,69 @@ const SelectInput = ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     menu: (base: any) => ({
       ...base,
-      overflowY: "auto",
+      borderRadius: "0.625rem",
+      border: "1px solid #e5e5e5",
+      boxShadow:
+        "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.04)",
+      overflow: "hidden",
+    }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    menuList: (base: any) => ({
+      ...base,
+      padding: "4px",
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     option: (base: any, state: any) => ({
       ...base,
-      borderRadius: "6px",
+      borderRadius: "0.375rem",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      color: "#4B5563",
+      padding: "8px 12px",
+      margin: "2px 0",
+      color: state.isSelected ? "#171717" : "#525252",
       cursor: "pointer",
-      backgroundColor: state.isSelected ? "#EDF7FF" : base.backgroundColor,
-      ":hover": {
-        color: "#0057FF",
+      backgroundColor: state.isSelected ? "#f5f5f5" : "transparent",
+      "&:hover": {
+        backgroundColor: "#fafafa",
+        color: "#171717",
       },
-      fontSize: "16px",
+      fontSize: "0.875rem",
+      transition: "all 0.15s",
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     placeholder: (base: any) => ({
       ...base,
-      color: "#b0b5ba",
-      fontSize: "16px",
+      color: "#a3a3a3",
+      fontSize: "0.875rem",
       fontWeight: 400,
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     singleValue: (base: any) => ({
       ...base,
-      fontSize: "16px",
+      fontSize: "0.875rem",
+      color: "#171717",
+    }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    multiValue: (base: any) => ({
+      ...base,
+      backgroundColor: "#f5f5f5",
+      borderRadius: "0.375rem",
+    }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    multiValueLabel: (base: any) => ({
+      ...base,
+      color: "#171717",
+      fontSize: "0.875rem",
+    }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    multiValueRemove: (base: any) => ({
+      ...base,
+      color: "#737373",
+      "&:hover": {
+        backgroundColor: "#e5e5e5",
+        color: "#171717",
+      },
     }),
   };
 
@@ -198,7 +239,7 @@ const SelectInput = ({
     return (
       <components.DropdownIndicator {...props}>
         <MdArrowDropDown
-          className="text-gray-500 text-2xl"
+          className="text-neutral-500 text-xl transition-colors hover:text-neutral-700"
           onMouseDown={(e) => {
             e.preventDefault();
             setIsSearchable(false);
@@ -234,9 +275,9 @@ const SelectInput = ({
           : "flex-col"
       } gap-2 __className_a182b8 `}
     >
-      <H6 className="flex items-center gap-2">
+      <H6 className="flex items-center gap-2 text-sm font-medium text-neutral-700">
         <span>{label}</span>
-        {requiredField && <span className="text-red-400">*</span>}
+        {requiredField && <span className="text-error-500">*</span>}
 
         {Array.isArray(suggestedOption) &&
           suggestedOption
@@ -346,9 +387,9 @@ const SelectInput = ({
           <GenericButton
             onClick={onClear}
             variant="icon"
-            className="w-10 h-10 my-auto text-gray-500 hover:text-red-700"
+            className="w-9 h-9 my-auto text-neutral-400 hover:text-neutral-600"
           >
-            <IoIosClose size={28} />
+            <IoIosClose size={24} />
           </GenericButton>
         )}
       </div>
