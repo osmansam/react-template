@@ -1,12 +1,7 @@
-import {
-  QueryClient,
-  QueryClientProvider,
-  useIsMutating,
-} from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { Slide, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import Loading from "./common/Loading";
 import { Sidebar } from "./common/Sidebar";
 import { GeneralContextProvider } from "./context/General.context";
 import { UserContextProvider } from "./context/User.context";
@@ -16,7 +11,7 @@ import RouterContainer from "./navigation/routes";
 import { ACCESS_TOKEN } from "./utils/api/axiosClient";
 
 function App() {
-  const isMutating = useIsMutating();
+  // const isMutating = useIsMutating();
   const location = useLocation();
   useWebSocket();
 
@@ -28,7 +23,7 @@ function App() {
     <div className="App">
       <UserContextProvider>
         <GeneralContextProvider>
-          {isMutating ? <Loading /> : null}
+          {/* {isMutating ? <Loading /> : null} */}
           {showSidebar && <Sidebar />}
           <div className={showSidebar ? "lg:ml-16" : ""}>
             <RouterContainer />

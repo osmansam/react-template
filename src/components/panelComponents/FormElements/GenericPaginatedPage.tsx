@@ -95,15 +95,6 @@ export default function GenericPaginatedPage({
     );
   }, [container]);
 
-  const {
-    createDynamicItem,
-    createMultipleDynamicItem,
-    updateDynamicItem,
-    deleteDynamicItem,
-    deleteMultipleDynamicItem,
-    updateMultipleDynamicItem,
-  } = useDynamicCrud<GenericItem>(schemaName, hasImageField);
-
   const [filterPanelFormElements, setFilterPanelFormElements] =
     useState<FormElementsState>({
       search: "",
@@ -112,6 +103,33 @@ export default function GenericPaginatedPage({
     });
 
   const [showFilters, setShowFilters] = useState(false);
+
+  // Moved useDynamicCrud below filter state so we can pass the query key
+  const mergedFilters = useMemo(() => {
+    return constantFilter
+      ? ({ ...filterPanelFormElements, ...constantFilter } as FormElementsState)
+      : filterPanelFormElements;
+  }, [filterPanelFormElements, constantFilter]);
+
+  // Create the paginated query key to pass to mutations
+  const paginatedQueryKey = useMemo(
+    () => [
+      "dynamic",
+      schemaName,
+      "page",
+      { page: currentPage, limit: rowsPerPage, filters: mergedFilters },
+    ],
+    [schemaName, currentPage, rowsPerPage, mergedFilters]
+  );
+
+  const {
+    createDynamicItem,
+    createMultipleDynamicItem,
+    updateDynamicItem,
+    deleteDynamicItem,
+    deleteMultipleDynamicItem,
+    updateMultipleDynamicItem,
+  } = useDynamicCrud<GenericItem>(schemaName, hasImageField, paginatedQueryKey);
 
   const displayFields: Field[] = useMemo(() => {
     if (!container?.fields) return [];
@@ -460,13 +478,7 @@ export default function GenericPaginatedPage({
     return { inputs: ins, formKeys: fks, constantFilterKeys };
   }, [displayFields, t, selectionDataMap, constantFilter]);
 
-  // Merge constantFilter with filterPanelFormElements for querying
-  const mergedFilters = useMemo(() => {
-    return constantFilter
-      ? ({ ...filterPanelFormElements, ...constantFilter } as FormElementsState)
-      : filterPanelFormElements;
-  }, [filterPanelFormElements, constantFilter]);
-
+  // mergedFilters is now defined earlier to pass to useDynamicCrud
   const itemsPayload = useGetPaginatedItems(
     currentPage,
     rowsPerPage,

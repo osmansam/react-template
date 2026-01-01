@@ -4,19 +4,22 @@ import { camelCase, isArray, isPlainObject, transform } from "lodash";
 
 // Recursively convert all keys in an object from PascalCase to camelCase
 // Special handling: preserve _id fields (don't convert to id)
-function toCamelCase(obj: any): any {
+function toCamelCase(obj: unknown): unknown {
   if (isArray(obj)) {
     return obj.map((item) => toCamelCase(item));
   }
-  
+
   if (isPlainObject(obj)) {
-    return transform(obj, (result: any, value: any, key: string) => {
-      // Preserve _id as-is (don't convert to id)
-      const camelKey = key === '_id' ? '_id' : camelCase(key);
-      result[camelKey] = toCamelCase(value);
-    });
+    return transform(
+      obj as Record<string, unknown>,
+      (result: Record<string, unknown>, value: unknown, key: string) => {
+        // Preserve _id as-is (don't convert to id)
+        const camelKey = key === "_id" ? "_id" : camelCase(key);
+        result[camelKey] = toCamelCase(value);
+      }
+    );
   }
-  
+
   return obj;
 }
 
@@ -29,7 +32,7 @@ export const ACCESS_TOKEN = "jwt";
 
 axiosClient.interceptors.request.use(
   async (req) => {
-    const accessToken = Cookies.get(ACCESS_TOKEN);
+    const accessToken = localStorage.getItem(ACCESS_TOKEN);
 
     if (accessToken) {
       (req.headers as AxiosHeaders).set(

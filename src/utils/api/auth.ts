@@ -21,8 +21,13 @@ export type LoginCredentials = Record<string, any>;
 import { User } from "../../types";
 
 export interface LoginResponse {
-  token: string;
-  user: User;
+  status: number;
+  message: string;
+  data: {
+    accessToken: string;
+    refreshToken: string;
+    user: User;
+  };
 }
 
 async function loginMethod(payload: LoginCredentials) {
@@ -47,10 +52,11 @@ export function useLogin(
     mutationFn: loginMethod,
     // We are updating tables query data with new item
     onSuccess: async (response: LoginResponse) => {
-      const { token, user } = response;
-      Cookies.set("jwt", token);
+      const { accessToken, refreshToken, user } = response.data;
+      Cookies.set("jwt", accessToken, { expires: 7, sameSite: "lax" }); // 7 days expiry
       toast.success(t("Logged in successfully"));
-      localStorage.setItem("jwt", token);
+      localStorage.setItem("jwt", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
       localStorage.setItem("loggedIn", "true");
       if (user) {
         localStorage.setItem("user", JSON.stringify(user));

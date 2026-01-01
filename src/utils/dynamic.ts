@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import { FormElementsState } from "../types";
-import { useGet, useMutationApi } from "../utils/api/factory";
+import { useGet } from "../utils/api/factory";
 import { axiosClient } from "./api/axiosClient";
 
 export interface DynamicPayload<T> {
@@ -44,9 +44,10 @@ function toFormData(obj: Record<string, unknown>): FormData {
 
 export function useDynamicCrud<T extends { _id: string | number }>(
   schemaName: string,
-  hasImageField: boolean = false
+  hasImageField: boolean = false,
+  customQueryKey?: unknown[]
 ) {
-  const queryKey = listKey(schemaName);
+  const queryKey = (customQueryKey || listKey(schemaName)) as unknown[];
   const qc = useQueryClient();
   const { t } = useTranslation();
 
@@ -61,7 +62,10 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       : { "Content-Type": "application/json" };
 
     const response = await axiosClient.post<T>(url, data, { headers });
-    return response.data;
+    // Server may return {data: newItem, message: "...", status: 200}
+    // We need to extract just the data property if it exists
+    const responseData = response.data as { data?: T };
+    return (responseData?.data || response.data) as T;
   }
 
   // Custom update function that handles FormData
@@ -75,29 +79,78 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       : { "Content-Type": "application/json" };
 
     const response = await axiosClient.patch<T>(url, data, { headers });
-    return response.data;
+    // Server returns {data: updatedItem, message: "...", status: 200}
+    // We need to extract just the data property if it exists
+    const responseData = response.data as { data?: T };
+    return (responseData?.data || response.data) as T;
   }
 
   // Create mutation
   const createMutation = useMutation({
     mutationFn: createRequest,
     onMutate: async (itemDetails: Partial<T>) => {
+      console.log("🟣 CREATE onMutate - Start", { itemDetails, queryKey });
       await qc.cancelQueries({ queryKey });
-      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
-      qc.setQueryData(queryKey, [...previousItems, itemDetails]);
-      return { previousItems };
+      const previousData = qc.getQueryData(queryKey);
+      console.log("🟣 CREATE onMutate - Previous Data:", previousData);
+
+      // Check if data is paginated (DynamicPayload) or simple array
+      const isPaginated =
+        previousData &&
+        typeof previousData === "object" &&
+        "items" in previousData;
+      const previousItems = isPaginated
+        ? (previousData as DynamicPayload<T>).items
+        : (previousData as T[]) || [];
+
+      // Optimistic update for instant UI feedback
+      const optimisticItems = [...previousItems, itemDetails as T];
+      console.log("🟣 CREATE onMutate - Optimistic Items:", optimisticItems);
+
+      if (isPaginated) {
+        qc.setQueryData(queryKey, {
+          ...previousData,
+          items: optimisticItems,
+          totalItems: (previousData as DynamicPayload<T>).totalItems + 1,
+        });
+      } else {
+        qc.setQueryData(queryKey, optimisticItems);
+      }
+      return { previousData };
     },
     onError: (_err: Error, _newItem, context) => {
-      if (context?.previousItems) {
-        qc.setQueryData<T[]>(queryKey, context.previousItems);
+      console.log("🔴 CREATE onError - Rolling back", context);
+      if (context?.previousData) {
+        qc.setQueryData(queryKey, context.previousData);
       }
       const errorMessage =
         (_err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: async () => {
-      qc.invalidateQueries({ queryKey });
+    onSettled: (newItem, error) => {
+      console.log("🟢 CREATE onSettled - Start", { newItem, error });
+      if (!error && newItem && newItem._id) {
+        const currentData = qc.getQueryData(queryKey);
+        const isPaginated =
+          currentData &&
+          typeof currentData === "object" &&
+          "items" in currentData;
+        const currentItems = isPaginated
+          ? (currentData as DynamicPayload<T>).items
+          : (currentData as T[]) || [];
+
+        // Replace optimistic data with real server response
+        const withoutOptimistic = currentItems.slice(0, -1);
+        const updatedItems = [...withoutOptimistic, newItem];
+        console.log("🟢 CREATE onSettled - Updated Items:", updatedItems);
+
+        if (isPaginated) {
+          qc.setQueryData(queryKey, { ...currentData, items: updatedItems });
+        } else {
+          qc.setQueryData(queryKey, updatedItems);
+        }
+      }
     },
   });
 
@@ -111,31 +164,145 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       updates: Partial<T>;
     }) => updateRequest(id, updates),
     onMutate: async ({ id, updates }) => {
+      console.log("🔵 UPDATE onMutate - Start", { id, updates, queryKey });
       await qc.cancelQueries({ queryKey });
-      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
-      const updatedItems = previousItems.map((item) =>
+      const previousData = qc.getQueryData(queryKey);
+      console.log("🔵 UPDATE onMutate - Previous Data:", previousData);
+
+      // Check if data is paginated (DynamicPayload) or simple array
+      const isPaginated =
+        previousData &&
+        typeof previousData === "object" &&
+        "items" in previousData;
+      const previousItems = isPaginated
+        ? (previousData as DynamicPayload<T>).items
+        : (previousData as T[]) || [];
+
+      // Optimistic update for instant UI feedback
+      const optimisticItems = previousItems.map((item) =>
         item._id === id ? { ...item, ...updates } : item
       );
-      qc.setQueryData(queryKey, updatedItems);
-      return { previousItems };
+      console.log("🔵 UPDATE onMutate - Optimistic Items:", optimisticItems);
+
+      if (isPaginated) {
+        qc.setQueryData(queryKey, { ...previousData, items: optimisticItems });
+      } else {
+        qc.setQueryData(queryKey, optimisticItems);
+      }
+      return { previousData };
     },
     onError: (_err: Error, _vars, context) => {
-      if (context?.previousItems) {
-        qc.setQueryData<T[]>(queryKey, context.previousItems);
+      console.log("🔴 UPDATE onError - Rolling back", context);
+      if (context?.previousData) {
+        qc.setQueryData(queryKey, context.previousData);
       }
       const errorMessage =
         (_err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: async () => {
-      qc.invalidateQueries({ queryKey });
+    onSettled: (updatedItem, error) => {
+      console.log("🟢 UPDATE onSettled - Start", { updatedItem, error });
+      if (!error && updatedItem) {
+        const currentData = qc.getQueryData(queryKey);
+        console.log(
+          "🟢 UPDATE onSettled - Current Data from cache:",
+          currentData
+        );
+
+        // Check if data is paginated or simple array
+        const isPaginated =
+          currentData &&
+          typeof currentData === "object" &&
+          "items" in currentData;
+        const currentItems = isPaginated
+          ? (currentData as DynamicPayload<T>).items
+          : (currentData as T[]) || [];
+
+        console.log(
+          "🟢 UPDATE onSettled - Looking for _id:",
+          updatedItem._id,
+          "Type:",
+          typeof updatedItem._id
+        );
+
+        // Replace optimistic data with real server response
+        const updatedItems = currentItems.map((item) => {
+          const match =
+            item._id === updatedItem._id ||
+            String(item._id) === String(updatedItem._id);
+          console.log(
+            `🟢 Comparing item._id: ${
+              item._id
+            } (${typeof item._id}) with updatedItem._id: ${
+              updatedItem._id
+            } (${typeof updatedItem._id}) - Match: ${match}`
+          );
+          return match ? updatedItem : item;
+        });
+
+        console.log("🟢 UPDATE onSettled - Updated Items:", updatedItems);
+
+        if (isPaginated) {
+          qc.setQueryData(queryKey, { ...currentData, items: updatedItems });
+        } else {
+          qc.setQueryData(queryKey, updatedItems);
+        }
+      }
     },
   });
 
-  const { deleteItem } = useMutationApi<T>({
-    baseQuery: BASE,
-    queryKey,
+  // Custom delete function
+  async function deleteRequest(id: string | number) {
+    const url = `${BASE}/${id}?${qs({ schemaName })}`;
+    const response = await axiosClient.delete(url);
+    return response.data;
+  }
+
+  // Delete single item mutation
+  const deleteMutation = useMutation({
+    mutationFn: deleteRequest,
+    onMutate: async (id: string | number) => {
+      console.log("🟠 DELETE onMutate - Start", { id, queryKey });
+      await qc.cancelQueries({ queryKey });
+
+      const previousData = qc.getQueryData(queryKey);
+      console.log("🟠 DELETE onMutate - Previous Data:", previousData);
+
+      // Check if data is paginated (DynamicPayload) or simple array
+      const isPaginated =
+        previousData &&
+        typeof previousData === "object" &&
+        "items" in previousData;
+      const previousItems = isPaginated
+        ? (previousData as DynamicPayload<T>).items
+        : (previousData as T[]) || [];
+
+      const updatedItems = previousItems.filter((item) => item._id !== id);
+      console.log("🟠 DELETE onMutate - Updated Items:", updatedItems);
+
+      if (isPaginated) {
+        qc.setQueryData(queryKey, {
+          ...previousData,
+          items: updatedItems,
+          totalItems: (previousData as DynamicPayload<T>).totalItems - 1,
+        });
+      } else {
+        qc.setQueryData(queryKey, updatedItems);
+      }
+
+      return { previousData };
+    },
+    onError: (_err: Error, _vars, context) => {
+      console.log("🔴 DELETE onError - Rolling back", context);
+      if (context?.previousData) {
+        qc.setQueryData(queryKey, context.previousData);
+      }
+      const errorMessage =
+        (_err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "An unexpected error occurred";
+      setTimeout(() => toast.error(t(errorMessage)), 200);
+    },
   });
 
   const createDynamicItem = (doc: Partial<T>) => createMutation.mutate(doc);
@@ -143,8 +310,10 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   const updateDynamicItem = (id: string | number, updates: Partial<T>) =>
     updateMutation.mutate({ id, updates });
 
-  const deleteDynamicItem = (id: string | number) =>
-    deleteItem(`${id}?${qs({ schemaName })}`);
+  const deleteDynamicItem = (id: string | number) => {
+    console.log("🟠 DELETE Single Item - Triggering mutation with id:", id);
+    deleteMutation.mutate(id);
+  };
 
   // Create multiple items functionality
   async function createManyRequest(payload: Array<Partial<T>>) {
@@ -160,26 +329,13 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   const createManyMutation = useMutation({
     mutationFn: createManyRequest,
-    onMutate: async () => {
-      await qc.cancelQueries({ queryKey });
-      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
-      return { previousItems };
-    },
-    onSuccess: (newItems: T[]) => {
-      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
-      qc.setQueryData<T[]>(queryKey, [...previousItems, ...newItems]);
-    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onError: (err: any, _vars, context) => {
-      if (context?.previousItems) {
-        qc.setQueryData<T[]>(queryKey, context.previousItems);
-      }
+    onError: (err: any) => {
       const errorMessage =
         err?.response?.data?.message || "An unexpected error occurred";
-      // setTimeout(() => toast.error(t(errorMessage)), 200);
-      console.log("Error creating multiple items:", errorMessage);
+      setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: async () => {
+    onSettled: () => {
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -200,31 +356,13 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   const deleteManyMutation = useMutation({
     mutationFn: deleteManyRequest,
-    onMutate: async (payload: Array<{ _id: string | number }>) => {
-      await qc.cancelQueries({ queryKey });
-
-      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
-      const idsToDelete = new Set(payload.map((p) => String(p._id)));
-
-      const updatedItems = previousItems.filter(
-        (item) => !idsToDelete.has(String(item._id))
-      );
-
-      qc.setQueryData<T[]>(queryKey, updatedItems);
-
-      return { previousItems };
-    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onError: (err: any, _vars, context) => {
-      if (context?.previousItems) {
-        qc.setQueryData<T[]>(queryKey, context.previousItems);
-      }
+    onError: (err: any) => {
       const errorMessage =
         err?.response?.data?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: async () => {
-      // keep your pattern consistent with the rest of your hook
+    onSettled: () => {
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -254,33 +392,13 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   const updateManyMutation = useMutation({
     mutationFn: updateManyRequest,
-    onMutate: async (
-      payload: Array<{ _id: string | number; updates: Partial<T> }>
-    ) => {
-      await qc.cancelQueries({ queryKey });
-
-      const previousItems = qc.getQueryData<T[]>(queryKey) || [];
-      const updateMap = new Map(payload.map((p) => [String(p._id), p.updates]));
-
-      const updatedItems = previousItems.map((item) => {
-        const updates = updateMap.get(String(item._id));
-        return updates ? { ...item, ...updates } : item;
-      });
-
-      qc.setQueryData<T[]>(queryKey, updatedItems);
-
-      return { previousItems };
-    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onError: (err: any, _vars, context) => {
-      if (context?.previousItems) {
-        qc.setQueryData<T[]>(queryKey, context.previousItems);
-      }
+    onError: (err: any) => {
       const errorMessage =
         err?.response?.data?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: async () => {
+    onSettled: () => {
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -325,6 +443,9 @@ export function useExportDynamicItems() {
 
   const exportMutation = useMutation({
     mutationFn: exportRequest,
+    onError: () => {
+      toast.error(t("Export failed"));
+    },
     onSuccess: (data) => {
       const url = window.URL.createObjectURL(new Blob([data]));
       const link = document.createElement("a");
@@ -334,9 +455,6 @@ export function useExportDynamicItems() {
       link.click();
       link.remove();
       toast.success(t("Export successful"));
-    },
-    onError: () => {
-      toast.error(t("Export failed"));
     },
   });
 

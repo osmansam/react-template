@@ -94,7 +94,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         return { previousItems };
       },
       // If the mutation fails, use the context returned from onMutate to roll back
-      onError: (_err: any, _newTable, context) => {
+      onError: (_err: Error, _newTable, context) => {
         const previousItemContext = context as {
           previousItems: T[];
         };
@@ -103,7 +103,8 @@ export function useMutationApi<T extends { _id: number | string }>({
           queryClient.setQueryData<T[]>(queryKey, previousItems);
         }
         const errorMessage =
-          _err?.response?.data?.message || "An unexpected error occurred";
+          (_err as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message || "An unexpected error occurred";
         setTimeout(() => toast.error(t(errorMessage)), 200);
       },
       // Always refetch after error or success:
@@ -144,7 +145,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         return { previousItems };
       },
       // If the mutation fails, use the context returned from onMutate to roll back
-      onError: (_err: any, _newTable, context) => {
+      onError: (_err: Error, _newTable, context) => {
         const previousItemContext = context as {
           previousItems: T[];
         };
@@ -153,7 +154,8 @@ export function useMutationApi<T extends { _id: number | string }>({
           queryClient.setQueryData<T[]>(queryKey, previousItems);
         }
         const errorMessage =
-          _err?.response?.data?.message || "An unexpected error occurred";
+          (_err as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message || "An unexpected error occurred";
         setTimeout(() => toast.error(t(errorMessage)), 200);
       },
       // Always refetch after error or success:
@@ -202,7 +204,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         return { previousItems };
       },
       // If the mutation fails, use the context returned from onMutate to roll back
-      onError: (_err: any, _newTable, context) => {
+      onError: (_err: Error, _newTable, context) => {
         const previousItemContext = context as {
           previousItems: T[];
         };
@@ -211,7 +213,8 @@ export function useMutationApi<T extends { _id: number | string }>({
           queryClient.setQueryData<T[]>(queryKey, previousItems);
         }
         const errorMessage =
-          _err?.response?.data?.message || "An unexpected error occurred";
+          (_err as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message || "An unexpected error occurred";
         setTimeout(() => toast.error(t(errorMessage)), 200);
       },
       // Always refetch after error or success:
