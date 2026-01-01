@@ -1,4 +1,4 @@
-@import './fonts.css';
+@import "./fonts.css";
 
 @tailwind base;
 @tailwind components;
@@ -13,7 +13,8 @@
     @apply bg-white text-neutral-900;
     overflow-x: hidden;
     overscroll-behavior-y: none;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, Arial, sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+      system-ui, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -34,7 +35,8 @@
   h4,
   h5,
   h6 {
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+      system-ui, sans-serif;
     font-weight: 600;
     letter-spacing: -0.022em;
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1, "ss01" 1;
@@ -44,7 +46,7 @@
     letter-spacing: -0.011em;
     line-height: 1.6;
   }
-  
+
   /* Optimize button text */
   button {
     -webkit-font-smoothing: antialiased;
