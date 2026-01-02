@@ -22,6 +22,7 @@ export interface GroupBy {
 export type ComponentType =
   | "table"
   | "tabPanel"
+  | "calendar" // Dynamic Calendar Component
   // Chart types
   | "barChart"
   | "lineChart"

@@ -6,6 +6,7 @@ import {
   TabContent,
 } from "../types/page";
 import { useGetSelection } from "../utils/dynamic";
+import DynamicCalendar from "./calendar/DynamicCalendar";
 import DynamicChart, { ChartType } from "./charts/DynamicChart";
 import "./dynamic-page-renderer.css";
 import { Header } from "./header/Header";
@@ -212,6 +213,56 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
           <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
             <p className="text-yellow-800 text-sm">
               TabPanel component requires tabs configuration
+            </p>
+          </div>
+        );
+
+      case "calendar":
+        // Render dynamic calendar component
+        if (dataBinding?.kind === "schema" && dataBinding.schemaName) {
+          return (
+            <DynamicCalendar
+              config={{
+                title: title,
+                height: props?.height as number | undefined,
+                width: props?.width as string | undefined,
+                schemaName: dataBinding.schemaName,
+                fieldMappings: props?.fieldMappings as
+                  | {
+                      id?: string;
+                      title?: string;
+                      date?: string;
+                      startTime?: string;
+                      endTime?: string;
+                      description?: string;
+                      color?: string;
+                      category?: string;
+                      status?: string;
+                    }
+                  | undefined,
+                options: props?.options as
+                  | {
+                      defaultView?: "month" | "week" | "day";
+                      showWeekNumbers?: boolean;
+                      firstDayOfWeek?: 0 | 1;
+                      allowEventClick?: boolean;
+                      highlightToday?: boolean;
+                      enableCreate?: boolean;
+                      enableEdit?: boolean;
+                      enableDelete?: boolean;
+                    }
+                  | undefined,
+              }}
+            />
+          );
+        }
+        return (
+          <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
+            <p className="text-yellow-800 text-sm">
+              Calendar component requires schema binding with schemaName. Schema
+              must include fields: _id, title, date (YYYY-MM-DD). Optional
+              fields: startTime (HH:mm), endTime (HH:mm), description, color,
+              category, status.
             </p>
           </div>
         );
