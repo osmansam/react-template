@@ -10,7 +10,7 @@ const PAGE_QUERY_KEY = ["page", "all"] as const;
 
 // Get all pages
 export function useGetAllPages() {
-  return useGet<PageModel[]>(BASE, PAGE_QUERY_KEY);
+  return useGet<PageModel[]>(`${BASE}/public`, PAGE_QUERY_KEY);
 }
 
 // Get single page by ID
