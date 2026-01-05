@@ -172,7 +172,12 @@ export const Sidebar = () => {
                               if (child.path) {
                                 resetGeneralContext();
                                 const fullPath = buildPath(child.path);
-                                console.log('Navigating to:', fullPath, 'from child.path:', child.path);
+                                console.log(
+                                  "Navigating to:",
+                                  fullPath,
+                                  "from child.path:",
+                                  child.path
+                                );
                                 navigate(fullPath);
                                 window.scrollTo(0, 0);
                                 setIsSidebarOpen(false);
@@ -224,8 +229,15 @@ export const Sidebar = () => {
                         }
                         if (filteredRouteChildren[0].path) {
                           resetGeneralContext();
-                          const fullPath = buildPath(filteredRouteChildren[0].path);
-                          console.log('Navigating to:', fullPath, 'from path:', filteredRouteChildren[0].path);
+                          const fullPath = buildPath(
+                            filteredRouteChildren[0].path
+                          );
+                          console.log(
+                            "Navigating to:",
+                            fullPath,
+                            "from path:",
+                            filteredRouteChildren[0].path
+                          );
                           navigate(fullPath);
                           window.scrollTo(0, 0);
                         }
@@ -279,7 +291,12 @@ export const Sidebar = () => {
                       if (route.path) {
                         resetGeneralContext();
                         const fullPath = buildPath(route.path);
-                        console.log('Navigating to:', fullPath, 'from route.path:', route.path);
+                        console.log(
+                          "Navigating to:",
+                          fullPath,
+                          "from route.path:",
+                          route.path
+                        );
                         navigate(fullPath);
                         window.scrollTo(0, 0);
                       }

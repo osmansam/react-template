@@ -41,11 +41,13 @@ The axios interceptor automatically extracts tenant and project from the URL and
 ### 3. Environment Configuration
 
 **Before:**
+
 ```env
 VITE_API_URL="http://localhost:3002/api/v1/acme/deneme"
 ```
 
 **After:**
+
 ```env
 VITE_API_URL="http://localhost:3002/api/v1"
 ```
@@ -59,18 +61,18 @@ The tenant (`acme`) and project (`deneme`) are now dynamic from the URL.
 Use the `useTenantProject` hook to access tenant/project values:
 
 ```tsx
-import { useTenantProject } from '../hooks/useTenantProject';
+import { useTenantProject } from "../hooks/useTenantProject";
 
 function MyComponent() {
   const { tenant, project, buildPath } = useTenantProject();
-  
-  console.log(tenant);  // 'acme'
+
+  console.log(tenant); // 'acme'
   console.log(project); // 'inventory'
-  
+
   // Build paths with tenant/project
-  const auditLogsPath = buildPath('/audit-logs');
+  const auditLogsPath = buildPath("/audit-logs");
   // Result: '/t/acme/p/inventory/audit-logs'
-  
+
   return <Link to={auditLogsPath}>Audit Logs</Link>;
 }
 ```
@@ -81,7 +83,7 @@ No changes needed! The axios interceptor handles everything:
 
 ```tsx
 // This works automatically
-const { data } = await axiosClient.get('/container');
+const { data } = await axiosClient.get("/container");
 
 // Will be transformed to: GET /acme/inventory/container
 ```
@@ -91,19 +93,21 @@ const { data } = await axiosClient.get('/container');
 ### For Existing Projects
 
 1. **Update .env file:**
+
    ```env
    # Old
    VITE_API_URL="http://localhost:3002/api/v1/acme/deneme"
-   
+
    # New
    VITE_API_URL="http://localhost:3002/api/v1"
    ```
 
 2. **Update URLs when accessing the app:**
+
    ```
    # Old
    http://localhost:5173/audit-logs
-   
+
    # New
    http://localhost:5173/t/acme/p/deneme/audit-logs
    ```
@@ -120,6 +124,7 @@ Your backend should accept URLs in this format:
 ```
 
 Example:
+
 ```
 GET /api/v1/acme/inventory/container
 POST /api/v1/acme/inventory/dynamic
