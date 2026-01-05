@@ -93,9 +93,8 @@ const DynamicCalendar: React.FC<DynamicCalendarProps> = ({ config }) => {
     options = {},
   } = config;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const {
-    defaultView = "month", // Reserved for future view switching feature
+    // defaultView = "month", // Reserved for future view switching feature
     firstDayOfWeek = 0,
     allowEventClick = true,
     highlightToday = true,

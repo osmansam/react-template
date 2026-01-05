@@ -7,6 +7,7 @@ import { IoIosLogOut } from "react-icons/io";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGeneralContext } from "../context/General.context";
 import { useFilteredRoutes } from "../hooks/useFilteredRoutes";
+import { useTenantProject } from "../hooks/useTenantProject";
 import { getIconByName, getMenuIcon } from "../utils/menuIcons";
 import SidebarTooltip from "./SidebarTooltip";
 
@@ -17,6 +18,7 @@ export const Sidebar = () => {
   const queryClient = useQueryClient();
   const { isSidebarOpen, setIsSidebarOpen, resetGeneralContext } =
     useGeneralContext();
+  const { buildPath } = useTenantProject();
   // const { setUser } = useUserContext();
   // const user = useGetUser();
   const currentRoute = location.pathname;
@@ -169,7 +171,9 @@ export const Sidebar = () => {
                               }
                               if (child.path) {
                                 resetGeneralContext();
-                                navigate(child.path);
+                                const fullPath = buildPath(child.path);
+                                console.log('Navigating to:', fullPath, 'from child.path:', child.path);
+                                navigate(fullPath);
                                 window.scrollTo(0, 0);
                                 setIsSidebarOpen(false);
                               }
@@ -220,7 +224,9 @@ export const Sidebar = () => {
                         }
                         if (filteredRouteChildren[0].path) {
                           resetGeneralContext();
-                          navigate(filteredRouteChildren[0].path);
+                          const fullPath = buildPath(filteredRouteChildren[0].path);
+                          console.log('Navigating to:', fullPath, 'from path:', filteredRouteChildren[0].path);
+                          navigate(fullPath);
                           window.scrollTo(0, 0);
                         }
                       }}
@@ -272,7 +278,9 @@ export const Sidebar = () => {
                       }
                       if (route.path) {
                         resetGeneralContext();
-                        navigate(route.path);
+                        const fullPath = buildPath(route.path);
+                        console.log('Navigating to:', fullPath, 'from route.path:', route.path);
+                        navigate(fullPath);
                         window.scrollTo(0, 0);
                       }
                     }}

@@ -45,22 +45,37 @@ const RouterContainer = () => {
 
   return (
     <Routes>
+      {/* Tenant/Project scoped routes - ALL routes including login */}
+      <Route path="/t/:tenant/p/:project">
+        <Route path="login" element={<Login />} />
+        <Route path="auth/google/callback" element={<GoogleCallback />} />
+        
+        {/* Private routes */}
+        <Route element={<PrivateRoutes />}>
+          {flattenedRoutes.map((route) => (
+            <Route
+              key={route.path}
+              path={route.path?.startsWith('/') ? route.path.slice(1) : route.path}
+              element={route.element && <route.element />}
+            />
+          ))}
+        </Route>
+      </Route>
+
+      {/* Legacy routes without tenant/project (for backward compatibility) */}
+      <Route path={PublicRoutes.Login} element={<Login />} />
+      <Route path={PublicRoutes.GoogleCallback} element={<GoogleCallback />} />
       <Route element={<PrivateRoutes />}>
         {flattenedRoutes.map((route) => (
           <Route
-            key={route.path}
+            key={`legacy-${route.path}`}
             path={route.path}
             element={route.element && <route.element />}
           />
         ))}
       </Route>
-
-      <Route path={PublicRoutes.Login} element={<Login />} />
-      <Route path={PublicRoutes.GoogleCallback} element={<GoogleCallback />} />
-  
     </Routes>
   );
 };
 
 export default RouterContainer;
-

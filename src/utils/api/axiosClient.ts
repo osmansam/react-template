@@ -23,6 +23,27 @@ function toCamelCase(obj: unknown): unknown {
   return obj;
 }
 
+// Helper to extract tenant and project from current URL
+function getTenantAndProject(): { tenant: string; project: string } | null {
+  const pathParts = window.location.pathname.split("/");
+  const tIndex = pathParts.indexOf("t");
+  const pIndex = pathParts.indexOf("p");
+
+  if (
+    tIndex !== -1 &&
+    pIndex !== -1 &&
+    pathParts[tIndex + 1] &&
+    pathParts[pIndex + 1]
+  ) {
+    return {
+      tenant: pathParts[tIndex + 1],
+      project: pathParts[pIndex + 1],
+    };
+  }
+
+  return null;
+}
+
 export const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   responseType: "json",
@@ -39,6 +60,13 @@ axiosClient.interceptors.request.use(
         "Authorization",
         `Bearer ${accessToken}`
       );
+    }
+
+    // Inject tenant and project into the URL path
+    const tenantProject = getTenantAndProject();
+    if (tenantProject && req.url) {
+      // Prepend tenant/project to the URL path
+      req.url = `/${tenantProject.tenant}/${tenantProject.project}${req.url}`;
     }
 
     return req;
