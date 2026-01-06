@@ -49,7 +49,7 @@ export const Sidebar = () => {
     Cookies.remove("jwt");
     // setUser(undefined);
     queryClient.clear();
-    navigate("/login");
+    navigate(buildPath("/login"));
   };
 
   return (

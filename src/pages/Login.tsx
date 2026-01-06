@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import Cookies from "js-cookie";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,6 +17,7 @@ const Login = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const containers = useGetContainers();
   const [authContainer, setAuthContainer] = useState<ContainerModel | null>(
     null
@@ -49,10 +51,10 @@ const Login = () => {
     const height = 600;
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
-    
+
     const popup = window.open(
       `${import.meta.env.VITE_API_URL}auth/google/login`,
-      'Google Login',
+      "Google Login",
       `width=${width},height=${height},left=${left},top=${top}`
     );
 
@@ -60,40 +62,44 @@ const Login = () => {
     const handleMessage = (event: MessageEvent) => {
       // Verify origin for security
       if (event.origin !== window.location.origin) return;
-      
-      if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+
+      if (event.data.type === "GOOGLE_AUTH_SUCCESS") {
         const { accessToken, refreshToken, user } = event.data;
-        // Store tokens
-        Cookies.set('jwt', accessToken);
-        localStorage.setItem('jwt', accessToken);
-        localStorage.setItem('loggedIn', 'true');
-        
+
+        // Store tokens FIRST
+        Cookies.set("jwt", accessToken);
+        localStorage.setItem("jwt", accessToken);
+        localStorage.setItem("loggedIn", "true");
+
         if (refreshToken) {
-          localStorage.setItem('refreshToken', refreshToken);
+          localStorage.setItem("refreshToken", refreshToken);
         }
 
         if (user) {
           localStorage.setItem("user", JSON.stringify(user));
           setUser(user);
         }
-        
-        toast.success(t('Logged in successfully'));
-        navigate(location.state?.from || '/');
-        
-        // Close popup
-        if (popup) popup.close();
-      } else if (event.data.type === 'GOOGLE_AUTH_ERROR') {
-        toast.error(t('Google login failed'));
+
+        // Invalidate all queries to refetch with new token
+        queryClient.invalidateQueries().then(() => {
+          toast.success(t("Logged in successfully"));
+          navigate(location.state?.from || "/");
+
+          // Close popup
+          if (popup) popup.close();
+        });
+      } else if (event.data.type === "GOOGLE_AUTH_ERROR") {
+        toast.error(t("Google login failed"));
         if (popup) popup.close();
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    
+    window.addEventListener("message", handleMessage);
+
     // Clean up listener when component unmounts or popup closes
     const checkPopupClosed = setInterval(() => {
       if (popup?.closed) {
-        window.removeEventListener('message', handleMessage);
+        window.removeEventListener("message", handleMessage);
         clearInterval(checkPopupClosed);
       }
     }, 500);

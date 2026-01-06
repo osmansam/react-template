@@ -44,6 +44,7 @@ export function useLogin(
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { setUser } = useUserContext();
+  const queryClient = useQueryClient();
   const { mutate: login } = useMutation<
     LoginResponse,
     LoginError,
@@ -53,15 +54,23 @@ export function useLogin(
     // We are updating tables query data with new item
     onSuccess: async (response: LoginResponse) => {
       const { accessToken, refreshToken, user } = response.data;
+
+      // Set token in both cookie and localStorage FIRST
       Cookies.set("jwt", accessToken, { expires: 7, sameSite: "lax" }); // 7 days expiry
-      toast.success(t("Logged in successfully"));
       localStorage.setItem("jwt", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
       localStorage.setItem("loggedIn", "true");
+
       if (user) {
         localStorage.setItem("user", JSON.stringify(user));
         setUser(user);
       }
+
+      // Clear all queries and refetch with new token
+      await queryClient.invalidateQueries();
+
+      toast.success(t("Logged in successfully"));
+
       const target = location
         ? `${location.pathname}${location.search}`
         : // : Routes.HOME; // If no location is provided, redirect to home page
