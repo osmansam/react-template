@@ -16,7 +16,7 @@ interface LoginError {
   };
 }
 
-export type LoginCredentials = Record<string, any>;
+export type LoginCredentials = Record<string, unknown>;
 
 import { User } from "../../types";
 
@@ -83,6 +83,57 @@ export function useLogin(
   return { login };
 }
 
+async function registerMethod(
+  payload: LoginCredentials & { schemaName: string }
+) {
+  return post<LoginCredentials, LoginResponse>({
+    path: `/auth/register?schemaName=${payload.schemaName}`,
+    payload,
+  });
+}
+
+export function useRegister(
+  location?: Location,
+  onError?: (error: unknown) => void
+) {
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { setUser } = useUserContext();
+  const queryClient = useQueryClient();
+  const { mutate: register } = useMutation<
+    LoginResponse,
+    LoginError,
+    LoginCredentials & { schemaName: string }
+  >({
+    mutationFn: registerMethod,
+    onSuccess: async (response: LoginResponse) => {
+      const { accessToken, refreshToken, user } = response.data;
+
+      // Set token in both cookie and localStorage FIRST
+      Cookies.set("jwt", accessToken, { expires: 7, sameSite: "lax" }); // 7 days expiry
+      localStorage.setItem("jwt", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
+      localStorage.setItem("loggedIn", "true");
+
+      if (user) {
+        localStorage.setItem("user", JSON.stringify(user));
+        setUser(user);
+      }
+
+      // Clear all queries and refetch with new token
+      await queryClient.invalidateQueries();
+
+      toast.success(t("Registered successfully"));
+
+      const target = location ? `${location.pathname}${location.search}` : "/";
+      navigate(target);
+    },
+
+    onError,
+  });
+  return { register };
+}
+
 async function logoutMethod() {
   return post<undefined, { success: boolean }>({
     path: "/auth/logout",
@@ -97,13 +148,24 @@ export function useLogout(onError?: (error: unknown) => void) {
   const { mutateAsync: logout } = useMutation({
     mutationFn: logoutMethod,
     onSuccess: () => {
+      // Extract tenant/project from current URL before clearing
+      const pathParts = window.location.pathname.split("/");
+      const tIndex = pathParts.indexOf("t");
+      const pIndex = pathParts.indexOf("p");
+      const tenant = tIndex !== -1 ? pathParts[tIndex + 1] : "";
+      const project = pIndex !== -1 ? pathParts[pIndex + 1] : "";
+
       localStorage.clear();
       localStorage.setItem("loggedOut", "true");
       setTimeout(() => localStorage.removeItem("loggedOut"), 500);
       Cookies.remove("jwt");
       setUser(undefined);
       queryClient.clear();
-      navigate("/login");
+
+      // Redirect to login with tenant/project context preserved
+      const loginPath =
+        tenant && project ? `/t/${tenant}/p/${project}/login` : "/login";
+      navigate(loginPath);
     },
     onError,
   });

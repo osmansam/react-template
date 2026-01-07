@@ -8,7 +8,9 @@ const GoogleCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "success" | "error">(
+    "loading"
+  );
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -16,7 +18,7 @@ const GoogleCallback = () => {
       try {
         // Check if this page was opened in a popup (has window.opener)
         const isPopup = window.opener && !window.opener.closed;
-        
+
         // Try to get tokens from URL parameters first
         const accessToken = searchParams.get("accessToken");
         const refreshToken = searchParams.get("refreshToken");
@@ -26,7 +28,7 @@ const GoogleCallback = () => {
         if (errorParam) {
           setStatus("error");
           setMessage(searchParams.get("message") || "Google login failed");
-          
+
           if (isPopup) {
             window.opener.postMessage(
               { type: "GOOGLE_AUTH_ERROR", error: errorParam },
@@ -48,20 +50,41 @@ const GoogleCallback = () => {
         if (code) {
           setStatus("loading");
           setMessage("Exchanging code for tokens...");
-          
+
           try {
             // Call backend to exchange code
             // We must pass both code and state for validation
             const state = searchParams.get("state");
-            const apiUrl = import.meta.env.VITE_API_URL.endsWith('/') 
-              ? import.meta.env.VITE_API_URL 
-              : `${import.meta.env.VITE_API_URL}/`;
-            
-            const response = await fetch(`${apiUrl}auth/google/callback?code=${code}&state=${state || ''}`);
+
+            // Extract tenant and project from current URL path
+            const pathParts = window.location.pathname.split("/");
+            const tIndex = pathParts.indexOf("t");
+            const pIndex = pathParts.indexOf("p");
+            const tenant = tIndex !== -1 ? pathParts[tIndex + 1] : "";
+            const project = pIndex !== -1 ? pathParts[pIndex + 1] : "";
+
+            // Ensure API URL doesn't have trailing slash for consistent construction
+            const baseUrl = import.meta.env.VITE_API_URL.replace(/\/$/, "");
+            console.log(tenant, project);
+            const callbackUrl =
+              tenant && project
+                ? `${baseUrl}/${tenant}/${project}/auth/google/callback?code=${code}&state=${
+                    state || ""
+                  }`
+                : `${baseUrl}/auth/google/callback?code=${code}&state=${
+                    state || ""
+                  }`;
+
+            const response = await fetch(callbackUrl);
             const data = await response.json();
-            
+
             if (data.status === 200 && data.data?.accessToken) {
-              handleLoginSuccess(data.data.accessToken, data.data.refreshToken, data.data.user, isPopup);
+              handleLoginSuccess(
+                data.data.accessToken,
+                data.data.refreshToken,
+                data.data.user,
+                isPopup
+              );
               return;
             } else {
               throw new Error(data.message || "Failed to exchange token");
@@ -81,7 +104,12 @@ const GoogleCallback = () => {
           if (jsonMatch) {
             const data = JSON.parse(jsonMatch[0]);
             if (data.status === 200 && data.data?.accessToken) {
-              handleLoginSuccess(data.data.accessToken, data.data.refreshToken, data.data.user, isPopup);
+              handleLoginSuccess(
+                data.data.accessToken,
+                data.data.refreshToken,
+                data.data.user,
+                isPopup
+              );
               return;
             }
           }
@@ -91,8 +119,10 @@ const GoogleCallback = () => {
 
         // If we get here, we couldn't find tokens
         setStatus("error");
-        setMessage("Could not retrieve authentication tokens. Check backend logs.");
-        
+        setMessage(
+          "Could not retrieve authentication tokens. Check backend logs."
+        );
+
         if (isPopup) {
           window.opener.postMessage(
             { type: "GOOGLE_AUTH_ERROR", error: "No tokens found" },
@@ -104,7 +134,7 @@ const GoogleCallback = () => {
         console.error("Google OAuth callback error:", error);
         setStatus("error");
         setMessage("An error occurred during login");
-        
+
         if (window.opener && !window.opener.closed) {
           window.opener.postMessage(
             { type: "GOOGLE_AUTH_ERROR", error: String(error) },
@@ -115,10 +145,15 @@ const GoogleCallback = () => {
       }
     };
 
-    const handleLoginSuccess = (accessToken: string, refreshToken: string | null | undefined, user: any, isPopup: boolean | null) => {
+    const handleLoginSuccess = (
+      accessToken: string,
+      refreshToken: string | null | undefined,
+      user: unknown,
+      isPopup: boolean | null
+    ) => {
       setStatus("success");
       setMessage("Login successful!");
-      
+
       // Store tokens
       Cookies.set("jwt", accessToken);
       localStorage.setItem("jwt", accessToken);
@@ -146,8 +181,17 @@ const GoogleCallback = () => {
         );
         setTimeout(() => window.close(), 500);
       } else {
-        // Redirect to home page
-        setTimeout(() => navigate("/"), 500);
+        // Redirect to home page with tenant/project context
+        const pathParts = window.location.pathname.split("/");
+        const tIndex = pathParts.indexOf("t");
+        const pIndex = pathParts.indexOf("p");
+        const tenant = tIndex !== -1 ? pathParts[tIndex + 1] : "";
+        const project = pIndex !== -1 ? pathParts[pIndex + 1] : "";
+
+        const redirectPath =
+          tenant && project ? `/t/${tenant}/p/${project}/` : "/";
+
+        setTimeout(() => navigate(redirectPath), 500);
       }
     };
 
@@ -162,32 +206,60 @@ const GoogleCallback = () => {
           {status === "loading" && (
             <>
               <div className="animate-spin h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full mb-4"></div>
-              <p className="text-gray-800 font-semibold mb-2">{t("Processing...")}</p>
+              <p className="text-gray-800 font-semibold mb-2">
+                {t("Processing...")}
+              </p>
               <p className="text-gray-600 text-sm">{t("Please wait")}</p>
             </>
           )}
-          
+
           {status === "success" && (
             <>
               <div className="h-12 w-12 bg-green-100 rounded-full mb-4 flex items-center justify-center">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="h-6 w-6 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
               </div>
-              <p className="text-gray-800 font-semibold mb-2">{t("Success!")}</p>
+              <p className="text-gray-800 font-semibold mb-2">
+                {t("Success!")}
+              </p>
               <p className="text-gray-600 text-sm text-center">{message}</p>
-              <p className="text-gray-500 text-xs mt-2">{t("This window will close automatically...")}</p>
+              <p className="text-gray-500 text-xs mt-2">
+                {t("This window will close automatically...")}
+              </p>
             </>
           )}
-          
+
           {status === "error" && (
             <>
               <div className="h-12 w-12 bg-red-100 rounded-full mb-4 flex items-center justify-center">
-                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="h-6 w-6 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </div>
-              <p className="text-gray-800 font-semibold mb-2">{t("Authentication Error")}</p>
+              <p className="text-gray-800 font-semibold mb-2">
+                {t("Authentication Error")}
+              </p>
               <p className="text-gray-600 text-sm text-center">{message}</p>
             </>
           )}

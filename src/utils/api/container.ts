@@ -26,7 +26,14 @@ export interface Frontend {
   rowKeyClassName?: RowClassConfig[];
   invalidateKeys?: {
     key: string;
-    defaultValue: string | boolean | number | undefined | string[] | number[]|undefined
+    defaultValue:
+      | string
+      | boolean
+      | number
+      | undefined
+      | string[]
+      | number[]
+      | undefined;
   }[];
   linkTemplate?: string;
   linkLabelField?: string;
@@ -141,6 +148,7 @@ export interface ContainerModel {
   dynamicFunctions: DynamicFunction[];
   dynamicApis: DynamicApiModel[];
   isAuthContainer?: boolean;
+  isRegisterActive?: boolean;
   populationArray?: Population[];
   populatedRoutes: string[];
   frontend?: Frontend;

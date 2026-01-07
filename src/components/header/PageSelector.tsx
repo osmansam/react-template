@@ -63,13 +63,24 @@ export function PageSelector({
     if (onLogout) {
       onLogout();
     } else {
+      // Extract tenant/project from current URL before clearing
+      const pathParts = window.location.pathname.split("/");
+      const tIndex = pathParts.indexOf("t");
+      const pIndex = pathParts.indexOf("p");
+      const tenant = tIndex !== -1 ? pathParts[tIndex + 1] : "";
+      const project = pIndex !== -1 ? pathParts[pIndex + 1] : "";
+
       // Default logout behavior
       localStorage.clear();
       localStorage.setItem("loggedOut", "true");
       setTimeout(() => localStorage.removeItem("loggedOut"), 500);
       Cookies.remove("jwt");
       queryClient.clear();
-      navigate(loginRoute);
+
+      // Redirect to login with tenant/project context preserved
+      const redirectPath =
+        tenant && project ? `/t/${tenant}/p/${project}/login` : loginRoute;
+      navigate(redirectPath);
     }
   }
 

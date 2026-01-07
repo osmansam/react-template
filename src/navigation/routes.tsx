@@ -80,7 +80,6 @@ const RouterContainer = () => {
 
       {/* Legacy routes without tenant/project (for backward compatibility) */}
       <Route path={PublicRoutes.Login} element={<Login />} />
-      <Route path={PublicRoutes.GoogleCallback} element={<GoogleCallback />} />
       <Route element={<PrivateRoutes />}>
         {flattenedRoutes.map((route) => (
           <Route
