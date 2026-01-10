@@ -3,16 +3,19 @@ import { useLocation } from "react-router-dom";
 import { Slide, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Sidebar } from "./common/Sidebar";
-import { GeneralContextProvider } from "./context/General.context";
+import {
+  GeneralContextProvider,
+  useGeneralContext,
+} from "./context/General.context";
 import { UserContextProvider } from "./context/User.context";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { PublicRoutes } from "./navigation/constants";
 import RouterContainer from "./navigation/routes";
 import { ACCESS_TOKEN } from "./utils/api/axiosClient";
 
-function App() {
-  // const isMutating = useIsMutating();
+function AppContent() {
   const location = useLocation();
+  const { isSidebarOpen } = useGeneralContext();
   useWebSocket();
 
   // Don't show sidebar on login page or if user is not authenticated
@@ -20,21 +23,33 @@ function App() {
   const showSidebar = location.pathname !== PublicRoutes.Login && !!token;
 
   return (
+    <>
+      {/* {isMutating ? <Loading /> : null} */}
+      {showSidebar && <Sidebar />}
+      <div
+        className={`transition-all duration-300 ease-in-out ${
+          showSidebar ? (isSidebarOpen ? "lg:ml-64" : "lg:ml-16") : ""
+        }`}
+      >
+        <RouterContainer />
+      </div>
+      <ToastContainer
+        autoClose={2000}
+        hideProgressBar={true}
+        transition={Slide}
+        closeButton={false}
+        position="bottom-right"
+      />
+    </>
+  );
+}
+
+function App() {
+  return (
     <div className="App">
       <UserContextProvider>
         <GeneralContextProvider>
-          {/* {isMutating ? <Loading /> : null} */}
-          {showSidebar && <Sidebar />}
-          <div className={showSidebar ? "lg:ml-16" : ""}>
-            <RouterContainer />
-          </div>
-          <ToastContainer
-            autoClose={2000}
-            hideProgressBar={true}
-            transition={Slide}
-            closeButton={false}
-            position="bottom-right"
-          />
+          <AppContent />
         </GeneralContextProvider>
       </UserContextProvider>
     </div>
