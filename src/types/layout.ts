@@ -29,7 +29,30 @@ export interface ComponentBlock {
   /** Unique identifier for the component */
   id: string;
   /** Type of component to render */
-  type: "table" | "chart" | "form" | "text" | "kpi" | "custom";
+  type:
+    | "table"
+    | "chart"
+    | "form"
+    | "text"
+    | "kpi"
+    | "custom"
+    // Chart types
+    | "barChart"
+    | "lineChart"
+    | "pieChart"
+    | "areaChart"
+    | "radarChart"
+    | "heatmapChart"
+    | "scatterChart"
+    | "funnelChart"
+    | "sankeyChart"
+    | "sunburstChart"
+    | "treemapChart"
+    | "calendarChart"
+    | "bumpChart"
+    | "streamChart"
+    | "waffleChart"
+    | "circlePackingChart";
   /** Optional title for the component */
   title?: string;
   /** Order for stacking multiple components in a cell */

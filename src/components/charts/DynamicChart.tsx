@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { lazy, Suspense, useMemo } from "react";
 import { useGetPipeline } from "../../utils/dynamic";
 
@@ -31,9 +32,10 @@ export interface ChartConfig {
   additionalParams?: Record<string, unknown>;
   chartOptions?: Record<string, unknown>; // Nivo-specific options
   dataBinding?: {
-    kind: "pipeline";
-    schemaName: string;
-    pipelineName: string;
+    kind: "schema" | "pipeline" | "api";
+    schemaName?: string;
+    pipelineName?: string;
+    apiEndpoint?: string;
     params?: Record<string, unknown>;
   };
 }
@@ -248,10 +250,33 @@ export default function DynamicChart({ config }: DynamicChartProps) {
   // Extract schema and pipeline name from either direct props or dataBinding
   const schemaName = dataBinding?.schemaName || directSchemaName || "";
   const pipelineName = dataBinding?.pipelineName || directPipelineName || "";
-  const params = dataBinding?.params || additionalParams;
 
-  // Fetch data from pipeline
-  const data = useGetPipeline<unknown>(schemaName, pipelineName, params);
+  // IMPORTANT: If params contains chart config (indexBy, keys, etc.), extract them
+  // These should go to chartOptions, not be passed to the pipeline
+  const params = dataBinding?.params || additionalParams;
+  const paramsObj = (params as Record<string, any>) || {};
+
+  // Extract chart-specific params from pipeline params
+  const { indexBy, keys, axisBottom, axisLeft, margin, ...pipelineParams } =
+    paramsObj;
+
+  // Build chart options from extracted params
+  const extractedChartOptions: Record<string, any> = {};
+  if (indexBy !== undefined) extractedChartOptions.indexBy = indexBy;
+  if (keys !== undefined) extractedChartOptions.keys = keys;
+  if (axisBottom !== undefined) extractedChartOptions.axisBottom = axisBottom;
+  if (axisLeft !== undefined) extractedChartOptions.axisLeft = axisLeft;
+  if (margin !== undefined) extractedChartOptions.margin = margin;
+
+  // Merge with provided chartOptions
+  const mergedChartOptions = { ...extractedChartOptions, ...chartOptions };
+
+  // Fetch data from pipeline (only pass non-chart params)
+  const data = useGetPipeline<unknown>(
+    schemaName,
+    pipelineName,
+    Object.keys(pipelineParams).length > 0 ? pipelineParams : undefined
+  );
 
   // Get the chart component dynamically
   const ChartComponent = useMemo(() => getChartComponent(type), [type]);
@@ -259,14 +284,18 @@ export default function DynamicChart({ config }: DynamicChartProps) {
   // Merge default config with custom options
   const finalConfig = useMemo(() => {
     const defaultConfig = getDefaultConfig(type);
-    let config = { ...defaultConfig, ...chartOptions };
+    let config = { ...defaultConfig, ...mergedChartOptions };
 
     // Special handling for calendar chart - extract date range from data
     if (type === "calendar" && data && Array.isArray(data) && data.length > 0) {
       // Extract dates from data if not provided in chartOptions
       if (!config.from || !config.to) {
         const dates = data
-          .map((d: any) => d.day || d.date)
+          .map(
+            (d: unknown) =>
+              (d as { day?: string; date?: string }).day ||
+              (d as { day?: string; date?: string }).date
+          )
           .filter(Boolean)
           .sort();
 
@@ -281,7 +310,7 @@ export default function DynamicChart({ config }: DynamicChartProps) {
     }
 
     return config;
-  }, [type, chartOptions, data]);
+  }, [type, mergedChartOptions, data]);
 
   if (!data || (Array.isArray(data) && data.length === 0)) {
     return (
@@ -328,7 +357,9 @@ export default function DynamicChart({ config }: DynamicChartProps) {
             </div>
           }
         >
-          <ChartComponent data={data} {...finalConfig} />
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          {/* @ts-expect-error - Nivo chart props have complex union types that are too complex for TypeScript */}
+          <ChartComponent data={data as any} {...finalConfig} />
         </Suspense>
       </div>
     </div>

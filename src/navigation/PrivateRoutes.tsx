@@ -21,12 +21,6 @@ export function PrivateRoutes() {
   // If we have tenant/project in URL, validate token matches
   if (tenant && project) {
     const isValid = validateTokenForTenantProject(token, tenant, project);
-    console.log("🔐 Token validation:", {
-      urlTenant: tenant,
-      urlProject: project,
-      isValid,
-      token: token.substring(0, 20) + "...",
-    });
     if (!isValid) {
       // Token doesn't match tenant/project or is expired
       console.warn("❌ Token invalid - clearing and redirecting to login");
