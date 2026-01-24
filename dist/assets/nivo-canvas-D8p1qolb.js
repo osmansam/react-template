@@ -1,0 +1,1 @@
+var a=function(c,T,t,v,l,n){n>0?(c.moveTo(T+n,t),c.lineTo(T+v-n,t),c.quadraticCurveTo(T+v,t,T+v,t+n),c.lineTo(T+v,t+l-n),c.quadraticCurveTo(T+v,t+l,T+v-n,t+l),c.lineTo(T+n,t+l),c.quadraticCurveTo(T,t+l,T,t+l-n),c.lineTo(T,t+n),c.quadraticCurveTo(T,t,T+n,t),c.closePath()):c.rect(T,t,v,l)};export{a as o};

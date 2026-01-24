@@ -1,0 +1,1 @@
+function o(u){u.x0=Math.round(u.x0),u.y0=Math.round(u.y0),u.x1=Math.round(u.x1),u.y1=Math.round(u.y1)}function v(u,h,t,y,i){for(var r=u.children,a,l=-1,n=r.length,x=u.value&&(y-h)/u.value;++l<n;)a=r[l],a.y0=t,a.y1=i,a.x0=h,a.x1=h+=a.value*x}export{o as r,v as w};

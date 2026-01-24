@@ -12,6 +12,9 @@ import { H6 } from "../Typography";
 import { GenericButton } from "./GenericButton";
 dayjs.extend(customParseFormat);
 
+// @ts-ignore - Type compatibility issue with react-input-mask and React 18
+const InputMaskComponent = InputMask as any;
+
 type DateInputProps = {
   label?: string;
   value: string | null; // expects "YYYY-MM-DD"
@@ -180,7 +183,7 @@ export default function DateInput({
           )}
 
           <div className="relative flex items-center gap-2 w-full">
-            <InputMask
+            <InputMaskComponent
               mask="99/99/9999"
               maskChar=""
               value={inputText}
@@ -201,7 +204,7 @@ export default function DateInput({
                   />
                 );
               }}
-            </InputMask>
+            </InputMaskComponent>
 
             <FaRegCalendar
               className="absolute right-3 cursor-pointer text-gray-500"
