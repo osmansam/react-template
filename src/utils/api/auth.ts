@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Cookies from "js-cookie";
 import { useTranslation } from "react-i18next";
-import { Location, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useUserContext } from "../../context/User.context";
 import { useFilteredRoutes } from "../../hooks/useFilteredRoutes";
@@ -40,7 +40,7 @@ async function loginMethod(payload: LoginCredentials) {
 }
 
 export function useLogin(
-  location?: Location,
+  redirectPath?: string,
   onError?: (error: unknown) => void,
 ) {
   const navigate = useNavigate();
@@ -89,11 +89,9 @@ export function useLogin(
 
       toast.success(t("Logged in successfully"));
 
-      // Redirect to first page or location state
+      // Redirect to first page or provided redirect path
       const firstPagePath = getFirstPagePath();
-      const target = location
-        ? `${location.pathname}${location.search}`
-        : buildPath(firstPagePath);
+      const target = redirectPath || buildPath(firstPagePath);
       navigate(target);
     },
 
@@ -112,13 +110,29 @@ async function registerMethod(
 }
 
 export function useRegister(
-  location?: Location,
+  redirectPath?: string,
   onError?: (error: unknown) => void,
 ) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { setUser } = useUserContext();
   const queryClient = useQueryClient();
+  const { buildPath } = useTenantProject();
+  const routes = useFilteredRoutes();
+
+  // Get first available page path
+  const getFirstPagePath = () => {
+    for (const route of routes) {
+      if (route.children) {
+        const firstChild = route.children.find((child) => child.path);
+        if (firstChild?.path) return firstChild.path;
+      } else if (route.path) {
+        return route.path;
+      }
+    }
+    return "/";
+  };
+
   const { mutate: register } = useMutation<
     LoginResponse,
     LoginError,
@@ -144,7 +158,9 @@ export function useRegister(
 
       toast.success(t("Registered successfully"));
 
-      const target = location ? `${location.pathname}${location.search}` : "/";
+      // Redirect to first page or provided redirect path
+      const firstPagePath = getFirstPagePath();
+      const target = redirectPath || buildPath(firstPagePath);
       navigate(target);
     },
 
