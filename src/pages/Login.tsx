@@ -9,6 +9,8 @@ import { GenericButton } from "../components/panelComponents/FormElements/Generi
 import TextInput from "../components/panelComponents/FormElements/TextInput";
 import { H1, H5 } from "../components/panelComponents/Typography";
 import { useUserContext } from "../context/User.context";
+import { useFilteredRoutes } from "../hooks/useFilteredRoutes";
+import { useTenantProject } from "../hooks/useTenantProject";
 import { useLogin, useRegister } from "../utils/api/auth";
 import { ContainerModel, useGetContainers } from "../utils/api/container";
 import { getFieldLabel } from "../utils/genericPageHelpers";
@@ -19,15 +21,18 @@ const Login = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const containers = useGetContainers();
+  const { buildPath } = useTenantProject();
+  const routes = useFilteredRoutes();
   const [authContainer, setAuthContainer] = useState<ContainerModel | null>(
-    null
+    null,
   );
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const { setUser } = useUserContext();
 
-  const { login } = useLogin(location.state?.from || "/");
-  const { register } = useRegister(location.state?.from || "/");
+  // Don't pass redirectPath - let useLogin determine the first page automatically
+  const { login } = useLogin();
+  const { register } = useRegister();
 
   useEffect(() => {
     if (containers) {
@@ -76,7 +81,7 @@ const Login = () => {
     const popup = window.open(
       googleLoginUrl,
       "Google Login",
-      `width=${width},height=${height},left=${left},top=${top}`
+      `width=${width},height=${height},left=${left},top=${top}`,
     );
 
     // Listen for messages from the popup
@@ -105,11 +110,23 @@ const Login = () => {
         queryClient.invalidateQueries().then(() => {
           toast.success(t("Logged in successfully"));
 
-          // Redirect to tenant/project scoped path
-          const redirectPath =
-            tenant && project ? `/t/${tenant}/p/${project}/` : "/";
+          // Get first available page path
+          const getFirstPagePath = () => {
+            for (const route of routes) {
+              if (route.children) {
+                const firstChild = route.children.find((child) => child.path);
+                if (firstChild?.path) return firstChild.path;
+              } else if (route.path) {
+                return route.path;
+              }
+            }
+            return "/";
+          };
 
-          navigate(location.state?.from || redirectPath);
+          // Redirect to first page with tenant/project context
+          const firstPagePath = getFirstPagePath();
+          const redirectPath = buildPath(firstPagePath);
+          navigate(redirectPath);
 
           // Close popup
           if (popup) popup.close();
@@ -163,7 +180,7 @@ const Login = () => {
 
   const loginFields = authContainer.fields.filter((f) => f.isLoginCredential);
   const allFields = authContainer.fields.filter(
-    (f) => f.name !== "_id" && f.name !== "createdAt" && f.name !== "updatedAt"
+    (f) => f.name !== "_id" && f.name !== "createdAt" && f.name !== "updatedAt",
   );
   const fieldsToShow = isRegisterMode ? allFields : loginFields;
 
