@@ -12,8 +12,16 @@ import { H6 } from "../Typography";
 import { GenericButton } from "./GenericButton";
 dayjs.extend(customParseFormat);
 
-// @ts-ignore - Type compatibility issue with react-input-mask and React 18
-const InputMaskComponent = InputMask as any;
+// Type compatibility workaround for react-input-mask and React 18
+const InputMaskComponent = InputMask as unknown as React.ComponentType<{
+  mask: string;
+  maskChar: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onFocus: () => void;
+  disabled: boolean;
+  children: (props: React.InputHTMLAttributes<HTMLInputElement>) => JSX.Element;
+}>;
 
 type DateInputProps = {
   label?: string;
@@ -56,10 +64,24 @@ export default function DateInput({
 
   useEffect(() => {
     if (value) {
-      const p = dayjs(value, "YYYY-MM-DD", true);
+      // Try parsing with strict mode first, then fallback to non-strict
+      let p = dayjs(value, "YYYY-MM-DD", true);
+      if (!p.isValid()) {
+        // Try parsing without strict mode
+        p = dayjs(value, "YYYY-MM-DD");
+      }
+      if (!p.isValid()) {
+        // Try parsing as ISO string
+        p = dayjs(value);
+      }
+
       if (p.isValid()) {
         setInputText(p.format("MM/DD/YYYY"));
         setMonth(p.toDate());
+      } else {
+        // If still invalid, clear the input
+        setInputText("");
+        setMonth(new Date());
       }
     } else {
       setInputText("");
