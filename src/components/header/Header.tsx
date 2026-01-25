@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Logo } from "../Logo";
 import { PageSelector } from "./PageSelector";
 
 interface HeaderProps {
@@ -13,7 +14,7 @@ interface HeaderProps {
 export function Header({
   logoSrc = "",
   logoAlt = "logo",
-  appName = "Panel",
+  appName = "AutoAPI",
   homeRoute = "/test",
   showMobileMenu = true,
   className = "",
@@ -34,7 +35,15 @@ export function Header({
               onClick={handleScrollToTop}
               className="flex items-center"
             >
-              <img src={logoSrc} alt={logoAlt} className="w-8 h-8 rounded-lg" />
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  alt={logoAlt}
+                  className="w-8 h-8 rounded-lg"
+                />
+              ) : (
+                <Logo size={32} />
+              )}
             </Link>
             <Link
               to={homeRoute}

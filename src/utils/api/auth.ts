@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { Location, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useUserContext } from "../../context/User.context";
+import { useFilteredRoutes } from "../../hooks/useFilteredRoutes";
+import { useTenantProject } from "../../hooks/useTenantProject";
 // import { Routes } from "../../navigation/constants";
 import { post } from "./index";
 
@@ -39,12 +41,28 @@ async function loginMethod(payload: LoginCredentials) {
 
 export function useLogin(
   location?: Location,
-  onError?: (error: unknown) => void
+  onError?: (error: unknown) => void,
 ) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { setUser } = useUserContext();
   const queryClient = useQueryClient();
+  const { buildPath } = useTenantProject();
+  const routes = useFilteredRoutes();
+
+  // Get first available page path
+  const getFirstPagePath = () => {
+    for (const route of routes) {
+      if (route.children) {
+        const firstChild = route.children.find((child) => child.path);
+        if (firstChild?.path) return firstChild.path;
+      } else if (route.path) {
+        return route.path;
+      }
+    }
+    return "/";
+  };
+
   const { mutate: login } = useMutation<
     LoginResponse,
     LoginError,
@@ -71,10 +89,11 @@ export function useLogin(
 
       toast.success(t("Logged in successfully"));
 
+      // Redirect to first page or location state
+      const firstPagePath = getFirstPagePath();
       const target = location
         ? `${location.pathname}${location.search}`
-        : // : Routes.HOME; // If no location is provided, redirect to home page
-          "/";
+        : buildPath(firstPagePath);
       navigate(target);
     },
 
@@ -84,7 +103,7 @@ export function useLogin(
 }
 
 async function registerMethod(
-  payload: LoginCredentials & { schemaName: string }
+  payload: LoginCredentials & { schemaName: string },
 ) {
   return post<LoginCredentials, LoginResponse>({
     path: `/auth/register?schemaName=${payload.schemaName}`,
@@ -94,7 +113,7 @@ async function registerMethod(
 
 export function useRegister(
   location?: Location,
-  onError?: (error: unknown) => void
+  onError?: (error: unknown) => void,
 ) {
   const navigate = useNavigate();
   const { t } = useTranslation();
