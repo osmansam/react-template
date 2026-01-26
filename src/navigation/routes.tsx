@@ -43,6 +43,9 @@ const RouterContainer = () => {
     return routes;
   }, [combinedRoutes]);
 
+  // Check if we have at least some routes loaded (static routes always exist)
+  const hasRoutes = flattenedRoutes.length > 0;
+
   return (
     <Routes>
       {/* Tenant/Project scoped routes - ALL routes including login */}
@@ -61,20 +64,22 @@ const RouterContainer = () => {
               element={route.element && <route.element />}
             />
           ))}
-          {/* Catch-all for 404 within tenant/project context */}
-          <Route
-            path="*"
-            element={
-              <div className="p-8 text-center">
-                <h1 className="text-2xl font-bold mb-2">
-                  404 - Page Not Found
-                </h1>
-                <p className="text-gray-600">
-                  The page you're looking for doesn't exist.
-                </p>
-              </div>
-            }
-          />
+          {/* Catch-all for 404 within tenant/project context - only show if routes are loaded */}
+          {hasRoutes && (
+            <Route
+              path="*"
+              element={
+                <div className="p-8 text-center">
+                  <h1 className="text-2xl font-bold mb-2">
+                    404 - Page Not Found
+                  </h1>
+                  <p className="text-gray-600">
+                    The page you're looking for doesn't exist.
+                  </p>
+                </div>
+              }
+            />
+          )}
         </Route>
       </Route>
 
