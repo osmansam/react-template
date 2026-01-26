@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { FiChevronDown } from "react-icons/fi";
 import { IoIosLogOut } from "react-icons/io";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTenantProject } from "../../hooks/useTenantProject";
 
 export interface MenuRoute {
   name: string;
@@ -42,7 +43,6 @@ interface PageSelectorProps {
 export function PageSelector({
   routes = [],
   onLogout,
-  loginRoute = "/login",
   showLogout = true,
   onNavigate,
 }: PageSelectorProps) {
@@ -50,6 +50,7 @@ export function PageSelector({
   const { t } = useTranslation();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const { buildPath } = useTenantProject();
   const currentRoute = location.pathname;
   const [openGroups, setOpenGroups] = useState<{ [group: string]: boolean }>(
     {},
@@ -63,13 +64,6 @@ export function PageSelector({
     if (onLogout) {
       onLogout();
     } else {
-      // Extract tenant/project from current URL before clearing
-      const pathParts = window.location.pathname.split("/");
-      const tIndex = pathParts.indexOf("t");
-      const pIndex = pathParts.indexOf("p");
-      const tenant = tIndex !== -1 ? pathParts[tIndex + 1] : "";
-      const project = pIndex !== -1 ? pathParts[pIndex + 1] : "";
-
       // Default logout behavior
       localStorage.clear();
       localStorage.setItem("loggedOut", "true");
@@ -77,10 +71,8 @@ export function PageSelector({
       Cookies.remove("jwt");
       queryClient.clear();
 
-      // Redirect to login with tenant/project context preserved
-      const redirectPath =
-        tenant && project ? `/t/${tenant}/p/${project}/login` : loginRoute;
-      navigate(redirectPath);
+      // Redirect to login with tenant/project context preserved using buildPath
+      navigate(buildPath("/login"));
     }
   }
 
@@ -93,7 +85,9 @@ export function PageSelector({
       if (onNavigate) {
         onNavigate();
       }
-      navigate(path);
+      const fullPath = buildPath(path);
+      console.log("PageSelector navigating to:", fullPath, "from path:", path);
+      navigate(fullPath);
       window.scrollTo(0, 0);
     }
   }
