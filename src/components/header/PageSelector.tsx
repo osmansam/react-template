@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import Cookies from "js-cookie";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FiChevronDown, FiChevronRight } from "react-icons/fi";
+import { FiChevronDown } from "react-icons/fi";
 import { IoIosLogOut } from "react-icons/io";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -52,7 +52,7 @@ export function PageSelector({
   const queryClient = useQueryClient();
   const currentRoute = location.pathname;
   const [openGroups, setOpenGroups] = useState<{ [group: string]: boolean }>(
-    {}
+    {},
   );
 
   const toggleGroup = (groupName: string) => {
@@ -101,28 +101,32 @@ export function PageSelector({
   return (
     <Menu>
       <MenuHandler>
-        <button className="text-sm text-white">
-          <Bars3Icon className="h-5 w-5" />
+        <button
+          className="p-2 text-neutral-700 hover:bg-neutral-100 rounded-lg transition-all duration-200 active:scale-95"
+          aria-label="Menu"
+        >
+          <Bars3Icon className="h-6 w-6" strokeWidth={2} />
         </button>
       </MenuHandler>
       <MenuList
-        className="overflow-scroll no-scrollbar h-[95%] max-h-max"
+        className="overflow-y-auto max-h-[85vh] p-2 min-w-[240px] shadow-xl border border-neutral-200/50 rounded-2xl backdrop-blur-xl bg-white/95"
         placeholder=""
         onPointerEnterCapture={() => {}}
         onPointerLeaveCapture={() => {}}
         onResize={() => {}}
         onResizeCapture={() => {}}
       >
-        {routes.map((route) => {
+        {routes.map((route, index) => {
           const filteredRouteChildren = route?.children?.filter(
-            (child) => child.isOnSidebar !== false
+            (child) => child.isOnSidebar !== false,
           );
 
           if (filteredRouteChildren && filteredRouteChildren?.length > 1) {
             return (
               <div key={route.name}>
+                {index > 0 && <div className="h-px bg-neutral-200/50 my-2" />}
                 <MenuItem
-                  className="group flex items-center justify-between cursor-pointer hover:bg-gray-100"
+                  className="group flex items-center justify-between cursor-pointer rounded-lg px-3 py-2.5 transition-all duration-200 hover:bg-neutral-100 active:scale-[0.98]"
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleGroup(route.name);
@@ -133,12 +137,14 @@ export function PageSelector({
                   onPointerEnterCapture={() => {}}
                   onPointerLeaveCapture={() => {}}
                 >
-                  <span>{t(route.name)}</span>
-                  {openGroups[route.name] ? (
-                    <FiChevronDown className="text-lg" />
-                  ) : (
-                    <FiChevronRight className="text-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                  )}
+                  <span className="text-sm font-medium text-neutral-900">
+                    {t(route.name)}
+                  </span>
+                  <div
+                    className={`transition-transform duration-200 ${openGroups[route.name] ? "rotate-0" : "-rotate-90"}`}
+                  >
+                    <FiChevronDown className="text-base text-neutral-500" />
+                  </div>
                 </MenuItem>
 
                 {openGroups[route.name] &&
@@ -147,16 +153,11 @@ export function PageSelector({
                     .map((child) => (
                       <MenuItem
                         key={child.name}
-                        className={`pl-6 ${
+                        className={`ml-3 pl-3 pr-3 py-2 rounded-lg transition-all duration-200 text-sm ${
                           child.path === currentRoute
-                            ? "bg-gray-100 text-black"
-                            : ""
-                        }
-                        ${
-                          child.link &&
-                          "text-blue-700 w-fit cursor-pointer hover:text-blue-500 transition-transform"
-                        }    
-                        `}
+                            ? "bg-blue-50 text-blue-600 font-medium"
+                            : "text-neutral-700 hover:bg-neutral-100"
+                        } active:scale-[0.98]`}
                         onClick={() => handleNavigation(child.path, child.link)}
                         placeholder=""
                         onResize={() => {}}
@@ -175,71 +176,74 @@ export function PageSelector({
           ) {
             if (filteredRouteChildren[0].isOnSidebar === false) return null;
             return (
-              <MenuItem
-                key={filteredRouteChildren[0].name}
-                className={`${
-                  filteredRouteChildren[0].path === currentRoute
-                    ? "bg-gray-100 text-black"
-                    : ""
-                } ${
-                  filteredRouteChildren[0].link &&
-                  "text-blue-700 w-fit cursor-pointer hover:text-blue-500 transition-transform"
-                }`}
-                onClick={() =>
-                  handleNavigation(
-                    filteredRouteChildren[0].path,
-                    filteredRouteChildren[0].link
-                  )
-                }
-                placeholder=""
-                onResize={() => {}}
-                onResizeCapture={() => {}}
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
-              >
-                {t(filteredRouteChildren[0].name)}
-              </MenuItem>
+              <div key={filteredRouteChildren[0].name}>
+                {index > 0 && <div className="h-px bg-neutral-200/50 my-2" />}
+                <MenuItem
+                  className={`px-3 py-2.5 rounded-lg transition-all duration-200 text-sm active:scale-[0.98] ${
+                    filteredRouteChildren[0].path === currentRoute
+                      ? "bg-blue-50 text-blue-600 font-medium"
+                      : "text-neutral-700 hover:bg-neutral-100"
+                  }`}
+                  onClick={() =>
+                    handleNavigation(
+                      filteredRouteChildren[0].path,
+                      filteredRouteChildren[0].link,
+                    )
+                  }
+                  placeholder=""
+                  onResize={() => {}}
+                  onResizeCapture={() => {}}
+                  onPointerEnterCapture={() => {}}
+                  onPointerLeaveCapture={() => {}}
+                >
+                  {t(filteredRouteChildren[0].name)}
+                </MenuItem>
+              </div>
             );
           } else {
             if (route.isOnSidebar === false) return null;
             return (
-              <MenuItem
-                key={route.name}
-                className={`${
-                  route.path === currentRoute ? "bg-gray-100 text-black" : ""
-                } ${
-                  route.link &&
-                  "text-blue-700 w-fit cursor-pointer hover:text-blue-500 transition-transform"
-                }`}
-                onClick={() => {
-                  if (currentRoute === route.path) return;
-                  handleNavigation(route.path, route.link);
-                }}
-                placeholder=""
-                onResize={() => {}}
-                onResizeCapture={() => {}}
-                onPointerEnterCapture={() => {}}
-                onPointerLeaveCapture={() => {}}
-              >
-                {t(route.name)}
-              </MenuItem>
+              <div key={route.name}>
+                {index > 0 && <div className="h-px bg-neutral-200/50 my-2" />}
+                <MenuItem
+                  className={`px-3 py-2.5 rounded-lg transition-all duration-200 text-sm active:scale-[0.98] ${
+                    route.path === currentRoute
+                      ? "bg-blue-50 text-blue-600 font-medium"
+                      : "text-neutral-700 hover:bg-neutral-100"
+                  } ${route.link && "text-blue-600 hover:text-blue-700"}`}
+                  onClick={() => {
+                    if (currentRoute === route.path) return;
+                    handleNavigation(route.path, route.link);
+                  }}
+                  placeholder=""
+                  onResize={() => {}}
+                  onResizeCapture={() => {}}
+                  onPointerEnterCapture={() => {}}
+                  onPointerLeaveCapture={() => {}}
+                >
+                  {t(route.name)}
+                </MenuItem>
+              </div>
             );
           }
         })}
 
         {showLogout && (
-          <MenuItem
-            className="flex flex-row gap-2 items-center"
-            onClick={handleLogout}
-            placeholder=""
-            onResize={() => {}}
-            onResizeCapture={() => {}}
-            onPointerEnterCapture={() => {}}
-            onPointerLeaveCapture={() => {}}
-          >
-            <IoIosLogOut className="text-lg" />
-            {t("Logout")}
-          </MenuItem>
+          <>
+            <div className="h-px bg-neutral-200/50 my-2" />
+            <MenuItem
+              className="flex flex-row gap-2 items-center px-3 py-2.5 rounded-lg transition-all duration-200 text-sm text-red-600 hover:bg-red-50 active:scale-[0.98]"
+              onClick={handleLogout}
+              placeholder=""
+              onResize={() => {}}
+              onResizeCapture={() => {}}
+              onPointerEnterCapture={() => {}}
+              onPointerLeaveCapture={() => {}}
+            >
+              <IoIosLogOut className="text-lg" />
+              {t("Logout")}
+            </MenuItem>
+          </>
         )}
       </MenuList>
     </Menu>

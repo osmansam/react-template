@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useFilteredRoutes } from "../../hooks/useFilteredRoutes";
 import { Logo } from "../Logo";
 import { PageSelector } from "./PageSelector";
 
@@ -19,6 +20,8 @@ export function Header({
   showMobileMenu = true,
   className = "",
 }: HeaderProps) {
+  const routes = useFilteredRoutes();
+
   const handleScrollToTop = () => {
     if (location.pathname === homeRoute) {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -58,7 +61,7 @@ export function Header({
           <div className="w-auto h-full flex items-center justify-end gap-x-3">
             {showMobileMenu && (
               <div className="lg:hidden">
-                <PageSelector />
+                <PageSelector routes={routes} />
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Route, Routes } from "react-router-dom";
 import { useDynamicPages } from "../hooks/useDynamicPages";
 import GoogleCallback from "../pages/GoogleCallback";
@@ -18,6 +18,7 @@ interface RouteConfig {
 
 const RouterContainer = () => {
   const { dynamicRoutes } = useDynamicPages();
+  const [isReady, setIsReady] = useState(false);
 
   // Combine static routes with dynamic routes
   const combinedRoutes = useMemo(() => {
@@ -43,8 +44,18 @@ const RouterContainer = () => {
     return routes;
   }, [combinedRoutes]);
 
-  // Check if we have at least some routes loaded (static routes always exist)
-  const hasRoutes = flattenedRoutes.length > 0;
+  // Wait for initial setup to prevent 404 flash
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Show blank screen during initial load to prevent 404 flash
+  if (!isReady) {
+    return <div className="min-h-screen bg-white" />;
+  }
 
   return (
     <Routes>
@@ -64,22 +75,20 @@ const RouterContainer = () => {
               element={route.element && <route.element />}
             />
           ))}
-          {/* Catch-all for 404 within tenant/project context - only show if routes are loaded */}
-          {hasRoutes && (
-            <Route
-              path="*"
-              element={
-                <div className="p-8 text-center">
-                  <h1 className="text-2xl font-bold mb-2">
-                    404 - Page Not Found
-                  </h1>
-                  <p className="text-gray-600">
-                    The page you're looking for doesn't exist.
-                  </p>
-                </div>
-              }
-            />
-          )}
+          {/* Catch-all for 404 within tenant/project context */}
+          <Route
+            path="*"
+            element={
+              <div className="p-8 text-center">
+                <h1 className="text-2xl font-bold mb-2">
+                  404 - Page Not Found
+                </h1>
+                <p className="text-gray-600">
+                  The page you're looking for doesn't exist.
+                </p>
+              </div>
+            }
+          />
         </Route>
       </Route>
 
