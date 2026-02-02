@@ -8,5 +8,8 @@ export default defineConfig({
   server: {
     port: 3005,
   },
+  build: {
+    outDir: "dist",
+  },
   plugins: [react(), viteTsconfigPaths(), svgrPlugin()],
 });
