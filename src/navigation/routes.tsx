@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Route, Routes } from "react-router-dom";
 import { useDynamicPages } from "../hooks/useDynamicPages";
 import GoogleCallback from "../pages/GoogleCallback";
@@ -17,8 +17,7 @@ interface RouteConfig {
 }
 
 const RouterContainer = () => {
-  const { dynamicRoutes } = useDynamicPages();
-  const [isReady, setIsReady] = useState(false);
+  const { dynamicRoutes, isLoading } = useDynamicPages();
 
   // Combine static routes with dynamic routes
   const combinedRoutes = useMemo(() => {
@@ -44,16 +43,8 @@ const RouterContainer = () => {
     return routes;
   }, [combinedRoutes]);
 
-  // Wait for initial setup to prevent 404 flash
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 50);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Show blank screen during initial load to prevent 404 flash
-  if (!isReady) {
+  // Show loading screen while fetching dynamic pages to prevent 404 flash
+  if (isLoading) {
     return <div className="min-h-screen bg-white" />;
   }
 

@@ -6,6 +6,7 @@ import { FiChevronDown, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { IoIosLogOut } from "react-icons/io";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGeneralContext } from "../context/General.context";
+import { useUserContext } from "../context/User.context";
 import { useFilteredRoutes } from "../hooks/useFilteredRoutes";
 import { useTenantProject } from "../hooks/useTenantProject";
 import { getIconByName, getMenuIcon } from "../utils/menuIcons";
@@ -19,11 +20,11 @@ export const Sidebar = () => {
   const { isSidebarOpen, setIsSidebarOpen, resetGeneralContext } =
     useGeneralContext();
   const { buildPath } = useTenantProject();
-  // const { setUser } = useUserContext();
+  const { setUser } = useUserContext();
   // const user = useGetUser();
   const currentRoute = location.pathname;
   const [openGroups, setOpenGroups] = useState<{ [group: string]: boolean }>(
-    {}
+    {},
   );
 
   const routes = useFilteredRoutes();
@@ -47,7 +48,7 @@ export const Sidebar = () => {
     localStorage.setItem("loggedOut", "true");
     setTimeout(() => localStorage.removeItem("loggedOut"), 500);
     Cookies.remove("jwt");
-    // setUser(undefined);
+    setUser(undefined);
     queryClient.clear();
     navigate(buildPath("/login"));
   };
@@ -176,7 +177,7 @@ export const Sidebar = () => {
                                   "Navigating to:",
                                   fullPath,
                                   "from child.path:",
-                                  child.path
+                                  child.path,
                                 );
                                 navigate(fullPath);
                                 window.scrollTo(0, 0);
@@ -230,13 +231,13 @@ export const Sidebar = () => {
                         if (filteredRouteChildren[0].path) {
                           resetGeneralContext();
                           const fullPath = buildPath(
-                            filteredRouteChildren[0].path
+                            filteredRouteChildren[0].path,
                           );
                           console.log(
                             "Navigating to:",
                             fullPath,
                             "from path:",
-                            filteredRouteChildren[0].path
+                            filteredRouteChildren[0].path,
                           );
                           navigate(fullPath);
                           window.scrollTo(0, 0);
@@ -295,7 +296,7 @@ export const Sidebar = () => {
                           "Navigating to:",
                           fullPath,
                           "from route.path:",
-                          route.path
+                          route.path,
                         );
                         navigate(fullPath);
                         window.scrollTo(0, 0);

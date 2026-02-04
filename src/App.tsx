@@ -7,20 +7,25 @@ import {
   GeneralContextProvider,
   useGeneralContext,
 } from "./context/General.context";
-import { UserContextProvider } from "./context/User.context";
+import { UserContextProvider, useUserContext } from "./context/User.context";
 import { useWebSocket } from "./hooks/useWebSocket";
-import { PublicRoutes } from "./navigation/constants";
 import RouterContainer from "./navigation/routes";
-import { ACCESS_TOKEN } from "./utils/api/axiosClient";
 
 function AppContent() {
   const location = useLocation();
   const { isSidebarOpen } = useGeneralContext();
+  const { user } = useUserContext();
   useWebSocket();
 
-  // Don't show sidebar on login page or if user is not authenticated
-  const token = localStorage.getItem(ACCESS_TOKEN);
-  const showSidebar = location.pathname !== PublicRoutes.Login && !!token;
+  // Don't show sidebar on public routes or if user is not authenticated
+  // Check for login and auth callback routes (both legacy and multi-tenant paths)
+  const isPublicRoute =
+    location.pathname.endsWith("/login") ||
+    location.pathname === "/login" ||
+    location.pathname.includes("/auth/google/callback") ||
+    location.pathname === "/auth/google/callback";
+
+  const showSidebar = !isPublicRoute && !!user;
 
   return (
     <>
