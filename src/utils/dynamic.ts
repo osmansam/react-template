@@ -89,10 +89,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   const createMutation = useMutation({
     mutationFn: createRequest,
     onMutate: async (itemDetails: Partial<T>) => {
-      console.log("🟣 CREATE onMutate - Start", { itemDetails, queryKey });
       await qc.cancelQueries({ queryKey });
       const previousData = qc.getQueryData(queryKey);
-      console.log("🟣 CREATE onMutate - Previous Data:", previousData);
 
       // Check if data is paginated (DynamicPayload) or simple array
       const isPaginated =
@@ -105,7 +103,6 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
       // Optimistic update for instant UI feedback
       const optimisticItems = [...previousItems, itemDetails as T];
-      console.log("🟣 CREATE onMutate - Optimistic Items:", optimisticItems);
 
       if (isPaginated) {
         qc.setQueryData(queryKey, {
@@ -119,7 +116,6 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       return { previousData };
     },
     onError: (_err: Error, _newItem, context) => {
-      console.log("🔴 CREATE onError - Rolling back", context);
       if (context?.previousData) {
         qc.setQueryData(queryKey, context.previousData);
       }
@@ -143,10 +139,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       updates: Partial<T>;
     }) => updateRequest(id, updates),
     onMutate: async ({ id, updates }) => {
-      console.log("🔵 UPDATE onMutate - Start", { id, updates, queryKey });
       await qc.cancelQueries({ queryKey });
       const previousData = qc.getQueryData(queryKey);
-      console.log("🔵 UPDATE onMutate - Previous Data:", previousData);
 
       // Check if data is paginated (DynamicPayload) or simple array
       const isPaginated =
@@ -161,7 +155,6 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       const optimisticItems = previousItems.map((item) =>
         item._id === id ? { ...item, ...updates } : item,
       );
-      console.log("🔵 UPDATE onMutate - Optimistic Items:", optimisticItems);
 
       if (isPaginated) {
         qc.setQueryData(queryKey, { ...previousData, items: optimisticItems });
@@ -171,7 +164,6 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       return { previousData };
     },
     onError: (_err: Error, _vars, context) => {
-      console.log("🔴 UPDATE onError - Rolling back", context);
       if (context?.previousData) {
         qc.setQueryData(queryKey, context.previousData);
       }
@@ -196,11 +188,9 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   const deleteMutation = useMutation({
     mutationFn: deleteRequest,
     onMutate: async (id: string | number) => {
-      console.log("🟠 DELETE onMutate - Start", { id, queryKey });
       await qc.cancelQueries({ queryKey });
 
       const previousData = qc.getQueryData(queryKey);
-      console.log("🟠 DELETE onMutate - Previous Data:", previousData);
 
       // Check if data is paginated (DynamicPayload) or simple array
       const isPaginated =
@@ -212,7 +202,6 @@ export function useDynamicCrud<T extends { _id: string | number }>(
         : (previousData as T[]) || [];
 
       const updatedItems = previousItems.filter((item) => item._id !== id);
-      console.log("🟠 DELETE onMutate - Updated Items:", updatedItems);
 
       if (isPaginated) {
         qc.setQueryData(queryKey, {
@@ -227,7 +216,6 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       return { previousData };
     },
     onError: (_err: Error, _vars, context) => {
-      console.log("🔴 DELETE onError - Rolling back", context);
       if (context?.previousData) {
         qc.setQueryData(queryKey, context.previousData);
       }
@@ -247,7 +235,6 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     updateMutation.mutate({ id, updates });
 
   const deleteDynamicItem = (id: string | number) => {
-    console.log("🟠 DELETE Single Item - Triggering mutation with id:", id);
     deleteMutation.mutate(id);
   };
 

@@ -10,13 +10,47 @@ type WSInvalidateEvent =
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
-function toWsUrl(httpUrl: string, wsPath = "/ws") {
+// Helper to extract tenant and project from current URL
+function getTenantAndProject(): { tenant: string; project: string } | null {
+  const pathParts = window.location.pathname.split("/");
+  const tIndex = pathParts.indexOf("t");
+  const pIndex = pathParts.indexOf("p");
+
+  if (
+    tIndex !== -1 &&
+    pIndex !== -1 &&
+    pathParts[tIndex + 1] &&
+    pathParts[pIndex + 1]
+  ) {
+    return {
+      tenant: pathParts[tIndex + 1],
+      project: pathParts[pIndex + 1],
+    };
+  }
+
+  return null;
+}
+
+function toWsUrl(
+  httpUrl: string,
+  wsPath = "/ws",
+  tenantId?: string,
+  projectId?: string,
+) {
   const u = new URL(httpUrl);
   u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
   u.pathname = wsPath.startsWith("/") ? wsPath : `/${wsPath}`;
-  u.search = "";
+
+  // Add tenant and project as query parameters if available
+  if (tenantId && projectId) {
+    u.search = `?tenantId=${tenantId}&projectId=${projectId}`;
+  } else {
+    u.search = "";
+  }
+
   return u.toString();
 }
+
 export function useWebSocket() {
   const queryClient = useQueryClient();
   const { user } = useUserContext();
@@ -31,7 +65,14 @@ export function useWebSocket() {
       return;
     }
 
-    const WS_URL = toWsUrl(API_URL, "/ws");
+    // Get tenant and project from URL for WebSocket connection
+    const tenantProject = getTenantAndProject();
+    const WS_URL = toWsUrl(
+      API_URL,
+      "/ws",
+      tenantProject?.tenant,
+      tenantProject?.project,
+    );
     const state = stateRef.current;
 
     const connect = () => {
@@ -62,7 +103,7 @@ export function useWebSocket() {
           // Handle containerChanged event
           if (msg?.type === "containerChanged") {
             console.log(
-              "WS: Container data changed, invalidating container queries"
+              "WS: Container data changed, invalidating container queries",
             );
             await queryClient.invalidateQueries({
               queryKey: ["container"],
