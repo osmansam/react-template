@@ -17,7 +17,7 @@ const qs = (params: Record<string, unknown>) =>
   new URLSearchParams(
     Object.entries(params)
       .filter(([, v]) => v !== undefined && v !== null && v !== "")
-      .map(([k, v]) => [k, String(v)])
+      .map(([k, v]) => [k, String(v)]),
   ).toString();
 
 const listKey = (schema: string) => ["dynamic", schema, "all"] as const;
@@ -45,7 +45,7 @@ function toFormData(obj: Record<string, unknown>): FormData {
 export function useDynamicCrud<T extends { _id: string | number }>(
   schemaName: string,
   hasImageField: boolean = false,
-  customQueryKey?: unknown[]
+  customQueryKey?: unknown[],
 ) {
   const queryKey = (customQueryKey || listKey(schemaName)) as unknown[];
   const qc = useQueryClient();
@@ -128,29 +128,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: (newItem, error) => {
-      console.log("🟢 CREATE onSettled - Start", { newItem, error });
-      if (!error && newItem && newItem._id) {
-        const currentData = qc.getQueryData(queryKey);
-        const isPaginated =
-          currentData &&
-          typeof currentData === "object" &&
-          "items" in currentData;
-        const currentItems = isPaginated
-          ? (currentData as DynamicPayload<T>).items
-          : (currentData as T[]) || [];
-
-        // Replace optimistic data with real server response
-        const withoutOptimistic = currentItems.slice(0, -1);
-        const updatedItems = [...withoutOptimistic, newItem];
-        console.log("🟢 CREATE onSettled - Updated Items:", updatedItems);
-
-        if (isPaginated) {
-          qc.setQueryData(queryKey, { ...currentData, items: updatedItems });
-        } else {
-          qc.setQueryData(queryKey, updatedItems);
-        }
-      }
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey });
     },
   });
 
@@ -180,7 +159,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
       // Optimistic update for instant UI feedback
       const optimisticItems = previousItems.map((item) =>
-        item._id === id ? { ...item, ...updates } : item
+        item._id === id ? { ...item, ...updates } : item,
       );
       console.log("🔵 UPDATE onMutate - Optimistic Items:", optimisticItems);
 
@@ -201,54 +180,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: (updatedItem, error) => {
-      console.log("🟢 UPDATE onSettled - Start", { updatedItem, error });
-      if (!error && updatedItem) {
-        const currentData = qc.getQueryData(queryKey);
-        console.log(
-          "🟢 UPDATE onSettled - Current Data from cache:",
-          currentData
-        );
-
-        // Check if data is paginated or simple array
-        const isPaginated =
-          currentData &&
-          typeof currentData === "object" &&
-          "items" in currentData;
-        const currentItems = isPaginated
-          ? (currentData as DynamicPayload<T>).items
-          : (currentData as T[]) || [];
-
-        console.log(
-          "🟢 UPDATE onSettled - Looking for _id:",
-          updatedItem._id,
-          "Type:",
-          typeof updatedItem._id
-        );
-
-        // Replace optimistic data with real server response
-        const updatedItems = currentItems.map((item) => {
-          const match =
-            item._id === updatedItem._id ||
-            String(item._id) === String(updatedItem._id);
-          console.log(
-            `🟢 Comparing item._id: ${
-              item._id
-            } (${typeof item._id}) with updatedItem._id: ${
-              updatedItem._id
-            } (${typeof updatedItem._id}) - Match: ${match}`
-          );
-          return match ? updatedItem : item;
-        });
-
-        console.log("🟢 UPDATE onSettled - Updated Items:", updatedItems);
-
-        if (isPaginated) {
-          qc.setQueryData(queryKey, { ...currentData, items: updatedItems });
-        } else {
-          qc.setQueryData(queryKey, updatedItems);
-        }
-      }
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey });
     },
   });
 
@@ -303,6 +236,9 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey });
+    },
   });
 
   const createDynamicItem = (doc: Partial<T>) => createMutation.mutate(doc);
@@ -322,7 +258,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       payload,
       {
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
     return data;
   }
@@ -349,7 +285,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       {
         data: payload,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
     return data;
   }
@@ -372,7 +308,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   // Update multiple items functionality
   async function updateManyRequest(
-    payload: Array<{ _id: string | number; updates: Partial<T> }>
+    payload: Array<{ _id: string | number; updates: Partial<T> }>,
   ) {
     // Flatten the payload: merge _id with updates into a single object
     const flattenedPayload = payload.map(({ _id, updates }) => ({
@@ -385,7 +321,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       flattenedPayload,
       {
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
     return data;
   }
@@ -404,7 +340,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   });
 
   const updateMultipleDynamicItem = (
-    docs: Array<{ _id: string | number; updates: Partial<T> }>
+    docs: Array<{ _id: string | number; updates: Partial<T> }>,
   ) => updateManyMutation.mutate(docs);
 
   return {
@@ -436,7 +372,7 @@ export function useExportDynamicItems() {
       payload,
       {
         responseType: "blob",
-      }
+      },
     );
     return response.data;
   }
@@ -463,7 +399,7 @@ export function useExportDynamicItems() {
 
 export function useGetDynamicItems<T>(
   schemaName: string,
-  filters?: FormElementsState
+  filters?: FormElementsState,
 ) {
   const parts = [`schemaName=${schemaName}`];
 
@@ -504,7 +440,7 @@ export function useGetPaginatedItems<T>(
   page: number,
   limit: number,
   schemaName: string,
-  filters: FormElementsState
+  filters: FormElementsState,
 ) {
   const baseQueryUrl = `${BASE}/page`;
   const queryKey = [
@@ -585,7 +521,7 @@ export function useGetSelection<T>(schemaName: string, fieldName: string) {
 export function useGetPipeline<T>(
   schemaName: string,
   pipelineName: string,
-  additionalParams?: Record<string, unknown>
+  additionalParams?: Record<string, unknown>,
 ) {
   const hasParams = Boolean(schemaName && pipelineName);
 
