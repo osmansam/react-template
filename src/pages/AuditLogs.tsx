@@ -54,8 +54,9 @@ const initialFilterState: FormElementsState = {
 
 const AuditLogs = () => {
   const { t } = useTranslation();
-  const { rowsPerPage, currentPage, setCurrentPage } = useGeneralContext();
+  const { rowsPerPage } = useGeneralContext();
   const rawContainers = useGetContainers();
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Filter state
   const [showFilters, setShowFilters] = useState(() => {
@@ -73,7 +74,7 @@ const AuditLogs = () => {
   const auditLogsPayload = useGetPaginatedAuditLogs(
     currentPage,
     rowsPerPage,
-    filterFormElements
+    filterFormElements,
   );
 
   const schemaOptions = useMemo(() => {
@@ -170,7 +171,7 @@ const AuditLogs = () => {
         isSortable: false,
       },
     ],
-    [t]
+    [t],
   );
 
   const rowKeys = useMemo(
@@ -183,7 +184,7 @@ const AuditLogs = () => {
         key: "action",
         node: (row: AuditLogRow) => {
           const foundAction = auditActionTypes.find(
-            (action) => action.value === row.action
+            (action) => action.value === row.action,
           );
           if (!foundAction) {
             return (
@@ -218,7 +219,7 @@ const AuditLogs = () => {
         className: "font-mono text-sm text-gray-500",
       },
     ],
-    []
+    [],
   );
 
   const filterPanelInputs = useMemo(
@@ -259,7 +260,7 @@ const AuditLogs = () => {
         required: false,
       },
     ],
-    [t, schemaOptions]
+    [t, schemaOptions],
   );
 
   const filters = useMemo(
@@ -277,7 +278,7 @@ const AuditLogs = () => {
         ),
       },
     ],
-    [t, showFilters, setShowFilters]
+    [t, showFilters, setShowFilters],
   );
 
   const filterPanel = useMemo(
@@ -291,7 +292,7 @@ const AuditLogs = () => {
       },
       closeFilters: () => setShowFilters(false),
     }),
-    [showFilters, filterPanelInputs, filterFormElements]
+    [showFilters, filterPanelInputs, filterFormElements],
   );
 
   const pagination = useMemo(() => {
@@ -316,7 +317,7 @@ const AuditLogs = () => {
       filterPanelFormElements: filterFormElements,
       setFilterPanelFormElements: setFilterFormElements,
     }),
-    [filterFormElements]
+    [filterFormElements],
   );
 
   useEffect(() => {
@@ -341,6 +342,8 @@ const AuditLogs = () => {
           isCollapsible={true}
           outsideSortProps={outsideSort}
           {...(pagination && { pagination })}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
         />
       </div>
     </>

@@ -1,0 +1,1 @@
+import{f as s,h as r,g as o,y as i,z as b}from"./index-BakWhqUV.js";var n=r,D=s,v="[object Date]";function _(a){return D(a)&&n(a)==v}var c=_,g=c,d=b,e=i,t=e&&e.isDate,f=t?d(t):g,j=f;const I=o(j);export{I as O};
