@@ -103,6 +103,8 @@ type Props<T> = {
   localSetSelectedRows?: (rows: T[]) => void;
   localIsSelectionActive?: boolean;
   localSetIsSelectionActive?: (isActive: boolean) => void;
+  currentPage: number;
+  setCurrentPage: (page: number) => void;
 };
 
 const GenericTable = <T,>({
@@ -152,6 +154,8 @@ const GenericTable = <T,>({
   localSetSelectedRows,
   localIsSelectionActive,
   localSetIsSelectionActive,
+  currentPage,
+  setCurrentPage,
 }: Props<T>) => {
   const { t } = useTranslation();
 
@@ -160,7 +164,6 @@ const GenericTable = <T,>({
     if (value === null || value === undefined || value === "") {
       return value;
     }
-
     const type = fieldType.toLowerCase();
     const originalType = fieldType;
 
@@ -301,8 +304,6 @@ const GenericTable = <T,>({
   };
 
   const {
-    currentPage,
-    setCurrentPage,
     rowsPerPage,
     setRowsPerPage,
     expandedRows,
@@ -326,7 +327,7 @@ const GenericTable = <T,>({
     localSelectedRows !== undefined ? localSelectedRows : globalSelectedRows
   ) as T[];
   const setSelectedRows = (localSetSelectedRows || globalSetSelectedRows) as (
-    rows: T[]
+    rows: T[],
   ) => void;
   const isSelectionActive =
     localIsSelectionActive !== undefined
@@ -490,7 +491,7 @@ const GenericTable = <T,>({
   const usedRowKeys = title
     ? rowKeys.filter(
         (_rk, index) =>
-          tableColumns[title]?.[isActionsAtFront ? index + 1 : index]?.isActive
+          tableColumns[title]?.[isActionsAtFront ? index + 1 : index]?.isActive,
       )
     : rowKeys;
 
@@ -510,7 +511,7 @@ const GenericTable = <T,>({
         if (typeof value === "boolean")
           return (value ? "true" : "false").includes(q);
         return false;
-      })
+      }),
     );
   }, [baseRows, isSearch, searchQuery, searchRowKeys, usedRowKeys]);
 
@@ -548,7 +549,7 @@ const GenericTable = <T,>({
 
   const handleDragStart = (
     e: React.DragEvent<HTMLTableRowElement>,
-    draggedRow: T
+    draggedRow: T,
   ) => {
     e.dataTransfer.setData("draggedRow", JSON.stringify(draggedRow));
   };
@@ -557,7 +558,7 @@ const GenericTable = <T,>({
   };
   const handleDrop = (
     e: React.DragEvent<HTMLTableRowElement>,
-    targetRow: T
+    targetRow: T,
   ) => {
     e.preventDefault();
     const draggedRowData = e.dataTransfer.getData("draggedRow");
@@ -580,7 +581,7 @@ const GenericTable = <T,>({
       if (isSelectionActive) {
         if (selectedRows.length === 0) {
           toast.error(
-            t("Please select at least one row to perform this action.")
+            t("Please select at least one row to perform this action."),
           );
           return;
         }
@@ -602,7 +603,7 @@ const GenericTable = <T,>({
         ?.map((column) => ({
           text: column.key,
           style: "tableHeader",
-        }))
+        })),
     );
     sortedRows?.forEach((row) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -624,8 +625,8 @@ const GenericTable = <T,>({
               rowIndex === 0
                 ? "#000080"
                 : rowIndex % 2 === 0
-                ? "#d8d2d2"
-                : "#ffffff",
+                  ? "#d8d2d2"
+                  : "#ffffff",
           },
         },
       ],
@@ -703,8 +704,8 @@ const GenericTable = <T,>({
                     if (selectedRows.includes(row)) {
                       setSelectedRows(
                         selectedRows.filter(
-                          (selectedRow) => selectedRow !== row
-                        )
+                          (selectedRow) => selectedRow !== row,
+                        ),
                       );
                     } else {
                       setSelectedRows([...selectedRows, row]);
@@ -769,7 +770,7 @@ const GenericTable = <T,>({
             }
             if (rowKey.isParseFloat) {
               const formattedValue = parseFloat(
-                row[rowKey.key as keyof T] as string
+                row[rowKey.key as keyof T] as string,
               )
                 .toFixed(2)
                 .replace(/\.?0*$/, "");
@@ -797,7 +798,7 @@ const GenericTable = <T,>({
 
             if (rowKey.isOptional && rowKey.options) {
               const matchedOption = rowKey.options.find(
-                (option) => option.label === String(row[rowKey.key as keyof T])
+                (option) => option.label === String(row[rowKey.key as keyof T]),
               );
               style = {
                 ...style,
@@ -832,7 +833,7 @@ const GenericTable = <T,>({
                     className="w-12 h-12 rounded-full cursor-pointer"
                     onClick={() => {
                       setImageModalSrc(
-                        (row[rowKey.key as keyof T] as string) ?? imageHolder
+                        (row[rowKey.key as keyof T] as string) ?? imageHolder,
                       );
                       setIsImageModalOpen(true);
                     }}
@@ -903,7 +904,7 @@ const GenericTable = <T,>({
                               {column.key}
                             </h2>
                           </th>
-                        )
+                        ),
                       )}
                   </tr>
                 </thead>
@@ -914,7 +915,7 @@ const GenericTable = <T,>({
                         <tr
                           key={rowIndex}
                           className={`${row?.collapsible?.className?.(
-                            row?.collapsible?.collapsibleRows[rowIndex]
+                            row?.collapsible?.collapsibleRows[rowIndex],
                           )} `}
                         >
                           {row?.collapsible?.collapsibleRowKeys?.map(
@@ -958,7 +959,7 @@ const GenericTable = <T,>({
                                   {cellValue}
                                 </td>
                               );
-                            }
+                            },
                           )}
                           {collapsibleActions && isActionsActive && (
                             <td
@@ -970,12 +971,12 @@ const GenericTable = <T,>({
                             >
                               {renderActionButtons(
                                 { ...row, ...collapsibleRow },
-                                collapsibleActions
+                                collapsibleActions,
                               )}
                             </td>
                           )}
                         </tr>
-                      )
+                      ),
                     )}
                 </tbody>
               </table>
@@ -1013,7 +1014,7 @@ const GenericTable = <T,>({
             )}
             {filter.node}
           </div>
-        )
+        ),
     );
   };
 
@@ -1194,7 +1195,7 @@ const GenericTable = <T,>({
                             {filters
                               .filter(
                                 (filter) =>
-                                  filter.isUpperSide && !filter.isDisabled
+                                  filter.isUpperSide && !filter.isDisabled,
                               )
                               .map((filter, index) => (
                                 <div
@@ -1352,7 +1353,7 @@ const GenericTable = <T,>({
                                   outsideSort(
                                     column.correspondingKey,
                                     outsideSortProps.filterPanelFormElements,
-                                    outsideSortProps.setFilterPanelFormElements
+                                    outsideSortProps.setFilterPanelFormElements,
                                   )}
                                 {column.isSortable &&
                                   !outsideSortProps &&
@@ -1366,7 +1367,7 @@ const GenericTable = <T,>({
                                             keyof T,
                                             string
                                           >,
-                                          "descending"
+                                          "descending",
                                         )
                                       }
                                       className="p-1 rounded hover:bg-gray-200/50 transition-colors"
@@ -1382,7 +1383,7 @@ const GenericTable = <T,>({
                                             keyof T,
                                             string
                                           >,
-                                          "ascending"
+                                          "ascending",
                                         )
                                       }
                                       className="p-1 rounded hover:bg-gray-200/50 transition-colors opacity-0 group-hover:opacity-100"
@@ -1412,7 +1413,7 @@ const GenericTable = <T,>({
                     onChange={(e) => {
                       setRowsPerPage(Number(e.target.value));
                       const totalNewPages = Math.ceil(
-                        usedTotalRows / Number(e.target.value)
+                        usedTotalRows / Number(e.target.value),
                       );
                       if (currentPage > totalNewPages) {
                         setCurrentPage(Number(totalNewPages));
@@ -1432,7 +1433,7 @@ const GenericTable = <T,>({
                     <Caption>
                       {Math.min(
                         (currentPage - 1) * rowsPerPage + 1,
-                        usedTotalRows
+                        usedTotalRows,
                       )}
                       –{Math.min(currentPage * rowsPerPage, usedTotalRows)}{" "}
                       {"of"} {usedTotalRows}
