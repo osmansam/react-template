@@ -1275,7 +1275,6 @@ export default function GenericPaginatedPage({
     <>
       {isHeader && <Header />}
       <div className="w-[95%] mx-auto">
-        dafgdsdgf
         <GenericTable
           rowKeys={rowKeys}
           actions={actions}
