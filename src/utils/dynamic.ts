@@ -13,6 +13,8 @@ export interface DynamicPayload<T> {
 }
 
 const BASE = "/dynamic";
+const idempotencyKeys = new Map<string, string>();
+
 const qs = (params: Record<string, unknown>) =>
   new URLSearchParams(
     Object.entries(params)
@@ -21,6 +23,86 @@ const qs = (params: Record<string, unknown>) =>
   ).toString();
 
 const listKey = (schema: string) => ["dynamic", schema, "all"] as const;
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+
+  if (value instanceof Date) {
+    return JSON.stringify(value.toISOString());
+  }
+
+  if (value instanceof File) {
+    return JSON.stringify({
+      name: value.name,
+      size: value.size,
+      type: value.type,
+      lastModified: value.lastModified,
+    });
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map(stableSerialize).join(",")}]`;
+  }
+
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
+    .join(",")}}`;
+}
+
+function createIdempotencyKey() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getIdempotencyFingerprint(
+  schemaName: string,
+  operation: string,
+  payload: unknown,
+) {
+  return stableSerialize({ operation, payload, schemaName });
+}
+
+function getIdempotencyKey(fingerprint: string) {
+  const existingKey = idempotencyKeys.get(fingerprint);
+
+  if (existingKey) {
+    return existingKey;
+  }
+
+  const key = createIdempotencyKey();
+  idempotencyKeys.set(fingerprint, key);
+
+  return key;
+}
+
+function idempotencyHeader(
+  schemaName: string,
+  operation: string,
+  payload: unknown,
+) {
+  const fingerprint = getIdempotencyFingerprint(schemaName, operation, payload);
+
+  return {
+    "Idempotency-Key": getIdempotencyKey(fingerprint),
+  };
+}
+
+function releaseIdempotencyKey(
+  schemaName: string,
+  operation: string,
+  payload: unknown,
+) {
+  idempotencyKeys.delete(
+    getIdempotencyFingerprint(schemaName, operation, payload),
+  );
+}
 
 // Helper function to convert object to FormData
 function toFormData(obj: Record<string, unknown>): FormData {
@@ -61,7 +143,12 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       ? { "Content-Type": "multipart/form-data" }
       : { "Content-Type": "application/json" };
 
-    const response = await axiosClient.post<T>(url, data, { headers });
+    const response = await axiosClient.post<T>(url, data, {
+      headers: {
+        ...headers,
+        ...idempotencyHeader(schemaName, "create", payload),
+      },
+    });
     // Server may return {data: newItem, message: "...", status: 200}
     // We need to extract just the data property if it exists
     const responseData = response.data as { data?: T };
@@ -78,7 +165,12 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       ? { "Content-Type": "multipart/form-data" }
       : { "Content-Type": "application/json" };
 
-    const response = await axiosClient.patch<T>(url, data, { headers });
+    const response = await axiosClient.patch<T>(url, data, {
+      headers: {
+        ...headers,
+        ...idempotencyHeader(schemaName, "update", { id, updates }),
+      },
+    });
     // Server returns {data: updatedItem, message: "...", status: 200}
     // We need to extract just the data property if it exists
     const responseData = response.data as { data?: T };
@@ -124,7 +216,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: () => {
+    onSettled: (_data, _error, itemDetails) => {
+      releaseIdempotencyKey(schemaName, "create", itemDetails);
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -172,7 +265,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: () => {
+    onSettled: (_data, _error, variables) => {
+      releaseIdempotencyKey(schemaName, "update", variables);
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -180,7 +274,9 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   // Custom delete function
   async function deleteRequest(id: string | number) {
     const url = `${BASE}/${id}?${qs({ schemaName })}`;
-    const response = await axiosClient.delete(url);
+    const response = await axiosClient.delete(url, {
+      headers: idempotencyHeader(schemaName, "delete", { id }),
+    });
     return response.data;
   }
 
@@ -224,7 +320,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: () => {
+    onSettled: (_data, _error, id) => {
+      releaseIdempotencyKey(schemaName, "delete", { id });
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -244,7 +341,10 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       `${BASE}/multiple?${qs({ schemaName })}`,
       payload,
       {
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...idempotencyHeader(schemaName, "createMultiple", payload),
+        },
       },
     );
     return data;
@@ -258,7 +358,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
         err?.response?.data?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: () => {
+    onSettled: (_data, _error, payload) => {
+      releaseIdempotencyKey(schemaName, "createMultiple", payload);
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -271,7 +372,10 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       `${BASE}/multiple?${qs({ schemaName })}`,
       {
         data: payload,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...idempotencyHeader(schemaName, "deleteMultiple", payload),
+        },
       },
     );
     return data;
@@ -285,7 +389,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
         err?.response?.data?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: () => {
+    onSettled: (_data, _error, payload) => {
+      releaseIdempotencyKey(schemaName, "deleteMultiple", payload);
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -307,7 +412,14 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       `${BASE}/multiple?${qs({ schemaName })}`,
       flattenedPayload,
       {
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...idempotencyHeader(
+            schemaName,
+            "updateMultiple",
+            flattenedPayload,
+          ),
+        },
       },
     );
     return data;
@@ -321,7 +433,13 @@ export function useDynamicCrud<T extends { _id: string | number }>(
         err?.response?.data?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: () => {
+    onSettled: (_data, _error, payload) => {
+      const flattenedPayload = payload?.map(({ _id, updates }) => ({
+        _id,
+        ...updates,
+      }));
+
+      releaseIdempotencyKey(schemaName, "updateMultiple", flattenedPayload);
       qc.invalidateQueries({ queryKey });
     },
   });
