@@ -191,5 +191,5 @@ export const getIconByName = (iconName: string): IconType => {
   };
 
   // Return the icon if it exists, otherwise return default
-  return (allIcons as any)[iconName] || defaultIcon;
+  return (allIcons as Record<string, IconType>)[iconName] || defaultIcon;
 };

@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
+import { baseQueryOptions } from "../../config/queryClient";
 import { UpdatePayload, get, patch, post, remove } from ".";
 
 interface Props<T> {
@@ -28,11 +29,7 @@ export function useGet<T>(
     queryKey: fetchQueryKey,
     queryFn: () => get<T>({ path }),
     enabled: enabled, // Control whether the query should run
-    staleTime: Infinity, // never becomes stale on its own
-    gcTime: Infinity, // never garbage-collected
-    refetchOnWindowFocus: false, // no auto-refetch
-    refetchOnReconnect: false, // no auto-refetch
-    refetchOnMount: false, // no auto-refetch
+    ...baseQueryOptions,
   });
   return data;
 }
@@ -182,8 +179,6 @@ export function useMutationApi<T extends { _id: number | string }>({
 
         // Snapshot the previous value
         const previousItems = queryClient.getQueryData<T[]>(queryKey) || [];
-
-        console.log("previousItems", previousItems);
         const updatedItems = [...previousItems];
 
         for (let i = 0; i < updatedItems.length; i++) {
@@ -198,7 +193,6 @@ export function useMutationApi<T extends { _id: number | string }>({
 
         // Optimistically update to the new value
         queryClient.setQueryData(queryKey, updatedItems);
-        console.log("updatedItems", updatedItems);
 
         // Return a context object with the snapshotted value
         return { previousItems };

@@ -76,6 +76,32 @@ export interface GridSection {
   cells: GridCell[];
 }
 
+export interface PageTab {
+  id: string;
+  label: string;
+  icon?: string;
+  order: number;
+  sections: PageSection[];
+}
+
+export interface TabsSection {
+  tabs: PageTab[];
+}
+
+export type SectionType = "grid" | "tabs" | "component";
+
+export interface PageSection {
+  id?: string;
+  type?: SectionType;
+  order?: number;
+  grid?: GridSection;
+  tabs?: TabsSection;
+  component?: ComponentBlock;
+  columns?: number;
+  gap?: number;
+  cells?: GridCell[];
+}
+
 export interface PageModel {
   id?: string;
   name: string;
@@ -86,6 +112,6 @@ export interface PageModel {
   isAuthenticated?: boolean;
   isAuthorized?: boolean;
   authorizeRole?: string[];
-  sections: GridSection[]; // Array of grid sections directly
+  sections: PageSection[]; // Matches Go backend Section model; flat grid sections are still accepted.
   subPage?: PageModel; // Nested sub-page
 }

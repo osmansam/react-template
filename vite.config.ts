@@ -11,5 +11,11 @@ export default defineConfig({
   build: {
     outDir: "dist",
   },
+  esbuild:
+    process.env.NODE_ENV === "production"
+      ? {
+          drop: ["console", "debugger"],
+        }
+      : undefined,
   plugins: [react(), viteTsconfigPaths(), svgrPlugin()],
 });

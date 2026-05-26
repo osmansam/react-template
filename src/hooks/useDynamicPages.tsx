@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { DynamicPageRenderer } from "../components/DynamicPageRenderer";
-import { GridSection, PageModel } from "../types/page";
+import { PageModel, PageSection } from "../types/page";
 import { useGetAllPages } from "../utils/api/page";
 
 interface DynamicRoute {
@@ -16,9 +16,10 @@ interface DynamicRoute {
 export const useDynamicPages = () => {
   // Fetch all pages from the page API
   const pages = useGetAllPages();
+  const pageData = useMemo(() => pages.data || [], [pages.data]);
 
   // Memoize element factory to prevent function recreation
-  const createPageElement = useCallback((sections: GridSection[]) => {
+  const createPageElement = useCallback((sections: PageSection[] = []) => {
     return () => <DynamicPageRenderer sections={sections} />;
   }, []);
 
@@ -79,20 +80,20 @@ export const useDynamicPages = () => {
 
   // Generate routes from pages
   const dynamicRoutes = useMemo<DynamicRoute[]>(() => {
-    if (!pages || pages.length === 0) {
+    if (pageData.length === 0) {
       return [];
     }
 
-    return buildRouteHierarchy(pages);
-  }, [pages, buildRouteHierarchy]);
+    return buildRouteHierarchy(pageData);
+  }, [pageData, buildRouteHierarchy]);
 
   // Generate route enum entries
   const routeEnums = useMemo(() => {
-    if (!pages || pages.length === 0) {
+    if (pageData.length === 0) {
       return {};
     }
 
-    return pages.reduce((acc: Record<string, string>, page: PageModel) => {
+    return pageData.reduce((acc: Record<string, string>, page: PageModel) => {
       if (!page.isGroupOnly) {
         const enumKey = page.name
           .replace(/\s+/g, "")
@@ -102,12 +103,13 @@ export const useDynamicPages = () => {
       }
       return acc;
     }, {} as Record<string, string>);
-  }, [pages]);
+  }, [pageData]);
 
   return {
     dynamicRoutes,
     routeEnums,
-    isLoading: !pages,
-    pages: pages || [],
+    isLoading: pages.isLoading,
+    isError: pages.isError,
+    pages: pageData,
   };
 };

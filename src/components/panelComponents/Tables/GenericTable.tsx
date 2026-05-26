@@ -1,5 +1,4 @@
 import { Tooltip } from "@material-tailwind/react";
-import "pdfmake/build/pdfmake";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BsFilePdf } from "react-icons/bs";
@@ -11,7 +10,6 @@ import { PiFadersHorizontal } from "react-icons/pi";
 import { RiFilter3Line } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import * as XLSX from "xlsx";
 import { useGeneralContext } from "../../../context/General.context";
 import {
   DateFormatEnum,
@@ -348,32 +346,32 @@ const GenericTable = <T,>({
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
   // Derive sortConfig from sortConfigKey instead of maintaining separate state
-  const sortConfig = sortConfigKey
-    ? {
-        key: sortConfigKey.key,
-        direction: sortConfigKey.direction,
-      }
-    : null;
+  const sortConfig = useMemo(
+    () =>
+      sortConfigKey
+        ? {
+            key: sortConfigKey.key,
+            direction: sortConfigKey.direction,
+          }
+        : null,
+    [sortConfigKey],
+  );
 
   const handleUploadExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("File input changed");
     const file = event.target.files?.[0];
     if (!file) {
-      console.log("No file selected");
       return;
     }
-    console.log("File selected:", file.name);
     const reader = new FileReader();
-    reader.onload = (e: ProgressEvent<FileReader>) => {
-      console.log("File loaded");
+    reader.onload = async (e: ProgressEvent<FileReader>) => {
       const buffer = e.target?.result;
       if (buffer) {
         try {
+          const XLSX = await import("xlsx");
           const wb = XLSX.read(buffer, { type: "array" });
           const wsname = wb.SheetNames[0];
           const ws = wb.Sheets[wsname];
           const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-          console.log("Excel data parsed:", data);
 
           if (!data || data.length === 0) {
             toast.error(t("No data found in the Excel file"));
@@ -381,7 +379,6 @@ const GenericTable = <T,>({
           }
 
           const headers = data[0] as string[];
-          console.log("Excel headers:", headers);
 
           // Map column keys to their translated names
           const columnMap = new Map<string, string>();
@@ -390,8 +387,6 @@ const GenericTable = <T,>({
               columnMap.set(col.key, usedRowKeys[index]?.key as string);
             }
           });
-
-          console.log("Column map:", Array.from(columnMap.entries()));
 
           // Create a field type map for quick lookup
           const fieldTypeMap = new Map<string, string>();
@@ -418,16 +413,11 @@ const GenericTable = <T,>({
             return item;
           });
 
-          console.log("Processed items:", items);
-
           if (items.length > 0 && onExcelUpload) {
-            console.log("Calling onExcelUpload with processed items");
             onExcelUpload(items as Partial<T>[]);
             toast.success(t(`${items.length} items uploaded successfully`));
           } else if (items.length === 0) {
             toast.warning(t("No valid items found in the Excel file"));
-          } else {
-            console.log("No onExcelUpload callback provided");
           }
         } catch (error) {
           console.error("Error parsing Excel file:", error);
@@ -445,13 +435,10 @@ const GenericTable = <T,>({
   };
 
   const handleUploadClick = () => {
-    console.log("Upload button clicked");
-    console.log("Upload input ref:", uploadInputRef.current);
     if (uploadInputRef.current) {
       uploadInputRef.current.click();
-      console.log("File input clicked");
     } else {
-      console.error("Upload input ref is null");
+      toast.error(t("Upload input is not available"));
     }
   };
 
@@ -592,11 +579,10 @@ const GenericTable = <T,>({
     }
   };
 
-  const generatePDF = () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pdfMake = (window as any).pdfMake;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any[] = [];
+  const generatePDF = async () => {
+    const pdfMakeModule = await import("pdfmake/build/pdfmake");
+    const pdfMake = pdfMakeModule.default;
+    const data: Array<Array<string | { text: string; style: string }>> = [];
     data.push(
       usedColumns
         .filter((column) => column.correspondingKey)
@@ -606,8 +592,7 @@ const GenericTable = <T,>({
         })),
     );
     sortedRows?.forEach((row) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rowData: any[] = [];
+      const rowData: string[] = [];
       usedColumns?.forEach((column) => {
         if (column.correspondingKey) {
           const value = String(row[column.correspondingKey]);

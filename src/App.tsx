@@ -8,6 +8,7 @@ import {
   useGeneralContext,
 } from "./context/General.context";
 import { UserContextProvider, useUserContext } from "./context/User.context";
+import { baseQueryOptions } from "./config/queryClient";
 import { useWebSocket } from "./hooks/useWebSocket";
 import RouterContainer from "./navigation/routes";
 
@@ -61,8 +62,11 @@ function App() {
   );
 }
 
-// Create QueryClient once outside component to prevent recreation
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: baseQueryOptions,
+  },
+});
 
 // We are wrapping the App component to be able to use isMutating hooks in it
 function Wrapper() {

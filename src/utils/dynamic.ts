@@ -104,6 +104,19 @@ function releaseIdempotencyKey(
   );
 }
 
+async function withIdempotency<T>(
+  schemaName: string,
+  operation: string,
+  payload: unknown,
+  request: (headers: Record<string, string>) => Promise<T>,
+) {
+  try {
+    return await request(idempotencyHeader(schemaName, operation, payload));
+  } finally {
+    releaseIdempotencyKey(schemaName, operation, payload);
+  }
+}
+
 // Helper function to convert object to FormData
 function toFormData(obj: Record<string, unknown>): FormData {
   const formData = new FormData();
@@ -143,12 +156,18 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       ? { "Content-Type": "multipart/form-data" }
       : { "Content-Type": "application/json" };
 
-    const response = await axiosClient.post<T>(url, data, {
-      headers: {
-        ...headers,
-        ...idempotencyHeader(schemaName, "create", payload),
-      },
-    });
+    const response = await withIdempotency(
+      schemaName,
+      "create",
+      payload,
+      (idempotencyHeaders) =>
+        axiosClient.post<T>(url, data, {
+          headers: {
+            ...headers,
+            ...idempotencyHeaders,
+          },
+        }),
+    );
     // Server may return {data: newItem, message: "...", status: 200}
     // We need to extract just the data property if it exists
     const responseData = response.data as { data?: T };
@@ -165,12 +184,19 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       ? { "Content-Type": "multipart/form-data" }
       : { "Content-Type": "application/json" };
 
-    const response = await axiosClient.patch<T>(url, data, {
-      headers: {
-        ...headers,
-        ...idempotencyHeader(schemaName, "update", { id, updates }),
-      },
-    });
+    const idempotencyPayload = { id, updates };
+    const response = await withIdempotency(
+      schemaName,
+      "update",
+      idempotencyPayload,
+      (idempotencyHeaders) =>
+        axiosClient.patch<T>(url, data, {
+          headers: {
+            ...headers,
+            ...idempotencyHeaders,
+          },
+        }),
+    );
     // Server returns {data: updatedItem, message: "...", status: 200}
     // We need to extract just the data property if it exists
     const responseData = response.data as { data?: T };
@@ -216,8 +242,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: (_data, _error, itemDetails) => {
-      releaseIdempotencyKey(schemaName, "create", itemDetails);
+    onSettled: () => {
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -265,8 +290,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: (_data, _error, variables) => {
-      releaseIdempotencyKey(schemaName, "update", variables);
+    onSettled: () => {
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -274,9 +298,15 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   // Custom delete function
   async function deleteRequest(id: string | number) {
     const url = `${BASE}/${id}?${qs({ schemaName })}`;
-    const response = await axiosClient.delete(url, {
-      headers: idempotencyHeader(schemaName, "delete", { id }),
-    });
+    const response = await withIdempotency(
+      schemaName,
+      "delete",
+      { id },
+      (idempotencyHeaders) =>
+        axiosClient.delete(url, {
+          headers: idempotencyHeaders,
+        }),
+    );
     return response.data;
   }
 
@@ -320,8 +350,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           ?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: (_data, _error, id) => {
-      releaseIdempotencyKey(schemaName, "delete", { id });
+    onSettled: () => {
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -337,15 +366,17 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   // Create multiple items functionality
   async function createManyRequest(payload: Array<Partial<T>>) {
-    const { data } = await axiosClient.post(
-      `${BASE}/multiple?${qs({ schemaName })}`,
+    const { data } = await withIdempotency(
+      schemaName,
+      "createMultiple",
       payload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...idempotencyHeader(schemaName, "createMultiple", payload),
-        },
-      },
+      (idempotencyHeaders) =>
+        axiosClient.post(`${BASE}/multiple?${qs({ schemaName })}`, payload, {
+          headers: {
+            "Content-Type": "application/json",
+            ...idempotencyHeaders,
+          },
+        }),
     );
     return data;
   }
@@ -358,8 +389,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
         err?.response?.data?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: (_data, _error, payload) => {
-      releaseIdempotencyKey(schemaName, "createMultiple", payload);
+    onSettled: () => {
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -368,15 +398,18 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     createManyMutation.mutate(docs);
 
   async function deleteManyRequest(payload: Array<{ _id: string | number }>) {
-    const { data } = await axiosClient.delete(
-      `${BASE}/multiple?${qs({ schemaName })}`,
-      {
-        data: payload,
-        headers: {
-          "Content-Type": "application/json",
-          ...idempotencyHeader(schemaName, "deleteMultiple", payload),
-        },
-      },
+    const { data } = await withIdempotency(
+      schemaName,
+      "deleteMultiple",
+      payload,
+      (idempotencyHeaders) =>
+        axiosClient.delete(`${BASE}/multiple?${qs({ schemaName })}`, {
+          data: payload,
+          headers: {
+            "Content-Type": "application/json",
+            ...idempotencyHeaders,
+          },
+        }),
     );
     return data;
   }
@@ -389,8 +422,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
         err?.response?.data?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: (_data, _error, payload) => {
-      releaseIdempotencyKey(schemaName, "deleteMultiple", payload);
+    onSettled: () => {
       qc.invalidateQueries({ queryKey });
     },
   });
@@ -408,19 +440,21 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       ...updates,
     }));
 
-    const { data } = await axiosClient.patch(
-      `${BASE}/multiple?${qs({ schemaName })}`,
+    const { data } = await withIdempotency(
+      schemaName,
+      "updateMultiple",
       flattenedPayload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...idempotencyHeader(
-            schemaName,
-            "updateMultiple",
-            flattenedPayload,
-          ),
-        },
-      },
+      (idempotencyHeaders) =>
+        axiosClient.patch(
+          `${BASE}/multiple?${qs({ schemaName })}`,
+          flattenedPayload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              ...idempotencyHeaders,
+            },
+          },
+        ),
     );
     return data;
   }
@@ -433,13 +467,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
         err?.response?.data?.message || "An unexpected error occurred";
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: (_data, _error, payload) => {
-      const flattenedPayload = payload?.map(({ _id, updates }) => ({
-        _id,
-        ...updates,
-      }));
-
-      releaseIdempotencyKey(schemaName, "updateMultiple", flattenedPayload);
+    onSettled: () => {
       qc.invalidateQueries({ queryKey });
     },
   });

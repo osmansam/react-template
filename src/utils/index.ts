@@ -681,7 +681,7 @@ export type Order = {
   isOnlinePrice?: boolean;
   discountNote?: string | string[];
   stockLocation?: number;
-  [key: string]: any;
+  [key: string]: unknown;
   kitchen?: string;
   stockNote?: string;
   ikasId?: string;
@@ -749,7 +749,7 @@ export type Activity = {
   type: string;
   createdAt: Date;
   updatedAt: Date;
-  payload: any;
+  payload: unknown;
 };
 
 export enum ReservationStatusEnum {
@@ -785,7 +785,7 @@ export type Notification = {
   message:
     | {
         key: string;
-        params: Record<string, any>;
+        params: Record<string, unknown>;
       }
     | string;
   type: string;
@@ -840,20 +840,20 @@ export type IkasProduct = {
   googleTaxonomyId: null;
   salesChannelIds: string[];
   tagIds: string[];
-  translations: any[];
+  translations: unknown[];
   metaData: {
     id: string;
     canonicals: null;
     description: null;
     disableIndex: null;
-    metadataOverrides: any[];
+    metadataOverrides: unknown[];
     pageTitle: null;
     slug: string;
     targetType: string;
-    translations: any[];
+    translations: unknown[];
   };
   productOptionSetId: null;
-  productVariantTypes: any[];
+  productVariantTypes: unknown[];
   type: string;
   totalStock: null;
   variants: {
@@ -1629,7 +1629,7 @@ export type PersonalOrderDataType = {
   deliveredByTables: number[];
 };
 export type FormElementsState = {
-  [key: string]: any;
+  [key: string]: unknown;
 };
 export enum ExpenseTypes {
   STOCKABLE = "STOCKABLE",
@@ -1790,4 +1790,4 @@ export type PopularDiscounts = {
 export const GAMEEXPENSETYPE = "oys";
 export const DESSERTEXPENSETYPE = "tat";
 export const SANDWICHEXPENSETYPE = "sand";
-export type OptionType = { value: any; label: string; imageUrl?: string };
+export type OptionType = { value: unknown; label: string; imageUrl?: string };

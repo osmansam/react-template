@@ -1,0 +1,1 @@
+import{m as s,n as r,g as o,E as i,F as b}from"./index-F9jYwa57.js";var n=r,D=s,v="[object Date]";function _(a){return D(a)&&n(a)==v}var c=_,g=c,d=b,e=i,t=e&&e.isDate,j=t?d(t):g,m=j;const I=o(m);export{I as O};

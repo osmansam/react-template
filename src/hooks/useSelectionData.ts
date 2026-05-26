@@ -1,5 +1,6 @@
 import { useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { selectionQueryOptions } from "../config/queryClient";
 import { get } from "../utils/api";
 import { Field } from "../utils/api/container";
 
@@ -48,7 +49,7 @@ export function useSelectionData(
         queryKey: ["dynamic", schemaName, "selection", fieldName],
         queryFn: () => get<Array<Record<string, unknown>>>({ path }),
         enabled: hasParams,
-        staleTime: Infinity,
+        ...selectionQueryOptions,
       };
     }),
   });

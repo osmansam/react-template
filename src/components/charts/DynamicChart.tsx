@@ -260,16 +260,17 @@ export default function DynamicChart({ config }: DynamicChartProps) {
   const { indexBy, keys, axisBottom, axisLeft, margin, ...pipelineParams } =
     paramsObj;
 
-  // Build chart options from extracted params
-  const extractedChartOptions: Record<string, any> = {};
-  if (indexBy !== undefined) extractedChartOptions.indexBy = indexBy;
-  if (keys !== undefined) extractedChartOptions.keys = keys;
-  if (axisBottom !== undefined) extractedChartOptions.axisBottom = axisBottom;
-  if (axisLeft !== undefined) extractedChartOptions.axisLeft = axisLeft;
-  if (margin !== undefined) extractedChartOptions.margin = margin;
-
-  // Merge with provided chartOptions
-  const mergedChartOptions = { ...extractedChartOptions, ...chartOptions };
+  const mergedChartOptions = useMemo<Record<string, any>>(
+    () => ({
+      ...(indexBy !== undefined ? { indexBy } : {}),
+      ...(keys !== undefined ? { keys } : {}),
+      ...(axisBottom !== undefined ? { axisBottom } : {}),
+      ...(axisLeft !== undefined ? { axisLeft } : {}),
+      ...(margin !== undefined ? { margin } : {}),
+      ...chartOptions,
+    }),
+    [axisBottom, axisLeft, chartOptions, indexBy, keys, margin],
+  );
 
   // Fetch data from pipeline (only pass non-chart params)
   const data = useGetPipeline<unknown>(

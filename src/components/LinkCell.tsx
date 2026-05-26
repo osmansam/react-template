@@ -4,7 +4,7 @@ import { buildLinkUrl, getLinkLabel } from "../utils/linkHelpers";
 
 interface LinkCellProps {
   field: Field;
-  row: any;
+  row: Record<string, unknown>;
 }
 
 /**
@@ -81,6 +81,9 @@ export function LinkCell({ field, row }: LinkCellProps) {
  * Main render function for table cells
  * Determines whether to render a link or plain value based on field configuration
  */
-export function renderCell(field: Field, row: any): React.ReactNode {
+export function renderCell(
+  field: Field,
+  row: Record<string, unknown>,
+): React.ReactNode {
   return <LinkCell field={field} row={row} />;
 }

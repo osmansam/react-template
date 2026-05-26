@@ -6,6 +6,42 @@ import {
 import { ContainerModel, Field, Types } from "./api/container";
 
 type GenericItem = Record<string, unknown> & { _id: string };
+type ComparableValue = string | number | boolean | null | undefined;
+
+const toComparableValue = (value: unknown): ComparableValue => {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  return String(value);
+};
+
+const compareValues = (
+  left: ComparableValue,
+  right: ComparableValue,
+  operator: ">=" | "<=" | ">" | "<",
+) => {
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return false;
+  }
+
+  switch (operator) {
+    case ">=":
+      return left >= right;
+    case "<=":
+      return left <= right;
+    case ">":
+      return left > right;
+    case "<":
+      return left < right;
+  }
+};
 
 export type RawPopulationSettings = {
   fieldName?: string;
@@ -368,7 +404,10 @@ export const tailwindBgToStyle = (className: string): React.CSSProperties => {
 /**
  * Parse a value from a condition string
  */
-export const parseValue = (row: GenericItem, value: string): any => {
+export const parseValue = (
+  row: GenericItem,
+  value: string,
+): ComparableValue => {
   if (!value) return value;
   value = value.trim();
 
@@ -376,7 +415,7 @@ export const parseValue = (row: GenericItem, value: string): any => {
   const rowMatch = value.match(/^row\((.+)\)$/);
   if (rowMatch) {
     const field = rowMatch[1];
-    return row[field];
+    return toComparableValue(row[field]);
   }
 
   // Check for quoted strings
@@ -396,7 +435,7 @@ export const parseValue = (row: GenericItem, value: string): any => {
 
   // Fallback: Check if value is a key in row
   if (value in row) {
-    return row[value];
+    return toComparableValue(row[value]);
   }
 
   return value;
@@ -423,7 +462,7 @@ export const evaluateRowCondition = (
   if (condition.includes(">=")) {
     const [lhs, rhs] = condition.split(">=");
     if (!lhs || rhs === undefined) return false;
-    const result = parseValue(row, lhs) >= parseValue(row, rhs);
+    const result = compareValues(parseValue(row, lhs), parseValue(row, rhs), ">=");
     return result;
   }
 
@@ -431,7 +470,7 @@ export const evaluateRowCondition = (
   if (condition.includes("<=")) {
     const [lhs, rhs] = condition.split("<=");
     if (!lhs || rhs === undefined) return false;
-    const result = parseValue(row, lhs) <= parseValue(row, rhs);
+    const result = compareValues(parseValue(row, lhs), parseValue(row, rhs), "<=");
     return result;
   }
 
@@ -439,7 +478,7 @@ export const evaluateRowCondition = (
   if (condition.includes(">")) {
     const [lhs, rhs] = condition.split(">");
     if (!lhs || rhs === undefined) return false;
-    const result = parseValue(row, lhs) > parseValue(row, rhs);
+    const result = compareValues(parseValue(row, lhs), parseValue(row, rhs), ">");
     return result;
   }
 
@@ -447,7 +486,7 @@ export const evaluateRowCondition = (
   if (condition.includes("<")) {
     const [lhs, rhs] = condition.split("<");
     if (!lhs || rhs === undefined) return false;
-    const result = parseValue(row, lhs) < parseValue(row, rhs);
+    const result = compareValues(parseValue(row, lhs), parseValue(row, rhs), "<");
     return result;
   }
 
