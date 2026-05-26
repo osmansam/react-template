@@ -1,7 +1,7 @@
 import { Tooltip } from "@material-tailwind/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BsFilePdf } from "react-icons/bs";
+// import { BsFilePdf } from "react-icons/bs";
 import { FaFileExcel, FaFileUpload } from "react-icons/fa";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 import { FiChevronLeft, FiChevronRight, FiSearch } from "react-icons/fi";
@@ -124,7 +124,7 @@ const GenericTable = <T,>({
   outsideSortProps,
   outsideSearchProps,
   isSearch = true,
-  isPdf = false,
+  // isPdf = false,
   isExcel = false,
   isCollapsible = false,
   isToolTipEnabled = false,
@@ -579,61 +579,61 @@ const GenericTable = <T,>({
     }
   };
 
-  const generatePDF = async () => {
-    const pdfMakeModule = await import("pdfmake/build/pdfmake");
-    const pdfMake = pdfMakeModule.default;
-    const data: Array<Array<string | { text: string; style: string }>> = [];
-    data.push(
-      usedColumns
-        .filter((column) => column.correspondingKey)
-        ?.map((column) => ({
-          text: column.key,
-          style: "tableHeader",
-        })),
-    );
-    sortedRows?.forEach((row) => {
-      const rowData: string[] = [];
-      usedColumns?.forEach((column) => {
-        if (column.correspondingKey) {
-          const value = String(row[column.correspondingKey]);
-          rowData.push(value);
-        }
-      });
-      data.push([...rowData]);
-    });
-    const documentDefinition = {
-      content: [
-        {
-          table: { headerRows: 1, body: data },
-          layout: {
-            fillColor: (rowIndex: number) =>
-              rowIndex === 0
-                ? "#000080"
-                : rowIndex % 2 === 0
-                  ? "#d8d2d2"
-                  : "#ffffff",
-          },
-        },
-      ],
-      styles: {
-        yourTextStyle: { font: "Helvetica" },
-        header: { fontSize: 12 },
-        tableHeader: { bold: true, color: "#fff" },
-      },
-    };
-    pdfMake.fonts = {
-      Roboto: {
-        normal:
-          "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf",
-        bold: "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf",
-        italics:
-          "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Italic.ttf",
-        bolditalics:
-          "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-MediumItalic.ttf",
-      },
-    };
-    pdfMake.createPdf(documentDefinition).open();
-  };
+  // const generatePDF = async () => {
+  //   const pdfMakeModule = await import("pdfmake/build/pdfmake");
+  //   const pdfMake = pdfMakeModule.default;
+  //   const data: Array<Array<string | { text: string; style: string }>> = [];
+  //   data.push(
+  //     usedColumns
+  //       .filter((column) => column.correspondingKey)
+  //       ?.map((column) => ({
+  //         text: column.key,
+  //         style: "tableHeader",
+  //       })),
+  //   );
+  //   sortedRows?.forEach((row) => {
+  //     const rowData: string[] = [];
+  //     usedColumns?.forEach((column) => {
+  //       if (column.correspondingKey) {
+  //         const value = String(row[column.correspondingKey]);
+  //         rowData.push(value);
+  //       }
+  //     });
+  //     data.push([...rowData]);
+  //   });
+  //   const documentDefinition = {
+  //     content: [
+  //       {
+  //         table: { headerRows: 1, body: data },
+  //         layout: {
+  //           fillColor: (rowIndex: number) =>
+  //             rowIndex === 0
+  //               ? "#000080"
+  //               : rowIndex % 2 === 0
+  //                 ? "#d8d2d2"
+  //                 : "#ffffff",
+  //         },
+  //       },
+  //     ],
+  //     styles: {
+  //       yourTextStyle: { font: "Helvetica" },
+  //       header: { fontSize: 12 },
+  //       tableHeader: { bold: true, color: "#fff" },
+  //     },
+  //   };
+  //   pdfMake.fonts = {
+  //     Roboto: {
+  //       normal:
+  //         "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf",
+  //       bold: "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf",
+  //       italics:
+  //         "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Italic.ttf",
+  //       bolditalics:
+  //         "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-MediumItalic.ttf",
+  //     },
+  //   };
+  //   pdfMake.createPdf(documentDefinition).open();
+  // };
 
   const renderActionButtons = (row: T, actions: ActionType<T>[]) => (
     <div className="flex flex-row my-auto h-full gap-3 justify-center items-center">
@@ -1097,11 +1097,11 @@ const GenericTable = <T,>({
                   {/* Alt filters (Total vs) */}
                   {renderFilters(false)}
                   {/* PDF Button */}
-                  {isPdf && (
+                  {/* {isPdf && (
                     <Tooltip content={t("Export PDF")} placement="top">
                       <IconButton icon={<BsFilePdf />} onClick={generatePDF} />
                     </Tooltip>
-                  )}
+                  )} */}
                   {/* Excel Button with Dropdown - mobilde de göster */}
                   {(isExcel || onExcelUpload) && (
                     <>
