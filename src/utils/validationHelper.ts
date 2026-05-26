@@ -170,7 +170,6 @@ function extractValueAndMessage(
   messageKey: string
 ): { value: number | null; message?: string } {
   let value: number | null = null;
-  let message: string | undefined;
   
   const keyIndex = part.indexOf(`${key}=`);
   if (keyIndex !== -1) {
@@ -189,7 +188,7 @@ function extractValueAndMessage(
     }
   }
   
-  message = extractMessage(part, messageKey);
+  const message = extractMessage(part, messageKey);
   
   return { value, message };
 }
@@ -259,7 +258,7 @@ function extractPatternValue(part: string): string | undefined {
  * Returns an error message if validation fails, null if valid
  */
 export function validateField(
-  value: any,
+  value: unknown,
   rules: ValidationRules,
   fieldType: string
 ): string | null {
@@ -288,7 +287,7 @@ export function validateField(
     
     // Email validation
     if (rules.email) {
-      const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
       if (!emailRegex.test(stringValue)) {
         return 'Please enter a valid email address';
       }
@@ -296,7 +295,7 @@ export function validateField(
     
     // Phone validation
     if (rules.phone) {
-      const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/;
+      const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
       if (!phoneRegex.test(stringValue)) {
         return 'Please enter a valid phone number';
       }

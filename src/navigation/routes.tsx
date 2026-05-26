@@ -17,7 +17,7 @@ interface RouteConfig {
 }
 
 const RouterContainer = () => {
-  const { dynamicRoutes, isLoading } = useDynamicPages();
+  const { dynamicRoutes, isLoading, isError } = useDynamicPages();
 
   // Combine static routes with dynamic routes
   const combinedRoutes = useMemo(() => {
@@ -45,7 +45,22 @@ const RouterContainer = () => {
 
   // Show loading screen while fetching dynamic pages to prevent 404 flash
   if (isLoading) {
-    return <div className="min-h-screen bg-white" />;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white text-sm text-gray-500">
+        Loading pages...
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white p-8 text-center">
+        <div>
+          <h1 className="mb-2 text-2xl font-bold">Pages failed to load</h1>
+          <p className="text-gray-600">Refresh the page or try again later.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

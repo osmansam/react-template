@@ -27,7 +27,7 @@ export interface Field {
   isSearchable?: boolean;
   children?: Field[];
   frontend?: FrontendConfig;
-  populationSettings?: any;
+  populationSettings?: Record<string, unknown>;
   equation?: string;
 }
 
@@ -44,8 +44,8 @@ export interface Field {
  */
 export function buildLinkUrl(
   frontend: FrontendConfig | undefined,
-  fieldValue: any,
-  row: any
+  fieldValue: unknown,
+  row: Record<string, unknown>,
 ): string | null {
   if (!frontend?.linkTemplate) {
     return null;
@@ -87,7 +87,10 @@ import { useNavigate } from "react-router-dom"; // or Next.js: import { useRoute
 /**
  * Renders a table cell that can be a clickable link based on field configuration
  */
-export function renderCell(field: Field, row: any): React.ReactNode {
+export function renderCell(
+  field: Field,
+  row: Record<string, unknown>,
+): React.ReactNode {
   const fieldValue = row?.[field.name];
   const { frontend } = field;
 
@@ -235,7 +238,7 @@ const complexField: Field = {
 };
 
 // Usage in table component:
-const TableCell = ({ field, row }: { field: Field; row: any }) => {
+const TableCell = ({ field, row }: { field: Field; row: Record<string, unknown> }) => {
   return <>{renderCell(field, row)}</>;
 };
 

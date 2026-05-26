@@ -14,8 +14,8 @@ import { Frontend } from "./api/container";
  */
 export function buildLinkUrl(
   frontend: Frontend | undefined,
-  fieldValue: any,
-  row: any
+  fieldValue: unknown,
+  row: Record<string, unknown>,
 ): string | null {
   if (!frontend?.linkTemplate) {
     return null;
@@ -62,8 +62,8 @@ export function buildLinkUrl(
  */
 export function getLinkLabel(
   frontend: Frontend | undefined,
-  fieldValue: any,
-  row: any
+  fieldValue: unknown,
+  row: Record<string, unknown>,
 ): string {
   if (frontend?.linkLabelField && row?.[frontend.linkLabelField]) {
     return String(row[frontend.linkLabelField]);

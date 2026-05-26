@@ -1,22 +1,32 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
+import { pageQueryOptions } from "../../config/queryClient";
 import { PageModel } from "../../types/page";
 import { axiosClient } from "./axiosClient";
-import { useGet } from "./factory";
+import { get } from ".";
 
 const BASE = "/page";
 const PAGE_QUERY_KEY = ["page", "all"] as const;
 
 // Get all pages
 export function useGetAllPages() {
-  return useGet<PageModel[]>(`${BASE}/public`, PAGE_QUERY_KEY);
+  return useQuery({
+    queryKey: PAGE_QUERY_KEY,
+    queryFn: () => get<PageModel[]>({ path: `${BASE}/public` }),
+    ...pageQueryOptions,
+  });
 }
 
 // Get single page by ID
 export function useGetPage(id: string) {
   const queryKey = ["page", id] as const;
-  return useGet<PageModel>(`${BASE}/${id}`, queryKey);
+  return useQuery({
+    queryKey,
+    queryFn: () => get<PageModel>({ path: `${BASE}/${id}` }),
+    enabled: Boolean(id),
+    ...pageQueryOptions,
+  });
 }
 
 // CRUD operations

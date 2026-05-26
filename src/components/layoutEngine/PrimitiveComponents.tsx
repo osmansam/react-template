@@ -2,14 +2,20 @@ import React from "react";
 import { ComponentBlock, DataBinding } from "../../types/layout";
 import DynamicChart, { ChartType } from "../charts/DynamicChart";
 
+type PrimitivePropValue =
+  | React.ReactNode
+  | DataBinding
+  | Record<string, unknown>
+  | Record<string, unknown>[]
+  | undefined;
+
 /**
  * Primitive Component Props Interface
  */
 interface PrimitiveComponentProps {
   title?: string;
   binding?: DataBinding;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
+  [key: string]: PrimitivePropValue;
 }
 
 /**
@@ -88,15 +94,20 @@ export const ChartView: React.FC<
 
   // Extract ALL params from dataBinding and use them as chart options
   // Since the pipeline doesn't need params, everything in params is for chart config
-  const chartParams = (binding?.params || {}) as Record<string, any>;
+  const chartParams = (binding?.params || {}) as Record<string, unknown>;
 
   // Remove params from dataBinding since they're chart config, not pipeline params
-  const updatedBinding = binding
+  const updatedBinding:
+    | {
+        kind: "schema" | "pipeline" | "api";
+        schemaName?: string;
+        pipelineName?: string;
+      }
+    | undefined = binding
     ? {
         kind: binding.kind,
         schemaName: binding.schemaName,
         pipelineName: binding.pipelineName,
-        // No params for pipeline
       }
     : undefined;
 
@@ -111,8 +122,7 @@ export const ChartView: React.FC<
           config={{
             type: chartType,
             title,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            dataBinding: updatedBinding as any,
+            dataBinding: updatedBinding,
             chartOptions: finalChartOptions,
           }}
         />
@@ -172,7 +182,7 @@ export const TextBlock: React.FC<PrimitiveComponentProps> = ({
       {title && <h3 className="text-lg font-semibold mb-4">{title}</h3>}
       <div className="prose max-w-none">
         {content ? (
-          <div>{content}</div>
+          <div>{content as React.ReactNode}</div>
         ) : (
           <p className="text-gray-600">
             Text content will be displayed here. Supports markdown and rich text
@@ -194,6 +204,10 @@ export const KPIBlock: React.FC<PrimitiveComponentProps> = ({
   unit,
   trend,
 }) => {
+  const displayValue = value as React.ReactNode;
+  const displayUnit = unit as React.ReactNode;
+  const trendNumber = typeof trend === "number" ? trend : undefined;
+
   return (
     <div className="primitive-component kpi-block bg-white rounded-lg shadow p-4">
       {title && (
@@ -201,16 +215,20 @@ export const KPIBlock: React.FC<PrimitiveComponentProps> = ({
       )}
       <div className="flex items-baseline justify-between">
         <div>
-          <p className="text-3xl font-bold text-gray-900">{value || "---"}</p>
-          {unit && <p className="text-sm text-gray-500 mt-1">{unit}</p>}
+          <p className="text-3xl font-bold text-gray-900">
+            {displayValue || "---"}
+          </p>
+          {displayUnit && (
+            <p className="text-sm text-gray-500 mt-1">{displayUnit}</p>
+          )}
         </div>
-        {trend && (
+        {trendNumber !== undefined && (
           <div
             className={`text-sm font-medium ${
-              trend > 0 ? "text-green-600" : "text-red-600"
+              trendNumber > 0 ? "text-green-600" : "text-red-600"
             }`}
           >
-            {trend > 0 ? "↑" : "↓"} {Math.abs(trend)}%
+            {trendNumber > 0 ? "↑" : "↓"} {Math.abs(trendNumber)}%
           </div>
         )}
       </div>
@@ -237,7 +255,9 @@ export const CustomComponent: React.FC<PrimitiveComponentProps> = ({
       <div className="border-2 border-dashed border-gray-300 rounded p-6 text-center">
         <p className="text-gray-600 text-sm mb-2">Custom Component</p>
         {componentType && (
-          <p className="text-xs text-gray-500 mb-2">Type: {componentType}</p>
+          <p className="text-xs text-gray-500 mb-2">
+            Type: {String(componentType)}
+          </p>
         )}
         <p className="text-sm text-gray-400">
           Custom component implementation will be loaded here based on the
