@@ -8,7 +8,9 @@ type AutocompleteInputProps = {
   label?: string;
   placeholder?: string;
   value: string;
-  options: Array<string | { value: string; label?: string; description?: string }>;
+  options: Array<
+    string | { value: string; label?: string; description?: string }
+  >;
   onChange: (value: string) => void;
   onClear?: () => void;
   className?: string;
@@ -36,13 +38,11 @@ const normalizeText = (text: string) => {
 
 const getOptionValue = (
   option: string | { value: string; label?: string; description?: string },
-) =>
-  typeof option === "string" ? option : option.value;
+) => (typeof option === "string" ? option : option.value);
 
 const getOptionLabel = (
   option: string | { value: string; label?: string; description?: string },
-) =>
-  typeof option === "string" ? option : (option.label ?? option.value);
+) => (typeof option === "string" ? option : (option.label ?? option.value));
 
 const getOptionDescription = (
   option: string | { value: string; label?: string; description?: string },

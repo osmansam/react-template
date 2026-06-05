@@ -28,7 +28,7 @@ type GeneralContextType = {
     config: {
       key: string;
       direction: "ascending" | "descending";
-    } | null
+    } | null,
   ) => void;
 
   userPageActiveTab: number;
@@ -68,10 +68,12 @@ type GeneralContextType = {
     keys: {
       key: string;
       defaultValue: FormElementValue;
-    }[]
+    }[],
   ) => void;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
+  isHoverExpanded: boolean;
+  setIsHoverExpanded: (open: boolean) => void;
   tabOrientation: TabOrientation;
   setTabOrientation: (orientation: TabOrientation) => void;
   isExtraModalOpen: boolean;
@@ -111,6 +113,8 @@ const GeneralContext = createContext<GeneralContextType>({
   setTabInputInvalidateKeys: () => {},
   isSidebarOpen: true,
   setIsSidebarOpen: () => {},
+  isHoverExpanded: false,
+  setIsHoverExpanded: () => {},
   tabOrientation: "horizontal",
   setTabOrientation: () => {},
   isExtraModalOpen: false,
@@ -144,7 +148,7 @@ export const GeneralContextProvider = ({ children }: PropsWithChildren) => {
     direction: "ascending" | "descending";
   } | null>(null);
   const [expandedRows, setExpandedRows] = useState<{ [key: string]: boolean }>(
-    {}
+    {},
   );
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpenState] = useState<boolean>(() => {
@@ -155,11 +159,12 @@ export const GeneralContextProvider = ({ children }: PropsWithChildren) => {
     localStorage.setItem("sidebar-open", JSON.stringify(open));
     setIsSidebarOpenState(open);
   };
+  const [isHoverExpanded, setIsHoverExpanded] = useState<boolean>(false);
   const [tabOrientation, setTabOrientationState] = useState<TabOrientation>(
     () => {
       const saved = localStorage.getItem("tab-orientation");
       return (saved as TabOrientation) || "horizontal";
-    }
+    },
   );
   const setTabOrientation = (orientation: TabOrientation) => {
     localStorage.setItem("tab-orientation", orientation);
@@ -216,6 +221,8 @@ export const GeneralContextProvider = ({ children }: PropsWithChildren) => {
         setTabInputInvalidateKeys,
         isSidebarOpen,
         setIsSidebarOpen,
+        isHoverExpanded,
+        setIsHoverExpanded,
         tabOrientation,
         setTabOrientation,
         isExtraModalOpen,

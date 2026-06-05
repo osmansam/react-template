@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FiChevronDown,
@@ -27,10 +27,14 @@ const getRouteIcon = (item: SidebarRouteItem) =>
 export const Sidebar = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { isSidebarOpen, setIsSidebarOpen, resetGeneralContext } =
-    useGeneralContext();
+  const {
+    isSidebarOpen,
+    setIsSidebarOpen,
+    isHoverExpanded,
+    setIsHoverExpanded,
+    resetGeneralContext,
+  } = useGeneralContext();
   const { buildPath } = useTenantProject();
-  const [isHoverExpanded, setIsHoverExpanded] = useState(false);
   const previousRouteRef = useRef<string | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isExpanded = isSidebarOpen || isHoverExpanded;
@@ -52,12 +56,12 @@ export const Sidebar = () => {
     handleLogoutClick,
   } = useSidebarNavigation();
 
-  const clearHoverTimeout = () => {
+  const clearHoverTimeout = useCallback(() => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
-  };
+  }, []);
 
   const handleMouseEnter = () => {
     if (isSidebarOpen) return;
@@ -181,7 +185,7 @@ export const Sidebar = () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       resetHoverExpansion();
     };
-  }, []);
+  }, [clearHoverTimeout, setIsHoverExpanded]);
 
   if (routes.length === 0) {
     return null;
