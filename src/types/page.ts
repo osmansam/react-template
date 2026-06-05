@@ -103,10 +103,12 @@ export interface PageSection {
 }
 
 export interface PageModel {
+  _id?: string;
   id?: string;
   name: string;
   icon?: string;
   slug?: string;
+  parentPageId?: string | null;
   order?: number;
   isGroupOnly?: boolean;
   isAuthenticated?: boolean;

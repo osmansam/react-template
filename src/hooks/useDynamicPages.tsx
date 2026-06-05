@@ -1,9 +1,20 @@
 import { useCallback, useMemo } from "react";
 import { DynamicPageRenderer } from "../components/DynamicPageRenderer";
-import { PageModel, PageSection } from "../types/page";
+import {
+  ComponentBlock,
+  PageModel,
+  PageSection,
+  PageTab,
+  TabContent,
+} from "../types/page";
 import { useGetAllPages } from "../utils/api/page";
 
-interface DynamicRoute {
+export interface DynamicRouteTab {
+  label: string;
+  icon?: string;
+}
+
+export interface DynamicRoute {
   name: string;
   path?: string;
   isOnSidebar: boolean;
@@ -11,7 +22,66 @@ interface DynamicRoute {
   element?: () => JSX.Element;
   children?: DynamicRoute[];
   link?: string;
+  tabs?: DynamicRouteTab[];
 }
+
+const getPageId = (page: PageModel) => page.id || page._id || "";
+
+const getPagePath = (page: PageModel) =>
+  `/${page.slug || page.name.toLowerCase().replace(/\s+/g, "-")}`;
+
+const addUniqueTab = (
+  tabs: DynamicRouteTab[],
+  seen: Set<string>,
+  tab?: DynamicRouteTab
+) => {
+  const label = tab?.label?.trim();
+  if (!label || seen.has(label)) return;
+
+  seen.add(label);
+  tabs.push({ label, icon: tab?.icon });
+};
+
+const extractComponentTabs = (
+  component: ComponentBlock | undefined,
+  tabs: DynamicRouteTab[],
+  seen: Set<string>
+) => {
+  if (!component) return;
+
+  if (component.type === "tabPanel" && component.tabs?.length) {
+    component.tabs.forEach((tab: TabContent) => {
+      addUniqueTab(tabs, seen, { label: tab.title });
+    });
+  }
+};
+
+const extractPageTabs = (sections: PageSection[] = []): DynamicRouteTab[] => {
+  const tabs: DynamicRouteTab[] = [];
+  const seen = new Set<string>();
+
+  sections.forEach((section) => {
+    if (section.type === "tabs" && section.tabs?.tabs?.length) {
+      section.tabs.tabs
+        .slice()
+        .sort((a: PageTab, b: PageTab) => a.order - b.order)
+        .forEach((tab) => {
+          addUniqueTab(tabs, seen, { label: tab.label, icon: tab.icon });
+        });
+    }
+
+    extractComponentTabs(section.component, tabs, seen);
+
+    const cells = section.grid?.cells || section.cells || [];
+    cells.forEach((cell) => {
+      cell.components.forEach((component) => {
+        extractComponentTabs(component, tabs, seen);
+      });
+    });
+  });
+
+  return tabs;
+};
 
 export const useDynamicPages = () => {
   // Fetch all pages from the page API
@@ -26,52 +96,69 @@ export const useDynamicPages = () => {
   // Helper to build hierarchical structure
   const buildRouteHierarchy = useCallback(
     (allPages: PageModel[]): DynamicRoute[] => {
-      // Helper to convert PageModel to DynamicRoute
-      const createRoute = (
-        page: PageModel,
-        isSubPage = false
-      ): DynamicRoute => {
+      const childrenByParentId = new Map<string, PageModel[]>();
+      const pageIds = new Set(allPages.map(getPageId).filter(Boolean));
+
+      allPages.forEach((page) => {
+        const parentId = page.parentPageId || "";
+        if (!parentId) return;
+
+        const siblings = childrenByParentId.get(parentId) || [];
+        siblings.push(page);
+        childrenByParentId.set(parentId, siblings);
+      });
+
+      const createRoute = (page: PageModel): DynamicRoute => {
+        const pageId = getPageId(page);
+        const childPages = (childrenByParentId.get(pageId) || []).sort(
+          (a, b) => (a.order ?? 0) - (b.order ?? 0)
+        );
+        const path = page.isGroupOnly ? undefined : getPagePath(page);
+        const tabs = extractPageTabs(page.sections);
+
         const route: DynamicRoute = {
           name: page.name,
-          path: page.isGroupOnly
-            ? undefined
-            : `/${page.slug || page.name.toLowerCase().replace(/\s+/g, "-")}`,
+          path,
           isOnSidebar: true,
           icon: page.icon,
         };
 
-        // If page has subPage (nested page), create children array with both parent and subpage
-        if (page.subPage && !isSubPage) {
+        if (tabs.length > 0) {
+          route.tabs = tabs;
+        }
+
+        if (!page.isGroupOnly && path) {
+          route.element = createPageElement(page.sections);
+        }
+
+        if (childPages.length > 0) {
           route.children = [
-            // First child: the parent page itself (if not group-only)
             ...(page.isGroupOnly
               ? []
               : [
                   {
                     name: page.name,
-                    path: route.path,
+                    path,
                     isOnSidebar: true,
                     icon: page.icon,
+                    tabs: tabs.length > 0 ? tabs : undefined,
                     element: createPageElement(page.sections),
                   },
                 ]),
-            // Second child: the subpage
-            createRoute(page.subPage, true),
+            ...childPages.map((childPage) => createRoute(childPage)),
           ];
-          // Make parent a group (no direct path when expanded)
-          if (!page.isGroupOnly) {
-            delete route.element;
-          }
-        } else if (!page.isGroupOnly && route.path) {
-          // If page is not group-only and has no subpage, add element to render
-          route.element = createPageElement(page.sections);
+
+          delete route.element;
         }
 
         return route;
       };
 
-      // Build routes from all pages (all are treated as root level)
       return allPages
+        .filter((page) => {
+          const parentId = page.parentPageId || "";
+          return !parentId || !pageIds.has(parentId);
+        })
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
         .map((page) => createRoute(page));
     },

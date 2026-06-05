@@ -111,13 +111,18 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
       shouldFetchGrouping && tabPanelGroupBy
         ? tabPanelGroupBy.groupByObjectId
         : "",
-      shouldFetchGrouping && tabPanelGroupBy ? tabPanelGroupBy.groupByField : "",
+      shouldFetchGrouping && tabPanelGroupBy
+        ? tabPanelGroupBy.groupByField
+        : "",
     );
 
     switch (type) {
       case "table":
         return dataBinding?.kind === "schema" && dataBinding.schemaName ? (
-          <GenericPaginatedPage schemaName={dataBinding.schemaName} isHeader={false} />
+          <GenericPaginatedPage
+            schemaName={dataBinding.schemaName}
+            isHeader={false}
+          />
         ) : (
           <NoticePanel>Table component requires schema binding.</NoticePanel>
         );
@@ -132,7 +137,8 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
           if (!baseComponent?.dataBinding?.schemaName) {
             return (
               <NoticePanel>
-                Tab panel grouping requires a table component with schema binding.
+                Tab panel grouping requires a table component with schema
+                binding.
               </NoticePanel>
             );
           }
@@ -169,7 +175,8 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
         if (tabs && Array.isArray(tabs) && tabs.length > 0) {
           const allTabsAreTables = tabs.every(
             (tab) =>
-              tab.components.length === 1 && tab.components[0]?.type === "table",
+              tab.components.length === 1 &&
+              tab.components[0]?.type === "table",
           );
 
           if (allTabsAreTables) {
@@ -187,7 +194,11 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
           return <MixedTabPanel tabs={tabs} />;
         }
 
-        return <NoticePanel>Tab panel component requires tabs configuration.</NoticePanel>;
+        return (
+          <NoticePanel>
+            Tab panel component requires tabs configuration.
+          </NoticePanel>
+        );
       case "calendar":
         return dataBinding?.kind === "schema" && dataBinding.schemaName ? (
           <Suspense fallback={<LoadingPanel message="Loading calendar..." />}>
@@ -246,7 +257,9 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
       case "circlePackingChart": {
         const chartType = getChartTypeFromComponentType(type);
         if (!chartType) {
-          return <NoticePanel tone="error">Invalid chart type: {type}</NoticePanel>;
+          return (
+            <NoticePanel tone="error">Invalid chart type: {type}</NoticePanel>
+          );
         }
         return dataBinding?.kind === "pipeline" &&
           dataBinding.schemaName &&
@@ -310,7 +323,11 @@ const GridSectionView: React.FC<{ grid: GridSection }> = React.memo(
     const { columns, gap = 16, cells } = grid;
 
     if (!cells?.length) {
-      return <NoticePanel tone="empty">No content configured for this section.</NoticePanel>;
+      return (
+        <NoticePanel tone="empty">
+          No content configured for this section.
+        </NoticePanel>
+      );
     }
 
     return (
@@ -367,5 +384,9 @@ export const PageSectionView: React.FC<{ section: PageSection }> = ({
     return <GridSectionView grid={grid} />;
   }
 
-  return <NoticePanel tone="empty">No content configured for this section.</NoticePanel>;
+  return (
+    <NoticePanel tone="empty">
+      No content configured for this section.
+    </NoticePanel>
+  );
 };
