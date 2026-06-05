@@ -14,6 +14,10 @@ interface RouteConfig {
   element?: () => JSX.Element;
   children?: RouteConfig[];
   link?: string;
+  tabs?: {
+    label: string;
+    icon?: string;
+  }[];
 }
 
 const RouterContainer = () => {
@@ -27,19 +31,16 @@ const RouterContainer = () => {
   // Flatten routes to include children
   const flattenedRoutes = useMemo(() => {
     const routes: RouteConfig[] = [];
-    combinedRoutes.forEach((route) => {
-      if (route.children) {
-        // Add all children routes
-        route.children.forEach((child: RouteConfig) => {
-          if (child.path) {
-            routes.push(child);
-          }
-        });
-      } else if (route.path) {
-        // Add route if it has a path
+
+    const addRoute = (route: RouteConfig) => {
+      if (route.path && route.element) {
         routes.push(route);
       }
-    });
+
+      route.children?.forEach(addRoute);
+    };
+
+    combinedRoutes.forEach(addRoute);
     return routes;
   }, [combinedRoutes]);
 
