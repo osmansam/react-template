@@ -14,7 +14,7 @@ import RouterContainer from "./navigation/routes";
 
 function AppContent() {
   const location = useLocation();
-  const { isSidebarOpen } = useGeneralContext();
+  const { isSidebarOpen, isHoverExpanded } = useGeneralContext();
   const { user } = useUserContext();
   useWebSocket();
 
@@ -27,14 +27,15 @@ function AppContent() {
     location.pathname === "/auth/google/callback";
 
   const showSidebar = !isPublicRoute && !!user;
+  const isSidebarExpanded = isSidebarOpen || isHoverExpanded;
 
   return (
     <>
       {/* {isMutating ? <Loading /> : null} */}
       {showSidebar && <Sidebar />}
       <div
-        className={`transition-all duration-300 ease-in-out ${
-          showSidebar ? (isSidebarOpen ? "lg:ml-64" : "lg:ml-16") : ""
+        className={`transition-[margin-left] duration-200 ease-out ${
+          showSidebar ? (isSidebarExpanded ? "lg:ml-64" : "lg:ml-16") : ""
         }`}
       >
         <RouterContainer />
