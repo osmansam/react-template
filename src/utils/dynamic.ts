@@ -489,6 +489,59 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     docs: Array<{ _id: string | number; updates: Partial<T> }>,
   ) => updateManyMutation.mutate(docs);
 
+  async function executeWorkflowRequest({
+    workflowName,
+    workflowSchema,
+    record,
+    oldRecord,
+  }: {
+    workflowName: string;
+    workflowSchema?: string;
+    record: Record<string, unknown>;
+    oldRecord?: Record<string, unknown>;
+  }) {
+    const targetSchema = workflowSchema || schemaName;
+    const payload = { record, oldRecord };
+    const { data } = await withIdempotency(
+      targetSchema,
+      `workflow:${workflowName}`,
+      payload,
+      (idempotencyHeaders) =>
+        axiosClient.post(
+          `${BASE}/workflow/${encodeURIComponent(workflowName)}?${qs({
+            schemaName: targetSchema,
+          })}`,
+          payload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              ...idempotencyHeaders,
+            },
+          },
+        ),
+    );
+    return data;
+  }
+
+  const executeWorkflowMutation = useMutation({
+    mutationFn: executeWorkflowRequest,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onError: (err: any) => {
+      const errorMessage =
+        err?.response?.data?.message || "An unexpected error occurred";
+      setTimeout(() => toast.error(t(errorMessage)), 200);
+    },
+    onSettled: () => {
+      invalidateSchemaQueries();
+    },
+  });
+
+  const executeWorkflow = (payload: {
+    workflowName: string;
+    workflowSchema?: string;
+    record: Record<string, unknown>;
+    oldRecord?: Record<string, unknown>;
+  }) => executeWorkflowMutation.mutate(payload);
   return {
     createDynamicItem,
     createMultipleDynamicItem,
@@ -499,6 +552,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     deleteManyMutation,
     updateMultipleDynamicItem,
     updateManyMutation,
+    executeWorkflow,
+    executeWorkflowMutation,
   };
 }
 

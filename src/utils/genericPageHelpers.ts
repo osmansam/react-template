@@ -16,6 +16,7 @@ type RowClassRule = {
 };
 type RawActionConfig = Partial<TableActionConfig> & {
   ID?: string;
+  Key?: string;
   Kind?: TableActionConfig["kind"];
   Label?: string;
   Icon?: string;
@@ -33,6 +34,8 @@ type RawActionConfig = Partial<TableActionConfig> & {
   RequiredCondition?: string;
   ConfirmTitle?: string;
   ConfirmText?: string;
+  Submit?: TableActionConfig["submit"];
+  Path?: string;
   LinkTemplate?: string;
   LinkType?: TableActionConfig["linkType"];
   ClassName?: string;
@@ -208,6 +211,7 @@ const normalizeActionConfig = (
   action: RawActionConfig,
 ): TableActionConfig => ({
   id: action.id ?? action.ID,
+  key: action.key ?? action.Key,
   kind: (action.kind ?? action.Kind ?? "update") as TableActionConfig["kind"],
   label: action.label ?? action.Label,
   icon: action.icon ?? action.Icon,
@@ -225,6 +229,8 @@ const normalizeActionConfig = (
   requiredCondition: action.requiredCondition ?? action.RequiredCondition,
   confirmTitle: action.confirmTitle ?? action.ConfirmTitle,
   confirmText: action.confirmText ?? action.ConfirmText,
+  submit: action.submit ?? action.Submit,
+  path: action.path ?? action.Path,
   linkTemplate: action.linkTemplate ?? action.LinkTemplate,
   linkType: action.linkType ?? action.LinkType,
   className: action.className ?? action.ClassName,

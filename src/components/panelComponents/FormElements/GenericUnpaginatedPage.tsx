@@ -1,7 +1,6 @@
+import { useQueries } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FiEdit } from "react-icons/fi";
-import { HiOutlineTrash } from "react-icons/hi2";
 import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { LinkCell } from "../../../components/LinkCell";
@@ -9,8 +8,12 @@ import { useGeneralContext } from "../../../context/General.context";
 import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
-import { TableComponentConfig } from "../../../types/page";
-import { UpdatePayload } from "../../../utils/api";
+import {
+  TableActionConfig,
+  TableActionFormFieldConfig,
+  TableComponentConfig,
+} from "../../../types/page";
+import { UpdatePayload, get } from "../../../utils/api";
 import {
   ContainerModel,
   Field,
@@ -29,6 +32,7 @@ import {
   normalizeField,
   tailwindBgToStyle,
 } from "../../../utils/genericPageHelpers";
+import { getIconByName } from "../../../utils/menuIcons";
 import {
   getTableCellClassName,
   getTableDisplayName,
@@ -40,11 +44,190 @@ import {
 } from "../../../utils/validationHelper";
 import { Header } from "../../header/Header";
 import SwitchButton from "../common/SwitchButton";
-import { FormKeyTypeEnum, InputTypes } from "../shared/types";
+import { FormKeyTypeEnum, GenericInputType, InputTypes } from "../shared/types";
 import GenericTable from "../Tables/GenericTable";
 import GenericAddEditPanel from "./GenericAddEditPanel";
 
 type GenericItem = Record<string, unknown> & { _id: string };
+
+const getActionId = (action: TableActionConfig, index: number) =>
+  action.id || action.key || `${action.kind}-${index}`;
+
+
+type ActionSelectDataMap = Map<string, GenericItem[]>;
+
+const actionQs = (params: Record<string, unknown>) =>
+  new URLSearchParams(
+    Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== null && value !== "")
+      .map(([key, value]) => [key, String(value)]),
+  ).toString();
+
+const useActionFormSelectionData = (
+  actions: TableActionConfig[] = [],
+): ActionSelectDataMap => {
+  const schemaSelectFields = actions.flatMap((action, actionIndex) =>
+    (action.formFields || [])
+      .filter(
+        (field) =>
+          field.type === "select" &&
+          field.optionsSource === "schema" &&
+          field.sourceSchemaName,
+      )
+      .map((field) => ({
+        actionId: getActionId(action, actionIndex),
+        field,
+      })),
+  );
+
+  const queryResults = useQueries({
+    queries: schemaSelectFields.map(({ field }) => ({
+      queryKey: ["dynamic", field.sourceSchemaName, "action-options"],
+      queryFn: () =>
+        get<GenericItem[]>({
+          path: `/dynamic?${actionQs({ schemaName: field.sourceSchemaName })}`,
+        }),
+      enabled: Boolean(field.sourceSchemaName),
+      staleTime: Infinity,
+    })),
+  });
+
+  return schemaSelectFields.reduce<ActionSelectDataMap>((map, item, index) => {
+    const rawData = queryResults[index]?.data;
+    const items = Array.isArray(rawData)
+      ? rawData
+      : ((rawData as { data?: GenericItem[]; items?: GenericItem[] } | undefined)
+          ?.data ||
+        (rawData as { data?: GenericItem[]; items?: GenericItem[] } | undefined)
+          ?.items ||
+        []);
+    map.set(`${item.actionId}:${item.field.formKey}`, items);
+    return map;
+  }, new Map());
+};
+
+const parseActionConstantValues = (
+  action: TableActionConfig,
+): Record<string, unknown> => {
+  if (action.constantValues) return action.constantValues;
+  if (!action.constantValuesJson?.trim()) return {};
+
+  try {
+    const parsed = JSON.parse(action.constantValuesJson);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+};
+
+const actionInputType = (type: string | undefined): InputTypes => {
+  const normalized = (type || "text").toLowerCase();
+  if (normalized === "number") return InputTypes.NUMBER;
+  if (normalized === "select") return InputTypes.SELECT;
+  if (normalized === "textarea") return InputTypes.TEXTAREA;
+  if (normalized === "checkbox" || normalized === "boolean") return InputTypes.CHECKBOX;
+  if (normalized === "date") return InputTypes.DATE;
+  if (normalized === "time") return InputTypes.TIME;
+  if (normalized === "color") return InputTypes.COLOR;
+  return InputTypes.TEXT;
+};
+
+const actionFormKeyType = (field: TableActionFormFieldConfig): string => {
+  if (field.formKeyType) return field.formKeyType;
+  if (field.isMultiple) return FormKeyTypeEnum.STRING_ARRAY;
+  if (field.type === "number") return FormKeyTypeEnum.NUMBER;
+  if (field.type === "checkbox") return FormKeyTypeEnum.BOOLEAN;
+  return FormKeyTypeEnum.STRING;
+};
+
+const getStaticActionOptions = (field: TableActionFormFieldConfig) => {
+  if (field.staticOptions?.length) return field.staticOptions;
+  if (!field.staticOptionsJson?.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(field.staticOptionsJson);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const getActionFieldOptions = (
+  actionId: string,
+  field: TableActionFormFieldConfig,
+  selectDataMap: ActionSelectDataMap,
+  fallback?: GenericInputType,
+) => {
+  if (field.type !== "select") return [];
+  if (field.optionsSource !== "schema") return getStaticActionOptions(field);
+
+  const valueField = field.sourceValueField || "_id";
+  const labelField = field.sourceLabelField || valueField;
+  return (selectDataMap.get(`${actionId}:${field.formKey}`) || []).map((item) => ({
+    value: String(item[valueField] ?? item._id ?? ""),
+    label: String(item[labelField] ?? item[valueField] ?? item._id ?? ""),
+  }));
+};
+const buildActionInputs = (
+  action: TableActionConfig,
+  fallbackInputs: GenericInputType[],
+  actionId: string,
+  selectDataMap: ActionSelectDataMap,
+): GenericInputType[] => {
+  if (action.formFields !== undefined) {
+    return action.formFields.map((field) => {
+      const fallback = fallbackInputs.find((input) => input.formKey === field.formKey);
+      return {
+        ...(fallback || {}),
+        type: actionInputType(field.type),
+        formKey: field.formKey,
+        label: field.label || fallback?.label || field.formKey,
+        placeholder: field.placeholder || fallback?.placeholder || field.label || field.formKey,
+        required: field.required ?? fallback?.required ?? false,
+        isMultiple: field.isMultiple ?? fallback?.isMultiple,
+        options: getActionFieldOptions(actionId, field, selectDataMap, fallback),
+        min: field.min ?? fallback?.min,
+        max: field.max ?? fallback?.max,
+        minLength: field.minLength ?? fallback?.minLength,
+        maxLength: field.maxLength ?? fallback?.maxLength,
+        pattern: field.pattern ?? fallback?.pattern,
+        validationMessage: field.validationMessage ?? fallback?.validationMessage,
+      };
+    });
+  }
+
+  return fallbackInputs;
+};
+
+const buildActionFormKeys = (
+  action: TableActionConfig,
+  actionInputs: GenericInputType[],
+) => {
+  if (action.formFields !== undefined) {
+    return action.formFields.map((field) => ({
+      key: field.formKey,
+      type: actionFormKeyType(field),
+    }));
+  }
+
+  return actionInputs.map((input) => ({
+    key: input.formKey,
+    type: input.type === InputTypes.NUMBER ? FormKeyTypeEnum.NUMBER : FormKeyTypeEnum.STRING,
+  }));
+};
+
+const resolveActionTemplate = (
+  template: string | undefined,
+  row: GenericItem | null,
+): string => {
+  if (!template || !row) return template || "";
+  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, key: string) => {
+    const value = row[key.trim()];
+    return value === null || value === undefined ? "" : String(value);
+  });
+};
 
 type Props = {
   schemaName: string;
@@ -71,6 +254,9 @@ export default function GenericUnpaginatedPage({
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isCustomActionOpen, setIsCustomActionOpen] = useState(false);
+  const [activeCustomAction, setActiveCustomAction] =
+    useState<TableActionConfig | null>(null);
   const [rowToAction, setRowToAction] = useState<GenericItem | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterFormElements, setFilterFormElements] =
@@ -137,6 +323,7 @@ export default function GenericUnpaginatedPage({
     createDynamicItem,
     createMultipleDynamicItem,
     updateDynamicItem,
+    executeWorkflow,
     deleteDynamicItem,
     deleteMultipleDynamicItem,
     updateMultipleDynamicItem,
@@ -508,6 +695,8 @@ export default function GenericUnpaginatedPage({
     };
   }, [t, isAddOpen, inputs, formKeys, handleSubmitItem]);
 
+  const actionSelectionDataMap = useActionFormSelectionData(tableConfig?.actions || []);
+
   const actions = useMemo(() => {
     if (!actionsEnabled) return [];
 
@@ -515,139 +704,232 @@ export default function GenericUnpaginatedPage({
       .filter((action) => action.enabled !== false)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const hasConfiguredActions = Array.isArray(tableConfig?.actions);
-    const deleteActionConfig = configuredActions.find(
-      (action) => action.kind === "delete",
-    );
-    const editActionConfig = configuredActions.find(
-      (action) => action.kind === "edit",
-    );
-    const shouldShowDelete = !hasConfiguredActions || !!deleteActionConfig;
-    const shouldShowEdit = !hasConfiguredActions || !!editActionConfig;
-    const editConfiguredFields = editActionConfig?.formFields
-      ?.map((field) => field.formKey)
-      .filter(Boolean);
-    const hasExplicitEditFormFields = editActionConfig?.formFields !== undefined;
-    const editFallbackFields = editActionConfig?.fields || [];
-    const editIncludedFields = new Set(
-      hasExplicitEditFormFields ? editConfiguredFields || [] : editFallbackFields,
-    );
-    const editExcludedFields = new Set(editActionConfig?.excludeFields || []);
-    const editInputs = editActionConfig
-      ? inputs.filter((input) => {
-          const isIncluded = hasExplicitEditFormFields
-            ? editIncludedFields.has(input.formKey)
-            : editIncludedFields.size === 0 || editIncludedFields.has(input.formKey);
-          return isIncluded && !editExcludedFields.has(input.formKey);
-        })
-      : inputs;
-    const editInputKeys = new Set(editInputs.map((input) => input.formKey));
-    const editFormKeys = editActionConfig
-      ? formKeys.filter((formKey) => editInputKeys.has(formKey.key))
-      : formKeys;
 
-    return [
-      shouldShowDelete
-        ? {
-            name: deleteActionConfig?.label || t("Delete"),
-            icon: <HiOutlineTrash />,
-            setRow: setRowToAction as (value: GenericItem) => void,
-            modal: rowToAction ? (
-              <ConfirmationDialog
-                isOpen={isDeleteOpen}
-                close={() => setIsDeleteOpen(false)}
-                confirm={() => {
-                  deleteDynamicItem(rowToAction._id);
-                  setIsDeleteOpen(false);
-                }}
-                title={deleteActionConfig?.confirmTitle || t("Delete")}
-                text={deleteActionConfig?.confirmText || t("GeneralDeleteMessage")}
-              />
-            ) : null,
-            className:
-              deleteActionConfig?.className ||
-              "text-red-500 cursor-pointer text-2xl ml-auto",
-            isModal: true,
-            isModalOpen: isDeleteOpen,
-            setIsModal: setIsDeleteOpen,
-            isPath: false,
-          }
-        : null,
-      shouldShowEdit
-        ? {
-            name: editActionConfig?.label || t("Edit"),
-            icon: <FiEdit />,
-            className:
-              editActionConfig?.className ||
-              "text-blue-500 cursor-pointer text-xl mr-auto",
-            isModal: true,
-            setRow: setRowToAction as (value: GenericItem) => void,
-            modal: rowToAction
-              ? (() => {
-                  const normalizedUpdates = { ...rowToAction };
-                  displayFields.forEach((f) => {
-                    const fieldType = (f.type || "").toLowerCase();
-                    if (
-                      (fieldType === Types.ObjectId ||
-                        fieldType === Types.AutoIncrementId) &&
-                      f.populationSettings &&
-                      normalizedUpdates[f.name] &&
-                      typeof normalizedUpdates[f.name] === "object"
-                    ) {
-                      const populatedValue = normalizedUpdates[f.name] as Record<
-                        string,
-                        unknown
-                      >;
-                      normalizedUpdates[f.name] = populatedValue._id;
-                    } else if (
-                      fieldType === Types.ObjectIdArray &&
-                      f.populationSettings &&
-                      normalizedUpdates[f.name] &&
-                      Array.isArray(normalizedUpdates[f.name])
-                    ) {
-                      const populatedArray = normalizedUpdates[f.name] as Array<
-                        Record<string, unknown>
-                      >;
-                      normalizedUpdates[f.name] = populatedArray.map((item) =>
-                        item && typeof item === "object" ? item._id : item,
-                      );
-                    }
-                  });
+    const buildDeleteAction = (deleteActionConfig?: TableActionConfig) => {
+      const DeleteIcon = getIconByName(deleteActionConfig?.icon || "HiOutlineTrash");
+      return {
+        name: deleteActionConfig?.label || t("Delete"),
+        icon: <DeleteIcon />,
+        setRow: setRowToAction as (value: GenericItem) => void,
+        modal: rowToAction ? (
+          <ConfirmationDialog
+            isOpen={isDeleteOpen}
+            close={() => setIsDeleteOpen(false)}
+            confirm={() => {
+              deleteDynamicItem(rowToAction._id);
+              setIsDeleteOpen(false);
+            }}
+            title={deleteActionConfig?.confirmTitle || t("Delete")}
+            text={deleteActionConfig?.confirmText || t("GeneralDeleteMessage")}
+          />
+        ) : null,
+        className:
+          deleteActionConfig?.className ||
+          "text-red-500 cursor-pointer text-2xl ml-auto",
+        isModal: true,
+        isModalOpen: isDeleteOpen,
+        setIsModal: setIsDeleteOpen,
+        isPath: false,
+      };
+    };
 
-                  return (
-                    <GenericAddEditPanel
-                      isOpen={isEditOpen}
-                      close={() => setIsEditOpen(false)}
-                      inputs={editInputs}
-                      formKeys={editFormKeys}
-                      submitItem={handleSubmitItem}
-                      isEditMode
-                      topClassName="flex flex-col gap-2"
-                      itemToEdit={{
-                        id: rowToAction._id,
-                        updates: normalizedUpdates,
-                      }}
-                    />
+    const buildEditAction = (editActionConfig?: TableActionConfig) => {
+      const EditIcon = getIconByName(editActionConfig?.icon || "FiEdit");
+      const editActionId = editActionConfig ? getActionId(editActionConfig, 0) : "edit-0";
+      const editInputs = buildActionInputs(
+        editActionConfig || { kind: "edit" },
+        inputs,
+        editActionId,
+        actionSelectionDataMap,
+      );
+      const editInputKeys = new Set(editInputs.map((input) => input.formKey));
+      const editFormKeys = editActionConfig?.formFields !== undefined
+        ? buildActionFormKeys(editActionConfig, editInputs)
+        : formKeys.filter((formKey) => editInputKeys.has(formKey.key));
+
+      return {
+        name: editActionConfig?.label || t("Edit"),
+        icon: <EditIcon />,
+        className:
+          editActionConfig?.className ||
+          "text-blue-500 cursor-pointer text-xl mr-auto",
+        isModal: true,
+        setRow: setRowToAction as (value: GenericItem) => void,
+        modal: rowToAction
+          ? (() => {
+              const normalizedUpdates = { ...rowToAction };
+              displayFields.forEach((f) => {
+                const fieldType = (f.type || "").toLowerCase();
+                if (
+                  (fieldType === Types.ObjectId ||
+                    fieldType === Types.AutoIncrementId) &&
+                  f.populationSettings &&
+                  normalizedUpdates[f.name] &&
+                  typeof normalizedUpdates[f.name] === "object"
+                ) {
+                  const populatedValue = normalizedUpdates[f.name] as Record<
+                    string,
+                    unknown
+                  >;
+                  normalizedUpdates[f.name] = populatedValue._id;
+                } else if (
+                  fieldType === Types.ObjectIdArray &&
+                  f.populationSettings &&
+                  normalizedUpdates[f.name] &&
+                  Array.isArray(normalizedUpdates[f.name])
+                ) {
+                  const populatedArray = normalizedUpdates[f.name] as Array<
+                    Record<string, unknown>
+                  >;
+                  normalizedUpdates[f.name] = populatedArray.map((item) =>
+                    item && typeof item === "object" ? item._id : item,
                   );
-                })()
-              : null,
-            isModalOpen: isEditOpen,
-            setIsModal: setIsEditOpen,
-            isPath: false,
+                }
+              });
+
+              return (
+                <GenericAddEditPanel
+                  isOpen={isEditOpen}
+                  close={() => setIsEditOpen(false)}
+                  inputs={editInputs}
+                  formKeys={editFormKeys}
+                  submitItem={handleSubmitItem}
+                  isEditMode
+                  topClassName="flex flex-col gap-2"
+                  itemToEdit={{
+                    id: rowToAction._id,
+                    updates: normalizedUpdates,
+                  }}
+                />
+              );
+            })()
+          : null,
+        isModalOpen: isEditOpen,
+        setIsModal: setIsEditOpen,
+        isPath: false,
+      };
+    };
+
+    const buildCustomAction = (action: TableActionConfig, index: number) => {
+      const actionId = getActionId(action, index);
+      const ActionIcon = getIconByName(action.icon || "FiCheck");
+      const actionInputs = buildActionInputs(
+        action,
+        inputs,
+        actionId,
+        actionSelectionDataMap,
+      );
+      const actionFormKeys = buildActionFormKeys(action, actionInputs);
+      const constantValues = parseActionConstantValues(action);
+      const workflowSubmit = action.submit;
+      const isWorkflowAction = Boolean(
+        workflowSubmit?.workflowName && workflowSubmit?.workflowSchema,
+      );
+      const isFormAction = action.modalType === "form";
+      const isActiveAction =
+        activeCustomAction && getActionId(activeCustomAction, index) === actionId;
+
+      return {
+        name: action.label || t("Action"),
+        icon: <ActionIcon />,
+        className:
+          action.className || "text-emerald-600 cursor-pointer text-xl mr-auto",
+        isButton: action.isButton,
+        buttonClassName: action.buttonClassName,
+        setRow: setRowToAction as (value: GenericItem) => void,
+        onClick: (row: GenericItem) => {
+          setActiveCustomAction(action);
+          if (isFormAction) return;
+
+          if (action.kind === "link") {
+            const path = resolveActionTemplate(action.linkTemplate || action.path, row);
+            if (path) window.location.href = path;
+            return;
           }
-        : null,
-    ].filter((action): action is NonNullable<typeof action> => Boolean(action));
+
+          if (action.kind === "update") {
+            if (isWorkflowAction) {
+              executeWorkflow({
+                workflowName: workflowSubmit?.workflowName || "",
+                workflowSchema: workflowSubmit?.workflowSchema,
+                record: { ...row, ...constantValues },
+                oldRecord: row,
+              });
+              return;
+            }
+            updateDynamicItem(row._id, constantValues as Partial<GenericItem>);
+          }
+        },
+        modal:
+          isFormAction && rowToAction && isActiveAction ? (
+            <GenericAddEditPanel
+              isOpen={isCustomActionOpen}
+              close={() => setIsCustomActionOpen(false)}
+              inputs={actionInputs}
+              formKeys={actionFormKeys}
+              submitItem={(item) => {
+                if ("id" in item && "updates" in item) {
+                  const record = {
+                    ...rowToAction,
+                    ...(item.updates as Record<string, unknown>),
+                    ...constantValues,
+                  };
+                  if (isWorkflowAction) {
+                    executeWorkflow({
+                      workflowName: workflowSubmit?.workflowName || "",
+                      workflowSchema: workflowSubmit?.workflowSchema,
+                      record,
+                      oldRecord: rowToAction,
+                    });
+                  } else {
+                    updateDynamicItem(item.id as string | number, record as Partial<GenericItem>);
+                  }
+                }
+                setIsCustomActionOpen(false);
+              }}
+              isEditMode
+              topClassName="flex flex-col gap-2"
+              itemToEdit={{
+                id: rowToAction._id,
+                updates: { ...rowToAction, ...constantValues },
+              }}
+            />
+          ) : null,
+        isModal: isFormAction,
+        isModalOpen: isCustomActionOpen,
+        setIsModal: setIsCustomActionOpen,
+        isPath: false,
+      };
+    };
+
+    if (!hasConfiguredActions) {
+      return [buildDeleteAction(), buildEditAction()];
+    }
+
+    return configuredActions
+      .map((action, index) => {
+        if (action.kind === "delete") return buildDeleteAction(action);
+        if (action.kind === "edit") return buildEditAction(action);
+        return buildCustomAction(action, index);
+      })
+      .filter((action): action is NonNullable<typeof action> => Boolean(action));
   }, [
     t,
     rowToAction,
     isDeleteOpen,
     isEditOpen,
+    isCustomActionOpen,
+    activeCustomAction,
     deleteDynamicItem,
+    updateDynamicItem,
+    executeWorkflow,
     handleSubmitItem,
     inputs,
     formKeys,
     actionsEnabled,
     displayFields,
     tableConfig?.actions,
+    actionSelectionDataMap,
   ]);
 
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
