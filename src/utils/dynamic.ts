@@ -154,6 +154,10 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   const queryKey = (customQueryKey || listKey(schemaName)) as unknown[];
   const qc = useQueryClient();
   const { t } = useTranslation();
+  const invalidateSchemaQueries = () => {
+    qc.invalidateQueries({ queryKey });
+    qc.invalidateQueries({ queryKey: ["dynamic", schemaName] });
+  };
 
   // Custom create function that handles FormData
   async function createRequest(payload: Partial<T>) {
@@ -252,7 +256,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey });
+      invalidateSchemaQueries();
     },
   });
 
@@ -300,7 +304,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey });
+      invalidateSchemaQueries();
     },
   });
 
@@ -360,7 +364,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey });
+      invalidateSchemaQueries();
     },
   });
 
@@ -399,7 +403,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey });
+      invalidateSchemaQueries();
     },
   });
 
@@ -432,7 +436,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey });
+      invalidateSchemaQueries();
     },
   });
 
@@ -477,7 +481,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey });
+      invalidateSchemaQueries();
     },
   });
 

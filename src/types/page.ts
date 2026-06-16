@@ -53,16 +53,110 @@ export interface TableCacheConfig {
   invalidateKeys?: string[];
 }
 
+export type TableActionKind = "edit" | "delete" | "update" | "link";
+export type TableActionModalType = "none" | "confirm" | "form";
+export type TableActionInputType =
+  | "text"
+  | "date"
+  | "number"
+  | "select"
+  | "textarea"
+  | "image"
+  | "password"
+  | "time"
+  | "color"
+  | "checkbox"
+  | "hour"
+  | "monthYear";
+export type TableActionFormKeyType =
+  | "string"
+  | "number"
+  | "color"
+  | "date"
+  | "boolean"
+  | "checkbox"
+  | "stringArray"
+  | "numberArray"
+  | "intArray";
+export type TableActionOptionsSource = "static" | "schema";
+
+export interface TableActionFieldConfig {
+  field: string;
+  required?: boolean;
+  disabledCondition?: string;
+}
+
+export interface TableActionFormOptionConfig {
+  value: string | number;
+  label: string;
+}
+
+export interface TableActionFormFieldConfig {
+  formKey: string;
+  type: TableActionInputType;
+  formKeyType?: TableActionFormKeyType;
+  label?: string;
+  placeholder?: string;
+  required?: boolean;
+  requiredCondition?: string;
+  disabledCondition?: string;
+  isMultiple?: boolean;
+  optionsSource?: TableActionOptionsSource;
+  staticOptions?: TableActionFormOptionConfig[];
+  staticOptionsJson?: string;
+  sourceSchemaName?: string;
+  sourceValueField?: string;
+  sourceLabelField?: string;
+  sourceFilterCondition?: string;
+  defaultValue?: string | number | boolean | string[] | number[];
+  min?: number;
+  max?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  validationMessage?: string;
+}
+
+export interface TableActionConfig {
+  id?: string;
+  kind: TableActionKind;
+  label?: string;
+  icon?: string;
+  order?: number;
+  enabled?: boolean;
+  modalType?: TableActionModalType;
+  formFields?: TableActionFormFieldConfig[];
+  fields?: string[];
+  excludeFields?: string[];
+  fieldOverrides?: TableActionFieldConfig[];
+  constantValues?: Record<string, unknown>;
+  constantValuesJson?: string;
+  disabledCondition?: string;
+  hiddenCondition?: string;
+  requiredCondition?: string;
+  confirmTitle?: string;
+  confirmText?: string;
+  linkTemplate?: string;
+  linkType?: LinkType;
+  className?: string;
+  buttonClassName?: string;
+  isButton?: boolean;
+}
+
 export interface TableComponentConfig {
   columns?: TableColumnConfig[];
   rows?: TableRowsConfig;
   cache?: TableCacheConfig;
+  actions?: TableActionConfig[];
 }
 
 export type ComponentType =
   | "table"
   | "tabPanel"
-  | "calendar" // Dynamic Calendar Component
+  | "form"
+  | "text"
+  | "custom"
+  | "calendar"
   // Chart types
   | "barChart"
   | "lineChart"
@@ -80,18 +174,22 @@ export type ComponentType =
   | "streamChart"
   | "waffleChart"
   | "circlePackingChart";
-// Future types: "form" | "text" | "custom"
 
 export interface TabContent {
+  id?: string; // Tab identifier for operations like Excel upload
   title: string;
+  icon?: string;
   components: ComponentBlock[];
 }
+
+// Alias for backend compatibility
+export type TabPanelTab = TabContent;
 
 export interface ComponentBlock {
   id: string;
   type: ComponentType;
   title?: string;
-  order: number;
+  order?: number;
   dataBinding?: DataBinding;
   groupBy?: GroupBy; // Grouping configuration for table components
   table?: TableComponentConfig;
@@ -129,7 +227,7 @@ export interface TabsSection {
   tabs: PageTab[];
 }
 
-export type SectionType = "grid" | "tabs" | "component";
+export type SectionType = "grid" | "component" | "tabs";
 
 export interface PageSection {
   id?: string;
@@ -144,17 +242,17 @@ export interface PageSection {
 }
 
 export interface PageModel {
-  _id?: string;
   id?: string;
+  _id?: string;
+  parentPageId?: string;
   name: string;
   icon?: string;
   slug?: string;
-  parentPageId?: string | null;
   order?: number;
   isGroupOnly?: boolean;
   isAuthenticated?: boolean;
   isAuthorized?: boolean;
   authorizeRole?: string[];
-  sections: PageSection[]; // Matches Go backend Section model; flat grid sections are still accepted.
+  sections: PageSection[];
   subPage?: PageModel; // Nested sub-page
 }

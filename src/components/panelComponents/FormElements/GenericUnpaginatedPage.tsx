@@ -510,92 +510,132 @@ export default function GenericUnpaginatedPage({
 
   const actions = useMemo(() => {
     if (!actionsEnabled) return [];
-    return [
-      {
-        name: t("Delete"),
-        icon: <HiOutlineTrash />,
-        setRow: setRowToAction as (value: GenericItem) => void,
-        modal: rowToAction ? (
-          <ConfirmationDialog
-            isOpen={isDeleteOpen}
-            close={() => setIsDeleteOpen(false)}
-            confirm={() => {
-              deleteDynamicItem(rowToAction._id);
-              setIsDeleteOpen(false);
-            }}
-            title={t("Delete")}
-            text={t("GeneralDeleteMessage")}
-          />
-        ) : null,
-        className: "text-red-500 cursor-pointer text-2xl ml-auto",
-        isModal: true,
-        isModalOpen: isDeleteOpen,
-        setIsModal: setIsDeleteOpen,
-        isPath: false,
-      },
-      {
-        name: t("Edit"),
-        icon: <FiEdit />,
-        className: "text-blue-500 cursor-pointer text-xl mr-auto",
-        isModal: true,
-        setRow: setRowToAction as (value: GenericItem) => void,
-        modal: rowToAction
-          ? (() => {
-              // Normalize the row data to extract IDs from populated fields
-              const normalizedUpdates = { ...rowToAction };
-              displayFields.forEach((f) => {
-                const fieldType = (f.type || "").toLowerCase();
-                if (
-                  (fieldType === Types.ObjectId ||
-                    fieldType === Types.AutoIncrementId) &&
-                  f.populationSettings &&
-                  normalizedUpdates[f.name] &&
-                  typeof normalizedUpdates[f.name] === "object"
-                ) {
-                  // Extract the _id from the populated object
-                  const populatedValue = normalizedUpdates[f.name] as Record<
-                    string,
-                    unknown
-                  >;
-                  normalizedUpdates[f.name] = populatedValue._id;
-                } else if (
-                  fieldType === Types.ObjectIdArray &&
-                  f.populationSettings &&
-                  normalizedUpdates[f.name] &&
-                  Array.isArray(normalizedUpdates[f.name])
-                ) {
-                  // Extract array of _ids from populated objects
-                  const populatedArray = normalizedUpdates[f.name] as Array<
-                    Record<string, unknown>
-                  >;
-                  normalizedUpdates[f.name] = populatedArray.map((item) =>
-                    item && typeof item === "object" ? item._id : item,
-                  );
-                }
-              });
 
-              return (
-                <GenericAddEditPanel
-                  isOpen={isEditOpen}
-                  close={() => setIsEditOpen(false)}
-                  inputs={inputs}
-                  formKeys={formKeys}
-                  submitItem={handleSubmitItem}
-                  isEditMode
-                  topClassName="flex flex-col gap-2"
-                  itemToEdit={{
-                    id: rowToAction._id,
-                    updates: normalizedUpdates,
-                  }}
-                />
-              );
-            })()
-          : null,
-        isModalOpen: isEditOpen,
-        setIsModal: setIsEditOpen,
-        isPath: false,
-      },
-    ];
+    const configuredActions = (tableConfig?.actions || [])
+      .filter((action) => action.enabled !== false)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const hasConfiguredActions = Array.isArray(tableConfig?.actions);
+    const deleteActionConfig = configuredActions.find(
+      (action) => action.kind === "delete",
+    );
+    const editActionConfig = configuredActions.find(
+      (action) => action.kind === "edit",
+    );
+    const shouldShowDelete = !hasConfiguredActions || !!deleteActionConfig;
+    const shouldShowEdit = !hasConfiguredActions || !!editActionConfig;
+    const editConfiguredFields = editActionConfig?.formFields
+      ?.map((field) => field.formKey)
+      .filter(Boolean);
+    const hasExplicitEditFormFields = editActionConfig?.formFields !== undefined;
+    const editFallbackFields = editActionConfig?.fields || [];
+    const editIncludedFields = new Set(
+      hasExplicitEditFormFields ? editConfiguredFields || [] : editFallbackFields,
+    );
+    const editExcludedFields = new Set(editActionConfig?.excludeFields || []);
+    const editInputs = editActionConfig
+      ? inputs.filter((input) => {
+          const isIncluded = hasExplicitEditFormFields
+            ? editIncludedFields.has(input.formKey)
+            : editIncludedFields.size === 0 || editIncludedFields.has(input.formKey);
+          return isIncluded && !editExcludedFields.has(input.formKey);
+        })
+      : inputs;
+    const editInputKeys = new Set(editInputs.map((input) => input.formKey));
+    const editFormKeys = editActionConfig
+      ? formKeys.filter((formKey) => editInputKeys.has(formKey.key))
+      : formKeys;
+
+    return [
+      shouldShowDelete
+        ? {
+            name: deleteActionConfig?.label || t("Delete"),
+            icon: <HiOutlineTrash />,
+            setRow: setRowToAction as (value: GenericItem) => void,
+            modal: rowToAction ? (
+              <ConfirmationDialog
+                isOpen={isDeleteOpen}
+                close={() => setIsDeleteOpen(false)}
+                confirm={() => {
+                  deleteDynamicItem(rowToAction._id);
+                  setIsDeleteOpen(false);
+                }}
+                title={deleteActionConfig?.confirmTitle || t("Delete")}
+                text={deleteActionConfig?.confirmText || t("GeneralDeleteMessage")}
+              />
+            ) : null,
+            className:
+              deleteActionConfig?.className ||
+              "text-red-500 cursor-pointer text-2xl ml-auto",
+            isModal: true,
+            isModalOpen: isDeleteOpen,
+            setIsModal: setIsDeleteOpen,
+            isPath: false,
+          }
+        : null,
+      shouldShowEdit
+        ? {
+            name: editActionConfig?.label || t("Edit"),
+            icon: <FiEdit />,
+            className:
+              editActionConfig?.className ||
+              "text-blue-500 cursor-pointer text-xl mr-auto",
+            isModal: true,
+            setRow: setRowToAction as (value: GenericItem) => void,
+            modal: rowToAction
+              ? (() => {
+                  const normalizedUpdates = { ...rowToAction };
+                  displayFields.forEach((f) => {
+                    const fieldType = (f.type || "").toLowerCase();
+                    if (
+                      (fieldType === Types.ObjectId ||
+                        fieldType === Types.AutoIncrementId) &&
+                      f.populationSettings &&
+                      normalizedUpdates[f.name] &&
+                      typeof normalizedUpdates[f.name] === "object"
+                    ) {
+                      const populatedValue = normalizedUpdates[f.name] as Record<
+                        string,
+                        unknown
+                      >;
+                      normalizedUpdates[f.name] = populatedValue._id;
+                    } else if (
+                      fieldType === Types.ObjectIdArray &&
+                      f.populationSettings &&
+                      normalizedUpdates[f.name] &&
+                      Array.isArray(normalizedUpdates[f.name])
+                    ) {
+                      const populatedArray = normalizedUpdates[f.name] as Array<
+                        Record<string, unknown>
+                      >;
+                      normalizedUpdates[f.name] = populatedArray.map((item) =>
+                        item && typeof item === "object" ? item._id : item,
+                      );
+                    }
+                  });
+
+                  return (
+                    <GenericAddEditPanel
+                      isOpen={isEditOpen}
+                      close={() => setIsEditOpen(false)}
+                      inputs={editInputs}
+                      formKeys={editFormKeys}
+                      submitItem={handleSubmitItem}
+                      isEditMode
+                      topClassName="flex flex-col gap-2"
+                      itemToEdit={{
+                        id: rowToAction._id,
+                        updates: normalizedUpdates,
+                      }}
+                    />
+                  );
+                })()
+              : null,
+            isModalOpen: isEditOpen,
+            setIsModal: setIsEditOpen,
+            isPath: false,
+          }
+        : null,
+    ].filter((action): action is NonNullable<typeof action> => Boolean(action));
   }, [
     t,
     rowToAction,
@@ -606,6 +646,8 @@ export default function GenericUnpaginatedPage({
     inputs,
     formKeys,
     actionsEnabled,
+    displayFields,
+    tableConfig?.actions,
   ]);
 
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);

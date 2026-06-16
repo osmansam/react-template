@@ -330,7 +330,7 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
 
 const GridCellView: React.FC<{ cell: GridCell }> = React.memo(({ cell }) => {
   const { row, column, rowSpan = 1, colSpan = 1, components } = cell;
-  const sortedComponents = [...components].sort((a, b) => a.order - b.order);
+  const sortedComponents = [...components].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   return (
     <div
@@ -400,11 +400,11 @@ export const PageSectionView: React.FC<{ section: PageSection }> = ({
   if (section.type === "tabs" && section.tabs?.tabs?.length) {
     const tabs: TabContent[] = section.tabs.tabs
       .slice()
-      .sort((a, b) => a.order - b.order)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       .map((tab) => ({
         title: tab.label,
         components: tab.sections
-          .flatMap((tabSection) => tabSection.component || [])
+          .flatMap((tabSection) => tabSection.component ? [tabSection.component] : [])
           .filter(Boolean),
       }));
     return <MixedTabPanel tabs={tabs} />;
