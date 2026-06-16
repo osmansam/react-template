@@ -130,14 +130,19 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
 
     switch (type) {
       case "table":
-        return dataBinding?.kind === "schema" && dataBinding.schemaName ? (
+        return dataBinding?.schemaName &&
+          ["schema", "pipeline", "workflow"].includes(dataBinding.kind) ? (
           <GenericPaginatedPage
             schemaName={dataBinding.schemaName}
             isHeader={false}
             tableConfig={tableConfig}
+            dataBinding={dataBinding}
+            actionsEnabled={dataBinding.kind === "schema"}
           />
         ) : (
-          <NoticePanel>Table component requires schema binding.</NoticePanel>
+          <NoticePanel>
+            Table component requires schema, pipeline, or workflow binding.
+          </NoticePanel>
         );
       case "tabPanel":
         if (shouldFetchGrouping && tabWithGroupByIndex >= 0) {

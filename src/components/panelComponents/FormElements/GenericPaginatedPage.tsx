@@ -11,7 +11,7 @@ import { useGeneralContext } from "../../../context/General.context";
 import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
-import { TableComponentConfig } from "../../../types/page";
+import { DataBinding, TableComponentConfig } from "../../../types/page";
 import { UpdatePayload } from "../../../utils/api";
 import {
   ContainerModel,
@@ -22,7 +22,8 @@ import {
 import {
   useDynamicCrud,
   useExportDynamicItems,
-  useGetPaginatedItems,
+  useGetTableSourceItems,
+  TableSourceBinding,
 } from "../../../utils/dynamic";
 import {
   RawContainer,
@@ -61,6 +62,7 @@ type Props = {
   constantFilter?: Record<string, unknown>; // Constant filter that won't be editable
   customTitle?: string; // Custom title for the table
   tableConfig?: TableComponentConfig;
+  dataBinding?: DataBinding;
 };
 
 export default function GenericPaginatedPage({
@@ -72,6 +74,7 @@ export default function GenericPaginatedPage({
   constantFilter,
   customTitle,
   tableConfig,
+  dataBinding,
 }: Props) {
   const { t } = useTranslation();
   const { rowsPerPage } = useGeneralContext();
@@ -111,6 +114,21 @@ export default function GenericPaginatedPage({
     });
 
   const [showFilters, setShowFilters] = useState(false);
+  const tableBinding = useMemo<TableSourceBinding>(
+    () => ({
+      kind:
+        dataBinding?.kind === "pipeline" || dataBinding?.kind === "workflow"
+          ? dataBinding.kind
+          : "schema",
+      schemaName: dataBinding?.schemaName || schemaName,
+      pipelineName: dataBinding?.pipelineName,
+      workflowName: dataBinding?.workflowName,
+      fields: tableConfig?.columns?.map((column) => column.field).filter(Boolean),
+      params: dataBinding?.params,
+    }),
+    [dataBinding, schemaName, tableConfig?.columns],
+  );
+  const schemaActionsEnabled = actionsEnabled && tableBinding.kind === "schema";
 
   // Moved useDynamicCrud below filter state so we can pass the query key
   const mergedFilters = useMemo(() => {
@@ -140,10 +158,28 @@ export default function GenericPaginatedPage({
   } = useDynamicCrud<GenericItem>(schemaName, hasImageField, paginatedQueryKey);
 
   const displayFields: Field[] = useMemo(() => {
-    if (!container?.fields) return [];
-    let fields = container.fields
+    const containerFields = container?.fields || [];
+    let fields = containerFields
       .map(normalizeField)
       .filter(isDisplayablePrimitive);
+
+    if (tableConfig?.columns?.length) {
+      fields = tableConfig.columns
+        .map((column) => {
+          const field = fields.find((item) => item.name === column.field);
+          return (
+            field || {
+              name: column.field,
+              type: "string",
+              frontend: column.displayName
+                ? { displayName: column.displayName }
+                : undefined,
+            }
+          );
+        })
+        .filter((field): field is Field => Boolean(field?.name));
+    }
+
     if (includeFields?.length) {
       fields = includeFields
         .map((name) => fields.find((f) => f.name === name))
@@ -176,7 +212,7 @@ export default function GenericPaginatedPage({
     });
 
     return fields;
-  }, [container, includeFields, excludeFields, user]);
+  }, [container, includeFields, excludeFields, user, tableConfig]);
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
@@ -362,10 +398,10 @@ export default function GenericPaginatedPage({
         isSortable: true,
         correspondingKey: f.name,
       }));
-    return actionsEnabled
+    return schemaActionsEnabled
       ? [...baseCols, { key: t("Actions"), isSortable: false }]
       : baseCols;
-  }, [displayFields, t, actionsEnabled, constantFilter, tableConfig]);
+  }, [displayFields, t, schemaActionsEnabled, constantFilter, tableConfig]);
 
   const { inputs, formKeys, constantFilterKeys } = useMemo(() => {
     const constantFilterKeys = constantFilter
@@ -493,10 +529,10 @@ export default function GenericPaginatedPage({
   }, [displayFields, t, selectionDataMap, constantFilter]);
 
   // mergedFilters is now defined earlier to pass to useDynamicCrud
-  const itemsPayload = useGetPaginatedItems(
+  const itemsPayload = useGetTableSourceItems(
     currentPage,
     rowsPerPage,
-    schemaName,
+    tableBinding,
     mergedFilters,
   );
 
@@ -629,7 +665,7 @@ export default function GenericPaginatedPage({
   );
 
   const actions = useMemo(() => {
-    if (!actionsEnabled) return [];
+    if (!schemaActionsEnabled) return [];
     return [
       {
         name: t("Delete"),
@@ -724,7 +760,7 @@ export default function GenericPaginatedPage({
     deleteDynamicItem,
     handleSubmitItem,
     formKeys,
-    actionsEnabled,
+    schemaActionsEnabled,
     displayFields,
     inputs,
   ]);
@@ -1184,7 +1220,7 @@ export default function GenericPaginatedPage({
           "px-2 ml-auto bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
         isModal: true,
         className: "cursor-pointer",
-        isDisabled: !actionsEnabled || !selectedRows?.length,
+        isDisabled: !schemaActionsEnabled || !selectedRows?.length,
         modal:
           selectedRows?.length > 0 ? (
             <ConfirmationDialog
@@ -1231,12 +1267,12 @@ export default function GenericPaginatedPage({
         isModalOpen: isBulkEditOpen,
         setIsModal: setIsBulkEditOpen,
         isPath: false,
-        isDisabled: !actionsEnabled || !selectedRows?.length,
+        isDisabled: !schemaActionsEnabled || !selectedRows?.length,
       },
     ],
     [
       t,
-      actionsEnabled,
+      schemaActionsEnabled,
       selectedRows,
       isBulkDeleteOpen,
       handleBulkDeleteConfirm,
@@ -1302,15 +1338,19 @@ export default function GenericPaginatedPage({
           title={customTitle || t(humanize(schemaName))}
           addButton={addButton}
           isCollapsible={false}
-          isActionsActive={actionsEnabled}
+          isActionsActive={schemaActionsEnabled}
           isSearch={false}
           outsideSortProps={outsideSort}
           {...(pagination && { pagination })}
           outsideSearchProps={outsideSearchProps}
           selectionActions={selectionActions}
           isExcel={true}
-          onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
-          onExcelExport={() => setIsExportModalOpen(true)}
+          onExcelUpload={
+            schemaActionsEnabled && !hasImageField ? createMultipleDynamicItem : undefined
+          }
+          onExcelExport={
+            schemaActionsEnabled ? () => setIsExportModalOpen(true) : undefined
+          }
           filters={filters}
           filterPanel={filterPanel}
           containerFields={container?.fields}

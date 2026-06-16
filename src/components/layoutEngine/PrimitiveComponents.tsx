@@ -99,7 +99,7 @@ export const ChartView: React.FC<
   // Remove params from dataBinding since they're chart config, not pipeline params
   const updatedBinding:
     | {
-        kind: "schema" | "pipeline" | "api";
+        kind: "schema" | "pipeline" | "workflow" | "api";
         schemaName?: string;
         pipelineName?: string;
       }
