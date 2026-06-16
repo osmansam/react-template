@@ -4,6 +4,7 @@ import {
   GridCell,
   GridSection,
   PageSection,
+  TableComponentConfig,
   TabContent,
 } from "../types/page";
 import { useGetSelection } from "../utils/dynamic";
@@ -65,6 +66,16 @@ const getChartTypeFromComponentType = (
   return mapping[componentType] || null;
 };
 
+const getTableConfig = (
+  table: TableComponentConfig | undefined,
+  props: Record<string, unknown> | undefined,
+): TableComponentConfig | undefined =>
+  table ||
+  (props?.table as TableComponentConfig | undefined) ||
+  (props?.columns || props?.rows || props?.cache
+    ? (props as TableComponentConfig)
+    : undefined);
+
 const MixedTabPanel: React.FC<{ tabs: TabContent[] }> = ({ tabs }) => {
   const [activeTab, setActiveTab] = useState(0);
 
@@ -94,6 +105,7 @@ const MixedTabPanel: React.FC<{ tabs: TabContent[] }> = ({ tabs }) => {
 const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
   ({ component }) => {
     const { type, dataBinding, tabs, groupBy, title, props } = component;
+    const tableConfig = getTableConfig(component.table, props);
     const tabWithGroupByIndex =
       tabs?.findIndex((tab) => tab.components[0]?.groupBy) ?? -1;
     const tabPanelGroupBy =
@@ -122,6 +134,7 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
           <GenericPaginatedPage
             schemaName={dataBinding.schemaName}
             isHeader={false}
+            tableConfig={tableConfig}
           />
         ) : (
           <NoticePanel>Table component requires schema binding.</NoticePanel>
@@ -152,6 +165,7 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
               constantFilter: {
                 [tabPanelGroupBy!.groupByObjectId]: groupValue,
               },
+              tableConfig: getTableConfig(baseComponent.table, baseComponent.props),
             };
           });
 
@@ -160,12 +174,20 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
               schemaName: tab.components[0]?.dataBinding?.schemaName || "",
               label: tab.title,
               isPaginated: true,
+              tableConfig: getTableConfig(
+                tab.components[0]?.table,
+                tab.components[0]?.props,
+              ),
             })),
             ...dynamicTabs,
             ...tabs!.slice(tabWithGroupByIndex + 1).map((tab: TabContent) => ({
               schemaName: tab.components[0]?.dataBinding?.schemaName || "",
               label: tab.title,
               isPaginated: true,
+              tableConfig: getTableConfig(
+                tab.components[0]?.table,
+                tab.components[0]?.props,
+              ),
             })),
           ];
 
@@ -186,6 +208,10 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
                   schemaName: tab.components[0]?.dataBinding?.schemaName || "",
                   label: tab.title,
                   isPaginated: true,
+                  tableConfig: getTableConfig(
+                    tab.components[0]?.table,
+                    tab.components[0]?.props,
+                  ),
                 }))}
               />
             );
