@@ -7,6 +7,12 @@ import { ContainerModel, Field, Types } from "./api/container";
 
 type GenericItem = Record<string, unknown> & { _id: string };
 type ComparableValue = string | number | boolean | null | undefined;
+type RowClassRule = {
+  condition?: string;
+  className?: string;
+  Condition?: string;
+  ClassName?: string;
+};
 
 const toComparableValue = (value: unknown): ComparableValue => {
   if (
@@ -441,14 +447,41 @@ export const parseValue = (
   return value;
 };
 
-/**
- * Evaluate a row condition (e.g., "field > 5", "status = active")
- */
-export const evaluateRowCondition = (
+const splitLogicalExpression = (
+  expression: string,
+  operator: "&&" | "||",
+): string[] => {
+  const parts: string[] = [];
+  let current = "";
+  let quote: '"' | "'" | null = null;
+
+  for (let index = 0; index < expression.length; index += 1) {
+    const char = expression[index];
+    const next = expression[index + 1];
+
+    if ((char === '"' || char === "'") && expression[index - 1] !== "\\") {
+      quote = quote === char ? null : quote ?? char;
+    }
+
+    if (!quote && char === operator[0] && next === operator[1]) {
+      parts.push(current.trim());
+      current = "";
+      index += 1;
+      continue;
+    }
+
+    current += char;
+  }
+
+  parts.push(current.trim());
+  return parts.filter(Boolean);
+};
+
+const evaluateSimpleRowCondition = (
   row: GenericItem,
-  condition: string
+  condition: string,
 ): boolean => {
-  if (!condition) return false;
+  if (!condition?.trim()) return false;
 
   // Handle inequality (!=)
   if (condition.includes("!=")) {
@@ -506,6 +539,57 @@ export const evaluateRowCondition = (
 
   // Handle truthy check (just field name)
   return !!parseValue(row, condition);
+};
+
+/**
+ * Evaluate a row condition (e.g., "field > 5", "status = active", "type='farm' && count=4")
+ */
+export const evaluateRowCondition = (
+  row: GenericItem,
+  condition: string
+): boolean => {
+  const trimmedCondition = condition?.trim();
+  if (!trimmedCondition) return false;
+
+  const orParts = splitLogicalExpression(trimmedCondition, "||");
+  if (orParts.length > 1) {
+    return orParts.some((part) => evaluateRowCondition(row, part));
+  }
+
+  const andParts = splitLogicalExpression(trimmedCondition, "&&");
+  if (andParts.length > 1) {
+    return andParts.every((part) => evaluateRowCondition(row, part));
+  }
+
+  return evaluateSimpleRowCondition(row, trimmedCondition);
+};
+
+export const getMatchingRowClassNames = (
+  row: GenericItem,
+  rules: RowClassRule[] = [],
+): string => {
+  const matchedClassNames: string[] = [];
+  const fallbackClassNames: string[] = [];
+
+  rules.forEach((rule) => {
+    const condition = rule.condition ?? rule.Condition ?? "";
+    const className = rule.className ?? rule.ClassName ?? "";
+    if (!className.trim()) return;
+
+    if (!condition.trim()) {
+      fallbackClassNames.push(className);
+      return;
+    }
+
+    if (evaluateRowCondition(row, condition)) {
+      matchedClassNames.push(className);
+    }
+  });
+
+  return (matchedClassNames.length > 0
+    ? matchedClassNames
+    : fallbackClassNames
+  ).join(" ");
 };
 
 /**

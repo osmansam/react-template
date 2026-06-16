@@ -1,23 +1,23 @@
 import { useNavigate } from "react-router-dom";
-import { Field } from "../utils/api/container";
+import { useTenantProject } from "../hooks/useTenantProject";
+import { Field, Frontend } from "../utils/api/container";
 import { buildLinkUrl, getLinkLabel } from "../utils/linkHelpers";
 
 interface LinkCellProps {
   field: Field;
   row: Record<string, unknown>;
+  linkConfig?: Frontend;
 }
 
 /**
  * Renders a table cell that can be a clickable link based on field configuration
  * Supports multiple link types: external, internal, email, phone, file
  */
-export function LinkCell({ field, row }: LinkCellProps) {
+export function LinkCell({ field, row, linkConfig }: LinkCellProps) {
   const navigate = useNavigate();
+  const { buildPath } = useTenantProject();
   const fieldValue = row?.[field.name];
-  
-  // Confirmed available user info:
-  // console.log("LinkCell User Access:", user);
-  const { frontend } = field;
+  const frontend = linkConfig ?? field.frontend;
 
   // If no link template is configured, render plain value
   if (!frontend?.linkTemplate) {
@@ -33,17 +33,30 @@ export function LinkCell({ field, row }: LinkCellProps) {
   }
 
   const linkType = frontend.linkType || "external";
+  const isTenantProjectPath = /^\/t\/[^/]+\/p\/[^/]+/.test(url);
+  const internalPath =
+    linkType === "internal" && !isTenantProjectPath
+      ? buildPath(url)
+      : url;
+  const href =
+    linkType === "internal"
+      ? internalPath
+      : linkType === "email" && !url.startsWith("mailto:")
+      ? `mailto:${url}`
+      : linkType === "phone" && !url.startsWith("tel:")
+        ? `tel:${url}`
+        : url;
 
   // Handle internal navigation using React Router
   if (linkType === "internal") {
     const handleClick = (e: React.MouseEvent) => {
       e.preventDefault();
-      navigate(url);
+      navigate(internalPath);
     };
 
     return (
       <a
-        href={url}
+        href={href}
         onClick={handleClick}
         className="text-blue-500 hover:text-blue-800  cursor-pointer"
       >
@@ -56,7 +69,7 @@ export function LinkCell({ field, row }: LinkCellProps) {
   if (linkType === "external") {
     return (
       <a
-        href={url}
+        href={href}
         target="_blank"
         rel="noreferrer"
         className="text-blue-500 hover:text-blue-800 "
@@ -69,7 +82,7 @@ export function LinkCell({ field, row }: LinkCellProps) {
   // Handle email, phone, and file links
   return (
     <a
-      href={url}
+      href={href}
       className="text-blue-500 hover:text-blue-800 "
     >
       {label}
