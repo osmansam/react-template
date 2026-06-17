@@ -100,7 +100,9 @@ export interface TableActionFormFieldConfig {
   required?: boolean;
   requiredCondition?: string;
   disabledCondition?: string;
+  isDisabled?: boolean;
   isMultiple?: boolean;
+  isNumberButtonsActive?: boolean;
   optionsSource?: TableActionOptionsSource;
   staticOptions?: TableActionFormOptionConfig[];
   staticOptionsJson?: string;
@@ -108,6 +110,7 @@ export interface TableActionFormFieldConfig {
   sourceValueField?: string;
   sourceLabelField?: string;
   sourceFilterCondition?: string;
+  invalidateKeys?: string[];
   defaultValue?: string | number | boolean | string[] | number[];
   min?: number;
   max?: number;
@@ -127,6 +130,7 @@ export interface TableActionConfig {
   key?: string;
   kind: TableActionKind;
   label?: string;
+  buttonName?: string;
   icon?: string;
   order?: number;
   enabled?: boolean;

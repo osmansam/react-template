@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SketchPicker } from "react-color";
 import "react-day-picker/dist/style.css";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
@@ -65,6 +65,10 @@ const TextInput = ({
   > | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
   const handleDivClick = () => {
     if (inputRef.current) {
       inputRef.current.focus();
@@ -113,6 +117,7 @@ const TextInput = ({
   };
 
   const handleIncrement = () => {
+    if (disabled || isReadOnly) return;
     if (type === "number") {
       const newValue = Math.max(minNumber, +localValue + 1);
       setLocalValue(newValue);
@@ -138,6 +143,7 @@ const TextInput = ({
     }
   };
   const handleDecrement = () => {
+    if (disabled || isReadOnly) return;
     if (type === "number" && +localValue > minNumber) {
       const newValue = Math.max(minNumber, +localValue - 1);
       setLocalValue(newValue);
@@ -178,6 +184,7 @@ const TextInput = ({
       document.activeElement.blur();
     }
   };
+  const isInputLocked = disabled || isReadOnly;
 
   if (type === "color") {
     return (
@@ -282,7 +289,7 @@ const TextInput = ({
             fontSize: "16px",
           }}
           placeholder={placeholder}
-          disabled={disabled || isReadOnly}
+          disabled={isInputLocked}
           value={localValue}
           onChange={handleChange}
           className={inputClassName}
@@ -304,13 +311,21 @@ const TextInput = ({
         )}
         {isNumberButtonsActive && (
           <FiMinusCircle
-            className="w-7 h-7 flex-shrink-0 text-error-500 hover:text-error-600 cursor-pointer focus:outline-none transition-colors active:scale-95"
+            className={`w-7 h-7 flex-shrink-0 focus:outline-none transition-colors active:scale-95 ${
+              isInputLocked
+                ? "text-neutral-300 cursor-not-allowed"
+                : "text-error-500 hover:text-error-600 cursor-pointer"
+            }`}
             onClick={handleDecrement}
           />
         )}
         {isNumberButtonsActive && (
           <GoPlusCircle
-            className="w-7 h-7 flex-shrink-0 text-success-500 hover:text-success-600 cursor-pointer focus:outline-none transition-colors active:scale-95"
+            className={`w-7 h-7 flex-shrink-0 focus:outline-none transition-colors active:scale-95 ${
+              isInputLocked
+                ? "text-neutral-300 cursor-not-allowed"
+                : "text-success-500 hover:text-success-600 cursor-pointer"
+            }`}
             onClick={handleIncrement}
           />
         )}

@@ -24,8 +24,8 @@ import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
 import {
   RawContainer,
   fieldToInput,
-  getMatchingRowClassNames,
   getFieldLabel,
+  getMatchingRowClassNames,
   humanize,
   isDisplayablePrimitive,
   normalizeContainer,
@@ -53,13 +53,14 @@ type GenericItem = Record<string, unknown> & { _id: string };
 const getActionId = (action: TableActionConfig, index: number) =>
   action.id || action.key || `${action.kind}-${index}`;
 
-
 type ActionSelectDataMap = Map<string, GenericItem[]>;
 
 const actionQs = (params: Record<string, unknown>) =>
   new URLSearchParams(
     Object.entries(params)
-      .filter(([, value]) => value !== undefined && value !== null && value !== "")
+      .filter(
+        ([, value]) => value !== undefined && value !== null && value !== "",
+      )
       .map(([key, value]) => [key, String(value)]),
   ).toString();
 
@@ -96,11 +97,11 @@ const useActionFormSelectionData = (
     const rawData = queryResults[index]?.data;
     const items = Array.isArray(rawData)
       ? rawData
-      : ((rawData as { data?: GenericItem[]; items?: GenericItem[] } | undefined)
+      : (rawData as { data?: GenericItem[]; items?: GenericItem[] } | undefined)
           ?.data ||
         (rawData as { data?: GenericItem[]; items?: GenericItem[] } | undefined)
           ?.items ||
-        []);
+        [];
     map.set(`${item.actionId}:${item.field.formKey}`, items);
     return map;
   }, new Map());
@@ -127,7 +128,8 @@ const actionInputType = (type: string | undefined): InputTypes => {
   if (normalized === "number") return InputTypes.NUMBER;
   if (normalized === "select") return InputTypes.SELECT;
   if (normalized === "textarea") return InputTypes.TEXTAREA;
-  if (normalized === "checkbox" || normalized === "boolean") return InputTypes.CHECKBOX;
+  if (normalized === "checkbox" || normalized === "boolean")
+    return InputTypes.CHECKBOX;
   if (normalized === "date") return InputTypes.DATE;
   if (normalized === "time") return InputTypes.TIME;
   if (normalized === "color") return InputTypes.COLOR;
@@ -165,10 +167,13 @@ const getActionFieldOptions = (
 
   const valueField = field.sourceValueField || "_id";
   const labelField = field.sourceLabelField || valueField;
-  return (selectDataMap.get(`${actionId}:${field.formKey}`) || []).map((item) => ({
-    value: String(item[valueField] ?? item._id ?? ""),
-    label: String(item[labelField] ?? item[valueField] ?? item._id ?? ""),
-  }));
+  return (selectDataMap.get(`${actionId}:${field.formKey}`) || []).map(
+    (item) => ({
+      value: String(item[valueField] ?? item._id ?? ""),
+      label: String(item[labelField] ?? item[valueField] ?? item._id ?? ""),
+      sourceItem: item,
+    }),
+  );
 };
 const buildActionInputs = (
   action: TableActionConfig,
@@ -178,22 +183,44 @@ const buildActionInputs = (
 ): GenericInputType[] => {
   if (action.formFields !== undefined) {
     return action.formFields.map((field) => {
-      const fallback = fallbackInputs.find((input) => input.formKey === field.formKey);
+      const fallback = fallbackInputs.find(
+        (input) => input.formKey === field.formKey,
+      );
       return {
         ...(fallback || {}),
         type: actionInputType(field.type),
         formKey: field.formKey,
         label: field.label || fallback?.label || field.formKey,
-        placeholder: field.placeholder || fallback?.placeholder || field.label || field.formKey,
+        placeholder:
+          field.placeholder ||
+          fallback?.placeholder ||
+          field.label ||
+          field.formKey,
         required: field.required ?? fallback?.required ?? false,
+        requiredCondition: field.requiredCondition,
+        disabledCondition: field.disabledCondition,
+        isDisabled: field.isDisabled ?? fallback?.isDisabled,
         isMultiple: field.isMultiple ?? fallback?.isMultiple,
-        options: getActionFieldOptions(actionId, field, selectDataMap, fallback),
+        isNumberButtonsActive:
+          field.isNumberButtonsActive ?? fallback?.isNumberButtonsActive,
+        options: getActionFieldOptions(
+          actionId,
+          field,
+          selectDataMap,
+          fallback,
+        ),
+        sourceFilterCondition: field.sourceFilterCondition,
+        invalidateKeys: field.invalidateKeys?.map((key) => ({
+          key,
+          defaultValue: "",
+        })),
         min: field.min ?? fallback?.min,
         max: field.max ?? fallback?.max,
         minLength: field.minLength ?? fallback?.minLength,
         maxLength: field.maxLength ?? fallback?.maxLength,
         pattern: field.pattern ?? fallback?.pattern,
-        validationMessage: field.validationMessage ?? fallback?.validationMessage,
+        validationMessage:
+          field.validationMessage ?? fallback?.validationMessage,
       };
     });
   }
@@ -214,9 +241,22 @@ const buildActionFormKeys = (
 
   return actionInputs.map((input) => ({
     key: input.formKey,
-    type: input.type === InputTypes.NUMBER ? FormKeyTypeEnum.NUMBER : FormKeyTypeEnum.STRING,
+    type:
+      input.type === InputTypes.NUMBER
+        ? FormKeyTypeEnum.NUMBER
+        : FormKeyTypeEnum.STRING,
   }));
 };
+
+const getActionDefaultValues = (
+  action: TableActionConfig,
+): Record<string, unknown> =>
+  (action.formFields || []).reduce<Record<string, unknown>>((values, field) => {
+    if (field.formKey && field.defaultValue !== undefined) {
+      values[field.formKey] = field.defaultValue;
+    }
+    return values;
+  }, {});
 
 const resolveActionTemplate = (
   template: string | undefined,
@@ -282,7 +322,10 @@ export default function GenericUnpaginatedPage({
       const rowClassName = tableConfig?.rows?.className;
 
       if (rowClassName) {
-        Object.assign(styles, tailwindBgToStyle(getMatchingRowClassNames(row, rowClassName)));
+        Object.assign(
+          styles,
+          tailwindBgToStyle(getMatchingRowClassNames(row, rowClassName)),
+        );
         return styles;
       }
 
@@ -290,7 +333,9 @@ export default function GenericUnpaginatedPage({
       if (container?.frontend?.rowClassName) {
         Object.assign(
           styles,
-          tailwindBgToStyle(getMatchingRowClassNames(row, container.frontend.rowClassName)),
+          tailwindBgToStyle(
+            getMatchingRowClassNames(row, container.frontend.rowClassName),
+          ),
         );
       }
 
@@ -299,7 +344,9 @@ export default function GenericUnpaginatedPage({
         if (field.frontend?.rowClassName) {
           Object.assign(
             styles,
-            tailwindBgToStyle(getMatchingRowClassNames(row, field.frontend.rowClassName)),
+            tailwindBgToStyle(
+              getMatchingRowClassNames(row, field.frontend.rowClassName),
+            ),
           );
         }
       });
@@ -695,7 +742,9 @@ export default function GenericUnpaginatedPage({
     };
   }, [t, isAddOpen, inputs, formKeys, handleSubmitItem]);
 
-  const actionSelectionDataMap = useActionFormSelectionData(tableConfig?.actions || []);
+  const actionSelectionDataMap = useActionFormSelectionData(
+    tableConfig?.actions || [],
+  );
 
   const actions = useMemo(() => {
     if (!actionsEnabled) return [];
@@ -706,7 +755,9 @@ export default function GenericUnpaginatedPage({
     const hasConfiguredActions = Array.isArray(tableConfig?.actions);
 
     const buildDeleteAction = (deleteActionConfig?: TableActionConfig) => {
-      const DeleteIcon = getIconByName(deleteActionConfig?.icon || "HiOutlineTrash");
+      const DeleteIcon = getIconByName(
+        deleteActionConfig?.icon || "HiOutlineTrash",
+      );
       return {
         name: deleteActionConfig?.label || t("Delete"),
         icon: <DeleteIcon />,
@@ -725,7 +776,7 @@ export default function GenericUnpaginatedPage({
         ) : null,
         className:
           deleteActionConfig?.className ||
-          "text-red-500 cursor-pointer text-2xl ml-auto",
+          "text-red-500 cursor-pointer text-2xl ",
         isModal: true,
         isModalOpen: isDeleteOpen,
         setIsModal: setIsDeleteOpen,
@@ -735,7 +786,12 @@ export default function GenericUnpaginatedPage({
 
     const buildEditAction = (editActionConfig?: TableActionConfig) => {
       const EditIcon = getIconByName(editActionConfig?.icon || "FiEdit");
-      const editActionId = editActionConfig ? getActionId(editActionConfig, 0) : "edit-0";
+      const editActionId = editActionConfig
+        ? getActionId(editActionConfig, 0)
+        : "edit-0";
+      const editDefaultValues = editActionConfig
+        ? getActionDefaultValues(editActionConfig)
+        : {};
       const editInputs = buildActionInputs(
         editActionConfig || { kind: "edit" },
         inputs,
@@ -743,16 +799,15 @@ export default function GenericUnpaginatedPage({
         actionSelectionDataMap,
       );
       const editInputKeys = new Set(editInputs.map((input) => input.formKey));
-      const editFormKeys = editActionConfig?.formFields !== undefined
-        ? buildActionFormKeys(editActionConfig, editInputs)
-        : formKeys.filter((formKey) => editInputKeys.has(formKey.key));
-
+      const editFormKeys =
+        editActionConfig?.formFields !== undefined
+          ? buildActionFormKeys(editActionConfig, editInputs)
+          : formKeys.filter((formKey) => editInputKeys.has(formKey.key));
       return {
         name: editActionConfig?.label || t("Edit"),
         icon: <EditIcon />,
         className:
-          editActionConfig?.className ||
-          "text-blue-500 cursor-pointer text-xl mr-auto",
+          editActionConfig?.className || "text-blue-500 cursor-pointer text-xl",
         isModal: true,
         setRow: setRowToAction as (value: GenericItem) => void,
         modal: rowToAction
@@ -795,10 +850,14 @@ export default function GenericUnpaginatedPage({
                   formKeys={editFormKeys}
                   submitItem={handleSubmitItem}
                   isEditMode
+                  buttonName={editActionConfig?.buttonName || t("Edit")}
                   topClassName="flex flex-col gap-2"
                   itemToEdit={{
                     id: rowToAction._id,
-                    updates: normalizedUpdates,
+                    updates: {
+                      ...normalizedUpdates,
+                      ...editDefaultValues,
+                    },
                   }}
                 />
               );
@@ -813,6 +872,8 @@ export default function GenericUnpaginatedPage({
     const buildCustomAction = (action: TableActionConfig, index: number) => {
       const actionId = getActionId(action, index);
       const ActionIcon = getIconByName(action.icon || "FiCheck");
+      const constantValues = parseActionConstantValues(action);
+      const defaultValues = getActionDefaultValues(action);
       const actionInputs = buildActionInputs(
         action,
         inputs,
@@ -820,20 +881,20 @@ export default function GenericUnpaginatedPage({
         actionSelectionDataMap,
       );
       const actionFormKeys = buildActionFormKeys(action, actionInputs);
-      const constantValues = parseActionConstantValues(action);
       const workflowSubmit = action.submit;
       const isWorkflowAction = Boolean(
         workflowSubmit?.workflowName && workflowSubmit?.workflowSchema,
       );
       const isFormAction = action.modalType === "form";
       const isActiveAction =
-        activeCustomAction && getActionId(activeCustomAction, index) === actionId;
+        activeCustomAction &&
+        getActionId(activeCustomAction, index) === actionId;
 
       return {
         name: action.label || t("Action"),
         icon: <ActionIcon />,
         className:
-          action.className || "text-emerald-600 cursor-pointer text-xl mr-auto",
+          action.className || "text-emerald-600 cursor-pointer text-xl ",
         isButton: action.isButton,
         buttonClassName: action.buttonClassName,
         setRow: setRowToAction as (value: GenericItem) => void,
@@ -842,7 +903,10 @@ export default function GenericUnpaginatedPage({
           if (isFormAction) return;
 
           if (action.kind === "link") {
-            const path = resolveActionTemplate(action.linkTemplate || action.path, row);
+            const path = resolveActionTemplate(
+              action.linkTemplate || action.path,
+              row,
+            );
             if (path) window.location.href = path;
             return;
           }
@@ -882,16 +946,24 @@ export default function GenericUnpaginatedPage({
                       oldRecord: rowToAction,
                     });
                   } else {
-                    updateDynamicItem(item.id as string | number, record as Partial<GenericItem>);
+                    updateDynamicItem(
+                      item.id as string | number,
+                      record as Partial<GenericItem>,
+                    );
                   }
                 }
                 setIsCustomActionOpen(false);
               }}
               isEditMode
+              buttonName={action.buttonName || action.label || t("Update")}
               topClassName="flex flex-col gap-2"
               itemToEdit={{
                 id: rowToAction._id,
-                updates: { ...rowToAction, ...constantValues },
+                updates: {
+                  ...rowToAction,
+                  ...defaultValues,
+                  ...constantValues,
+                },
               }}
             />
           ) : null,
@@ -912,7 +984,9 @@ export default function GenericUnpaginatedPage({
         if (action.kind === "edit") return buildEditAction(action);
         return buildCustomAction(action, index);
       })
-      .filter((action): action is NonNullable<typeof action> => Boolean(action));
+      .filter((action): action is NonNullable<typeof action> =>
+        Boolean(action),
+      );
   }, [
     t,
     rowToAction,
@@ -1336,7 +1410,7 @@ export default function GenericUnpaginatedPage({
         name: t("Delete Selected"),
         isButton: true,
         buttonClassName:
-          "px-2 ml-auto bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
+          "px-2 bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
         isModal: true,
         className: "cursor-pointer",
         isDisabled: !actionsEnabled || !selectedRows?.length,
@@ -1358,7 +1432,7 @@ export default function GenericUnpaginatedPage({
         name: t("Edit Selected"),
         isButton: true,
         buttonClassName:
-          "px-2 ml-auto bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
+          "px-2  bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
         isModal: true,
         className: "cursor-pointer",
         modal: isBulkEditOpen ? (

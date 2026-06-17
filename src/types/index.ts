@@ -56,5 +56,6 @@ export interface OptionType {
   imageUrl?: string;
   bgColor?: string;
   textColor?: string;
-  [key: string]: string | number | boolean | undefined;
+  sourceItem?: Record<string, unknown>;
+  [key: string]: string | number | boolean | Record<string, unknown> | undefined;
 }
