@@ -120,6 +120,12 @@ export interface TableActionFormFieldConfig {
   validationMessage?: string;
 }
 
+export type TableFilterPanelInputConfig = TableActionFormFieldConfig;
+
+export interface TableFilterPanelConfig {
+  inputs?: TableFilterPanelInputConfig[];
+}
+
 export interface TableActionSubmitConfig {
   workflowName?: string;
   workflowSchema?: string;
@@ -160,6 +166,7 @@ export interface TableComponentConfig {
   rows?: TableRowsConfig;
   cache?: TableCacheConfig;
   actions?: TableActionConfig[];
+  filterPanel?: TableFilterPanelConfig;
 }
 
 export type ComponentType =
