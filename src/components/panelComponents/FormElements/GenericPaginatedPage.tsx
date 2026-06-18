@@ -68,6 +68,9 @@ const getActionId = (action: TableActionConfig, index: number) =>
 
 type ActionSelectDataMap = Map<string, GenericItem[]>;
 
+const getSelectionFieldName = (field: TableActionFormFieldConfig) =>
+  field.sourceLabelField || field.sourceValueField || "_id";
+
 const actionQs = (params: Record<string, unknown>) =>
   new URLSearchParams(
     Object.entries(params)
@@ -95,15 +98,27 @@ const useActionFormSelectionData = (
   );
 
   const queryResults = useQueries({
-    queries: schemaSelectFields.map(({ field }) => ({
-      queryKey: ["dynamic", field.sourceSchemaName, "action-options"],
-      queryFn: () =>
-        get<GenericItem[]>({
-          path: `/dynamic?${actionQs({ schemaName: field.sourceSchemaName })}`,
-        }),
-      enabled: Boolean(field.sourceSchemaName),
-      staleTime: Infinity,
-    })),
+    queries: schemaSelectFields.map(({ field }) => {
+      const fieldName = getSelectionFieldName(field);
+      return {
+        queryKey: [
+          "dynamic",
+          field.sourceSchemaName,
+          "selection",
+          fieldName,
+          "action-options",
+        ],
+        queryFn: () =>
+          get<GenericItem[]>({
+            path: `/dynamic/selection?${actionQs({
+              schemaName: field.sourceSchemaName,
+              fieldName,
+            })}`,
+          }),
+        enabled: Boolean(field.sourceSchemaName && fieldName),
+        staleTime: Infinity,
+      };
+    }),
   });
 
   return schemaSelectFields.reduce<ActionSelectDataMap>((map, item, index) => {
@@ -942,6 +957,12 @@ export default function GenericPaginatedPage({
       .filter((action) => action.enabled !== false)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const hasConfiguredActions = Array.isArray(tableConfig?.actions);
+    const hasConfiguredDeleteAction = configuredActions.some(
+      (action) => action.kind === "delete",
+    );
+    const hasConfiguredEditAction = configuredActions.some(
+      (action) => action.kind === "edit",
+    );
 
     const buildDeleteAction = (deleteActionConfig?: TableActionConfig) => {
       const DeleteIcon = getIconByName(
@@ -1169,7 +1190,13 @@ export default function GenericPaginatedPage({
     }
 
     return configuredActions
-      .map((action, index) => {
+      .flatMap((action, index) => {
+        if (action.kind === "defaults") {
+          return [
+            !hasConfiguredDeleteAction ? buildDeleteAction() : null,
+            !hasConfiguredEditAction ? buildEditAction() : null,
+          ];
+        }
         if (action.kind === "delete") return buildDeleteAction(action);
         if (action.kind === "edit") return buildEditAction(action);
         return buildCustomAction(action, index);
@@ -1625,33 +1652,37 @@ export default function GenericPaginatedPage({
     configuredFilterInputs,
     filterSelectionDataMap,
   ]);
+  const hasFilterPanelInputs = filterPanelInputs.length > 0;
 
   const filters = useMemo(
-    () => [
-      {
-        label: t("Show Filters"),
-        isUpperSide: true,
-        node: (
-          <SwitchButton
-            checked={showFilters}
-            onChange={() => setShowFilters(!showFilters)}
-          />
-        ),
-      },
-    ],
-    [t, showFilters],
+    () =>
+      hasFilterPanelInputs
+        ? [
+            {
+              label: t("Show Filters"),
+              isUpperSide: true,
+              node: (
+                <SwitchButton
+                  checked={showFilters}
+                  onChange={() => setShowFilters(!showFilters)}
+                />
+              ),
+            },
+          ]
+        : [],
+    [t, showFilters, hasFilterPanelInputs],
   );
 
   const filterPanel = useMemo(
     () => ({
-      isFilterPanelActive: showFilters,
+      isFilterPanelActive: showFilters && hasFilterPanelInputs,
       inputs: filterPanelInputs,
       formElements: filterPanelFormElements,
       setFormElements: setFilterPanelFormElements,
       closeFilters: () => setShowFilters(false),
       isApplyButtonActive: true,
     }),
-    [showFilters, filterPanelInputs, filterPanelFormElements],
+    [showFilters, hasFilterPanelInputs, filterPanelInputs, filterPanelFormElements],
   );
 
   const selectionActions = useMemo(

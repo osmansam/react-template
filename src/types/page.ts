@@ -53,7 +53,12 @@ export interface TableCacheConfig {
   invalidateKeys?: string[];
 }
 
-export type TableActionKind = "edit" | "delete" | "update" | "link";
+export type TableActionKind =
+  | "edit"
+  | "delete"
+  | "update"
+  | "link"
+  | "defaults";
 export type TableActionModalType = "none" | "confirm" | "form";
 export type TableActionInputType =
   | "text"
@@ -67,7 +72,8 @@ export type TableActionInputType =
   | "color"
   | "checkbox"
   | "hour"
-  | "monthYear";
+  | "monthYear"
+  | "defaults";
 export type TableActionFormKeyType =
   | "string"
   | "number"

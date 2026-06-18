@@ -18,6 +18,9 @@ const qs = (params: Record<string, unknown>) =>
       .map(([k, v]) => [k, String(v)]),
   ).toString();
 
+const getSelectionFieldName = (field: TableFilterPanelInputConfig) =>
+  field.sourceLabelField || field.sourceValueField || "_id";
+
 const filterInputTypeMap: Record<string, InputTypes> = {
   text: InputTypes.TEXT,
   date: InputTypes.DATE,
@@ -33,6 +36,9 @@ const filterInputTypeMap: Record<string, InputTypes> = {
   monthYear: InputTypes.MONTHYEAR,
 };
 
+const isDefaultFilterMarker = (field: TableFilterPanelInputConfig) =>
+  field.type === "defaults" || field.formKey === "__defaults";
+
 export const useFilterPanelSelectionData = (
   inputs: TableFilterPanelInputConfig[] = [],
 ): FilterSelectDataMap => {
@@ -44,15 +50,27 @@ export const useFilterPanelSelectionData = (
   );
 
   const queryResults = useQueries({
-    queries: schemaSelectFields.map((field) => ({
-      queryKey: ["dynamic", field.sourceSchemaName, "filter-options"],
-      queryFn: () =>
-        get<Array<Record<string, unknown>>>({
-          path: `/dynamic?${qs({ schemaName: field.sourceSchemaName })}`,
-        }),
-      enabled: Boolean(field.sourceSchemaName),
-      staleTime: Infinity,
-    })),
+    queries: schemaSelectFields.map((field) => {
+      const fieldName = getSelectionFieldName(field);
+      return {
+        queryKey: [
+          "dynamic",
+          field.sourceSchemaName,
+          "selection",
+          fieldName,
+          "filter-options",
+        ],
+        queryFn: () =>
+          get<Array<Record<string, unknown>>>({
+            path: `/dynamic/selection?${qs({
+              schemaName: field.sourceSchemaName,
+              fieldName,
+            })}`,
+          }),
+        enabled: Boolean(field.sourceSchemaName && fieldName),
+        staleTime: Infinity,
+      };
+    }),
   });
 
   return schemaSelectFields.reduce<FilterSelectDataMap>((map, field, index) => {
@@ -117,12 +135,14 @@ export const buildConfiguredFilterInputs = (
   if (fields === undefined) return fallbackInputs;
 
   return fields
-    .filter((field) => field.formKey)
-    .map((field) => {
+    .filter((field) => field.formKey || isDefaultFilterMarker(field))
+    .flatMap((field) => {
+      if (isDefaultFilterMarker(field)) return fallbackInputs;
+
       const fallback = fallbackInputs.find(
         (input) => input.formKey === field.formKey,
       );
-      return {
+      return [{
         ...(fallback || {}),
         type: filterInputTypeMap[field.type] || InputTypes.TEXT,
         formKey: field.formKey,
@@ -152,7 +172,7 @@ export const buildConfiguredFilterInputs = (
         pattern: field.pattern ?? fallback?.pattern,
         validationMessage:
           field.validationMessage ?? fallback?.validationMessage,
-      };
+      }];
     });
 };
 

@@ -3,11 +3,7 @@ import { useTranslation } from "react-i18next";
 import { IoIosClose } from "react-icons/io";
 import { ActionMeta, MultiValue, SingleValue } from "react-select";
 import { useGeneralContext } from "../../../context/General.context";
-import {
-  FormElementsState,
-  FormElementValue,
-  NUMBER_FILTER_OPERATORS,
-} from "../../../types";
+import { FormElementsState, FormElementValue } from "../../../types";
 import { OptionType } from "../../panelComponents/shared/types";
 import DateInput from "../FormElements/DateInput";
 import { GenericButton } from "../FormElements/GenericButton";
@@ -17,6 +13,81 @@ import SelectInput from "../FormElements/SelectInput";
 import TextInput from "../FormElements/TextInput";
 import { H4, H6 } from "../Typography";
 import { InputTypes, PanelFilterType } from "../shared/types";
+
+const numberFilterPrefixPattern = /^(gte-|gt-|lte-|lt-)/;
+
+type NumberRangeBound = "min" | "max";
+
+type NumberRangeValues = {
+  min: string;
+  max: string;
+};
+
+type NumberRangeLimits = {
+  min: number;
+  max: number;
+};
+
+const toNumberFilterItems = (value: FormElementValue): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => item !== undefined && item !== null && item !== "")
+      .map(String);
+  }
+
+  if (value === undefined || value === null || value === "") return [];
+
+  return [String(value)];
+};
+
+const getNumberRangeValues = (
+  value: FormElementValue
+): NumberRangeValues => {
+  return toNumberFilterItems(value).reduce<NumberRangeValues>(
+    (range, item) => {
+      const rawValue = item.replace(numberFilterPrefixPattern, "");
+
+      if (item.startsWith("lte-") || item.startsWith("lt-")) {
+        return { ...range, max: rawValue };
+      }
+
+      return { ...range, min: rawValue };
+    },
+    { min: "", max: "" }
+  );
+};
+
+const buildNumberRangeFilterValue = (
+  currentValue: FormElementValue,
+  bound: NumberRangeBound,
+  nextRawValue: FormElementValue
+): FormElementValue => {
+  const currentRange = getNumberRangeValues(currentValue);
+  const nextRange = {
+    ...currentRange,
+    [bound]:
+      nextRawValue === undefined || nextRawValue === null
+        ? ""
+        : String(nextRawValue).trim(),
+  };
+
+  const nextValues = [
+    nextRange.min !== "" ? `gte-${nextRange.min}` : "",
+    nextRange.max !== "" ? `lte-${nextRange.max}` : "",
+  ].filter(Boolean);
+
+  return nextValues.length > 0 ? nextValues : "";
+};
+
+const toFiniteNumber = (value: string, fallback: number): number => {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max);
+
 const FilterPanel = ({
   inputs,
   formElements,
@@ -31,11 +102,6 @@ const FilterPanel = ({
   const { setCurrentPage } = useGeneralContext();
   const [tempFormElements, setTempFormElements] =
     useState<FormElementsState>(formElements);
-
-  // Track operators for number inputs - now supporting two conditions per field
-  const [numberOperators, setNumberOperators] = useState<
-    Record<string, { first: string; second: string }>
-  >({});
 
   // Sync tempFormElements with formElements when not in apply button mode
   useEffect(() => {
@@ -55,7 +121,6 @@ const FilterPanel = ({
 
     setFormElements(clearedFormElements);
     setTempFormElements(clearedFormElements);
-    setNumberOperators({});
     additionalFilterCleanFunction?.();
     setCurrentPage(1);
   };
@@ -72,141 +137,148 @@ const FilterPanel = ({
     },
   ];
 
-  // Helper function to render operator select dropdown
-  const renderOperatorSelect = (
+  const updateNumberRangeFilter = (
     fieldKey: string,
-    position: "first" | "second",
-    currentOperator: string
-  ) => (
-    <select
-      value={currentOperator}
-      onChange={(e) => {
-        const operator = e.target.value;
-        setNumberOperators((prev) => ({
-          ...prev,
-          [fieldKey]: {
-            first:
-              position === "first" ? operator : prev[fieldKey]?.first || "=",
-            second:
-              position === "second" ? operator : prev[fieldKey]?.second || "=",
-          },
-        }));
-
-        // Get current array or create new one
-        const currentValue = tempFormElements[fieldKey] ?? "";
-        const currentArray = Array.isArray(currentValue) ? currentValue : [];
-        const otherValue =
-          position === "first" ? currentArray[1] || "" : currentArray[0] || "";
-
-        // Extract raw value from current position
-        const currentRaw = currentArray[position === "first" ? 0 : 1]
-          ? String(currentArray[position === "first" ? 0 : 1]).replace(
-              /^(gte-|gt-|lte-|lt-)/,
-              ""
-            )
-          : "";
-
-        if (currentRaw) {
-          const newValue =
-            operator === "=" ? currentRaw : `${operator}-${currentRaw}`;
-          const newArray: string[] = (
-            position === "first"
-              ? [newValue, otherValue].filter((v) => v !== "")
-              : [otherValue, newValue].filter((v) => v !== "")
-          ) as string[];
-
-          isApplyButtonActive
-            ? setTempFormElements((prev) => ({
-                ...prev,
-                [fieldKey]: newArray.length > 0 ? newArray : "",
-              }))
-            : setFormElements((prev) => ({
-                ...prev,
-                [fieldKey]: newArray.length > 0 ? newArray : "",
-              }));
-        }
-      }}
-      className={`border border-gray-300 rounded-md px-4 py-2.5 text-sm w-20 h-[42px] ${
-        currentOperator === "=" ? "opacity-30" : ""
-      }`}
-    >
-      {NUMBER_FILTER_OPERATORS.map((op) => (
-        <option key={op.value} value={op.value}>
-          {op.label}
-        </option>
-      ))}
-    </select>
-  );
-
-  // Helper function to render number input field
-  const renderNumberInput = (
-    fieldKey: string,
-    position: "first" | "second",
-    value: FormElementValue,
-    placeholder: string,
-    isDebounce: boolean,
-    isOnClearActive?: boolean
+    bound: NumberRangeBound,
+    nextRawValue: FormElementValue
   ) => {
-    const currentArray = Array.isArray(value) ? value : [];
-    const currentValue = currentArray[position === "first" ? 0 : 1]
-      ? String(currentArray[position === "first" ? 0 : 1]).replace(
-          /^(gte-|gt-|lte-|lt-)/,
-          ""
-        )
-      : "";
+    const setNextValue = (prev: FormElementsState) => ({
+      ...prev,
+      [fieldKey]: buildNumberRangeFilterValue(
+        prev[fieldKey] ?? "",
+        bound,
+        nextRawValue
+      ),
+    });
+
+    isApplyButtonActive
+      ? setTempFormElements(setNextValue)
+      : setFormElements(setNextValue);
+
+    if (!isApplyButtonActive) {
+      setCurrentPage(1);
+    }
+  };
+
+  const clearNumberRangeFilter = (fieldKey: string) => {
+    isApplyButtonActive
+      ? setTempFormElements((prev) => ({ ...prev, [fieldKey]: "" }))
+      : setFormElements((prev) => ({ ...prev, [fieldKey]: "" }));
+
+    if (!isApplyButtonActive) {
+      setCurrentPage(1);
+    }
+  };
+
+  const renderNumberRangeSlider = (
+    fieldKey: string,
+    value: FormElementValue,
+    limits: NumberRangeLimits,
+    isOnClearActive = true
+  ) => {
+    const safeLimits =
+      limits.max > limits.min
+        ? limits
+        : {
+            min: limits.min,
+            max: limits.min + 1000,
+          };
+    const currentRange = getNumberRangeValues(value);
+    const minValue = clamp(
+      toFiniteNumber(currentRange.min, safeLimits.min),
+      safeLimits.min,
+      safeLimits.max
+    );
+    const maxValue = clamp(
+      toFiniteNumber(currentRange.max, safeLimits.max),
+      safeLimits.min,
+      safeLimits.max
+    );
+    const safeMinValue = Math.min(minValue, maxValue);
+    const safeMaxValue = Math.max(minValue, maxValue);
+    const rangeSize = safeLimits.max - safeLimits.min || 1;
+    const leftPercent = ((safeMinValue - safeLimits.min) / rangeSize) * 100;
+    const rightPercent = ((safeMaxValue - safeLimits.min) / rangeSize) * 100;
+    const minLabelPercent = clamp(leftPercent, 8, 92);
+    const maxLabelPercent = clamp(rightPercent, 8, 92);
+
+    const handleRangeChange =
+      (bound: NumberRangeBound) =>
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        const nextValue = Number(event.target.value);
+
+        if (bound === "min") {
+          updateNumberRangeFilter(
+            fieldKey,
+            "min",
+            Math.min(nextValue, safeMaxValue)
+          );
+          return;
+        }
+
+        updateNumberRangeFilter(
+          fieldKey,
+          "max",
+          Math.max(nextValue, safeMinValue)
+        );
+      };
 
     return (
-      <TextInput
-        key={`${fieldKey}-${position}`}
-        type={InputTypes.NUMBER}
-        value={currentValue}
-        label=""
-        placeholder={placeholder}
-        onChange={(newValue) => {
-          const operator = numberOperators[fieldKey]?.[position] || "=";
-          const finalValue =
-            operator === "=" ? String(newValue) : `${operator}-${newValue}`;
-
-          const otherValue = currentArray[position === "first" ? 1 : 0] || "";
-          const newArray: string[] = (
-            position === "first"
-              ? [finalValue, otherValue].filter((v) => v !== "")
-              : [otherValue, finalValue].filter((v) => v !== "")
-          ) as string[];
-
-          isApplyButtonActive
-            ? setTempFormElements((prev) => ({
-                ...prev,
-                [fieldKey]: newArray.length > 0 ? newArray : "",
-              }))
-            : setFormElements((prev) => ({
-                ...prev,
-                [fieldKey]: newArray.length > 0 ? newArray : "",
-              }));
-        }}
-        isDatePicker={false}
-        isOnClearActive={position === "second" ? isOnClearActive : false}
-        isDebounce={isDebounce}
-        onClear={
-          position === "second"
-            ? () => {
-                isApplyButtonActive
-                  ? setTempFormElements((prev) => ({
-                      ...prev,
-                      [fieldKey]: "",
-                    }))
-                  : setFormElements((prev) => ({
-                      ...prev,
-                      [fieldKey]: "",
-                    }));
-                setNumberOperators((prev) => ({
-                  ...prev,
-                  [fieldKey]: { first: "=", second: "=" },
-                }));
-              }
-            : undefined
-        }
-      />
+      <div className="flex flex-col gap-2">
+        <div className="relative h-16 pt-6">
+          {isOnClearActive && (
+            <GenericButton
+              onClick={() => clearNumberRangeFilter(fieldKey)}
+              variant="icon"
+              className="absolute right-0 top-0 z-20 h-6 w-6 text-lg text-neutral-400 hover:text-neutral-600"
+            >
+              <IoIosClose size={20} />
+            </GenericButton>
+          )}
+          <span
+            className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded bg-neutral-900 px-2 py-0.5 text-xs text-white shadow-sm"
+            style={{ left: `${minLabelPercent}%` }}
+          >
+            {safeMinValue}
+          </span>
+          <span
+            className="pointer-events-none absolute bottom-0 z-10 -translate-x-1/2 rounded bg-neutral-900 px-2 py-0.5 text-xs text-white shadow-sm"
+            style={{ left: `${maxLabelPercent}%` }}
+          >
+            {safeMaxValue}
+          </span>
+          <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded bg-gray-200" />
+          <div
+            className="absolute top-1/2 h-1 -translate-y-1/2 rounded bg-neutral-900"
+            style={{
+              left: `${leftPercent}%`,
+              right: `${100 - rightPercent}%`,
+            }}
+          />
+          <input
+            type="range"
+            min={safeLimits.min}
+            max={safeLimits.max}
+            step={1}
+            value={safeMinValue}
+            onChange={handleRangeChange("min")}
+            className="pointer-events-none absolute left-0 top-1/2 h-8 w-full -translate-y-1/2 appearance-none bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-neutral-900 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-neutral-900"
+          />
+          <input
+            type="range"
+            min={safeLimits.min}
+            max={safeLimits.max}
+            step={1}
+            value={safeMaxValue}
+            onChange={handleRangeChange("max")}
+            className="pointer-events-none absolute left-0 top-1/2 h-8 w-full -translate-y-1/2 appearance-none bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-neutral-900 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-neutral-900"
+          />
+        </div>
+        <div className="flex justify-between text-xs text-gray-400">
+          <span>{safeLimits.min}</span>
+          <span>{safeLimits.max}</span>
+        </div>
+      </div>
     );
   };
 
@@ -324,38 +396,15 @@ const FilterPanel = ({
                 <label className="text-sm font-medium text-gray-700">
                   {input.label}
                 </label>
-                {/* First condition */}
-                <div className="flex flex-row gap-2 items-center">
-                  {renderOperatorSelect(
-                    input.formKey,
-                    "first",
-                    numberOperators[input.formKey]?.first || "="
-                  )}
-                  {renderNumberInput(
-                    input.formKey,
-                    "first",
-                    value,
-                    input.placeholder ?? "",
-                    input?.isDebounce ?? false
-                  )}
-                </div>
-
-                {/* Second condition */}
-                <div className="flex flex-row gap-2 items-center">
-                  {renderOperatorSelect(
-                    input.formKey,
-                    "second",
-                    numberOperators[input.formKey]?.second || "="
-                  )}
-                  {renderNumberInput(
-                    input.formKey,
-                    "second",
-                    value,
-                    input.placeholder ?? "",
-                    input?.isDebounce ?? false,
-                    input?.isOnClearActive
-                  )}
-                </div>
+                {renderNumberRangeSlider(
+                  input.formKey,
+                  value,
+                  {
+                    min: input.min ?? input.minNumber ?? 0,
+                    max: input.max ?? 1000,
+                  },
+                  input?.isOnClearActive ?? true
+                )}
               </div>
             )}
             {(input.type === InputTypes.TEXT ||

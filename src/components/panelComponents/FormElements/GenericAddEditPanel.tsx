@@ -789,7 +789,8 @@ const GenericAddEditPanel = <T,>({
                             input.isDateInitiallyOpen ?? false
                           }
                           isTopFlexRow={input.isTopFlexRow ?? false}
-                          minNumber={input?.minNumber ?? 0}
+                          minNumber={input?.min ?? input?.minNumber ?? 0}
+                          maxNumber={input?.max}
                           isDebounce={input?.isDebounce ?? false}
                           disabled={isInputDisabled}
                           isReadOnly={input.isReadOnly ?? false}
