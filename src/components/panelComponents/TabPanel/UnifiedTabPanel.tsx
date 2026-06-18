@@ -1,8 +1,10 @@
 import React, {
   PropsWithChildren,
   createContext,
+  startTransition,
   useContext,
   useEffect,
+  useMemo,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGeneralContext } from "../../../context/General.context";
@@ -67,21 +69,42 @@ const UnifiedTabPanel: React.FC<Props> = ({
   injectOrientationToggleToFilters = false,
   activeTab,
   setActiveTab,
+  additionalOpenAction,
   ...props
 }) => {
   const { tabOrientation, setTabOrientation } = useGeneralContext();
   const location = useLocation();
   const navigate = useNavigate();
   const isLargeScreen = useIsLargeScreen();
-  const visibleTabs = React.useMemo(
+  const visibleTabs = useMemo(
     () => props.tabs.filter((tab) => !tab.isDisabled),
     [props.tabs]
   );
 
-  const currentTabIndex = React.useMemo(
+  const tabParam = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get(TAB_QUERY_PARAM);
+  }, [location.search]);
+
+  const requestedTabIndex = useMemo(() => {
+    if (!tabParam) {
+      return -1;
+    }
+
+    return visibleTabs.findIndex((tab) => getTabSlug(tab.label) === tabParam);
+  }, [tabParam, visibleTabs]);
+
+  const currentTabIndex = useMemo(
     () => resolveTabIndex(activeTab, visibleTabs),
     [activeTab, visibleTabs]
   );
+
+  const effectiveActiveTab =
+    requestedTabIndex !== -1
+      ? requestedTabIndex
+      : currentTabIndex !== -1
+        ? currentTabIndex
+        : 0;
 
   // Mobile'da her zaman horizontal
   const actualOrientation = !isLargeScreen ? "horizontal" : tabOrientation;
@@ -91,14 +114,18 @@ const UnifiedTabPanel: React.FC<Props> = ({
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const tabParam = searchParams.get(TAB_QUERY_PARAM);
-    const currentTab = visibleTabs[currentTabIndex] ?? visibleTabs[0] ?? null;
+    const currentTab =
+      visibleTabs[effectiveActiveTab] ?? visibleTabs[0] ?? null;
 
     if (!currentTab) {
       return;
     }
 
     const currentTabSlug = getTabSlug(currentTab.label);
+
+    if (activeTab !== effectiveActiveTab) {
+      setActiveTab(effectiveActiveTab);
+    }
 
     if (tabParam === null) {
       searchParams.set(TAB_QUERY_PARAM, currentTabSlug);
@@ -112,16 +139,7 @@ const UnifiedTabPanel: React.FC<Props> = ({
       return;
     }
 
-    const nextTabIndex = visibleTabs.findIndex(
-      (tab) => getTabSlug(tab.label) === tabParam
-    );
-
-    if (nextTabIndex !== -1 && nextTabIndex !== currentTabIndex) {
-      setActiveTab(nextTabIndex);
-      return;
-    }
-
-    if (nextTabIndex === -1 && tabParam !== currentTabSlug) {
+    if (requestedTabIndex === -1 && tabParam !== currentTabSlug) {
       searchParams.set(TAB_QUERY_PARAM, currentTabSlug);
       navigate(
         {
@@ -132,16 +150,22 @@ const UnifiedTabPanel: React.FC<Props> = ({
       );
     }
   }, [
-    currentTabIndex,
+    activeTab,
+    effectiveActiveTab,
     location.pathname,
     location.search,
     navigate,
+    requestedTabIndex,
     setActiveTab,
+    tabParam,
     visibleTabs,
   ]);
 
   const handleSetActiveTab = (tab: number) => {
-    setActiveTab(tab);
+    if (effectiveActiveTab !== tab) {
+      setActiveTab(tab);
+      additionalOpenAction?.();
+    }
 
     const nextTab = visibleTabs[tab] ?? visibleTabs[0];
     if (!nextTab) {
@@ -149,11 +173,21 @@ const UnifiedTabPanel: React.FC<Props> = ({
     }
 
     const searchParams = new URLSearchParams(location.search);
-    searchParams.set(TAB_QUERY_PARAM, getTabSlug(nextTab.label));
+    const nextTabSlug = getTabSlug(nextTab.label);
+    if (searchParams.get(TAB_QUERY_PARAM) === nextTabSlug) {
+      return;
+    }
 
-    navigate({
-      pathname: location.pathname,
-      search: `?${searchParams.toString()}`,
+    searchParams.set(TAB_QUERY_PARAM, nextTabSlug);
+
+    startTransition(() => {
+      navigate(
+        {
+          pathname: location.pathname,
+          search: `?${searchParams.toString()}`,
+        },
+        { replace: true }
+      );
     });
   };
 
@@ -187,7 +221,8 @@ const UnifiedTabPanel: React.FC<Props> = ({
     <TabPanelProvider allowOrientationToggle={allowOrientationToggle}>
       <TabComponent
         {...props}
-        activeTab={activeTab}
+        additionalOpenAction={additionalOpenAction}
+        activeTab={effectiveActiveTab}
         setActiveTab={handleSetActiveTab}
         filters={enhancedFilters}
       />

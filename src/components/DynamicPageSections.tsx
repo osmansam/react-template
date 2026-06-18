@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from "react";
+import React, { lazy, Suspense, useMemo, useState } from "react";
 import {
   ComponentBlock,
   GridCell,
@@ -85,18 +85,22 @@ const getTableConfig = (
 const MixedTabPanel: React.FC<{ tabs: TabContent[] }> = ({ tabs }) => {
   const [activeTab, setActiveTab] = useState(0);
 
-  const unifiedTabs = tabs.map((tab: TabContent, idx: number) => ({
-    number: idx,
-    label: tab.title,
-    isDisabled: false,
-    content: (
-      <div className="flex flex-col gap-4">
-        {tab.components.map((comp) => (
-          <RenderComponent key={comp.id} component={comp} />
-        ))}
-      </div>
-    ),
-  }));
+  const unifiedTabs = useMemo(
+    () =>
+      tabs.map((tab: TabContent, idx: number) => ({
+        number: idx,
+        label: tab.title,
+        isDisabled: false,
+        content: (
+          <div className="flex flex-col gap-4">
+            {tab.components.map((comp) => (
+              <RenderComponent key={comp.id} component={comp} />
+            ))}
+          </div>
+        ),
+      })),
+    [tabs],
+  );
 
   return (
     <UnifiedTabPanel
@@ -112,6 +116,8 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
   ({ component }) => {
     const { type, dataBinding, tabs, groupBy, title, props } = component;
     const tableConfig = getTableConfig(component.table, props);
+    const firstTableTabIndex =
+      tabs?.findIndex((tab) => tab.components[0]?.type === "table") ?? -1;
     const tabWithGroupByIndex =
       tabs?.findIndex((tab) => tab.components[0]?.groupBy) ?? -1;
     const tabPanelGroupBy =
@@ -119,19 +125,47 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
       (tabWithGroupByIndex >= 0
         ? tabs![tabWithGroupByIndex]?.components[0]?.groupBy
         : undefined);
+    const tabPanelTemplateTabIndex =
+      tabWithGroupByIndex >= 0
+        ? tabWithGroupByIndex
+        : tabPanelGroupBy
+          ? firstTableTabIndex
+          : -1;
+    const templateComponent =
+      tabPanelTemplateTabIndex >= 0
+        ? tabs?.[tabPanelTemplateTabIndex]?.components[0]
+        : undefined;
+    const templateSchemaName =
+      templateComponent?.dataBinding?.schemaName ||
+      dataBinding?.schemaName ||
+      "";
+    const groupByGroupedSchema =
+      tabPanelGroupBy?.groupedSchemaName || templateSchemaName;
+    const groupByGroupedField =
+      tabPanelGroupBy?.groupedField ||
+      tabPanelGroupBy?.filterField ||
+      tabPanelGroupBy?.groupByObjectId ||
+      "";
+    const groupBySourceSchema =
+      tabPanelGroupBy?.sourceSchemaName ||
+      tabPanelGroupBy?.groupByObjectId ||
+      "";
+    const groupByValueField = tabPanelGroupBy?.sourceValueField || "_id";
+    const groupByLabelField =
+      tabPanelGroupBy?.sourceLabelField ||
+      tabPanelGroupBy?.groupByField ||
+      groupByValueField;
     const shouldFetchGrouping =
       type === "tabPanel" &&
-      Boolean(tabPanelGroupBy?.groupByObjectId) &&
-      Boolean(tabPanelGroupBy?.groupByField) &&
-      tabs &&
-      tabs.length > 0;
+      Boolean(groupByGroupedSchema) &&
+      Boolean(groupByGroupedField) &&
+      Boolean(groupBySourceSchema) &&
+      Boolean(groupByLabelField) &&
+      Boolean(templateSchemaName);
     const selectionData = useGetSelection<Array<Record<string, unknown>>>(
-      shouldFetchGrouping && tabPanelGroupBy
-        ? tabPanelGroupBy.groupByObjectId
-        : "",
-      shouldFetchGrouping && tabPanelGroupBy
-        ? tabPanelGroupBy.groupByField
-        : "",
+      shouldFetchGrouping ? groupBySourceSchema : "",
+      shouldFetchGrouping ? groupByLabelField : "",
+      shouldFetchGrouping ? groupByValueField : "",
     );
 
     switch (type) {
@@ -151,55 +185,51 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
           </NoticePanel>
         );
       case "tabPanel":
-        if (shouldFetchGrouping && tabWithGroupByIndex >= 0) {
+        if (shouldFetchGrouping) {
           if (!selectionData || selectionData.length === 0) {
             return <LoadingPanel message="Loading grouped tabs..." />;
           }
 
-          const baseTab = tabs![tabWithGroupByIndex];
-          const baseComponent = baseTab?.components[0];
+          const baseComponent =
+            templateComponent ||
+            ({
+              dataBinding,
+              table: component.table,
+              props,
+            } as ComponentBlock);
           if (!baseComponent?.dataBinding?.schemaName) {
             return (
               <NoticePanel>
-                Tab panel grouping requires a table component with schema
-                binding.
+                Tab panel grouping requires a grouped schema binding.
               </NoticePanel>
             );
           }
 
           const dynamicTabs = selectionData.map((item) => {
-            const groupValue = item._id;
+            const groupValue = item[groupByValueField] ?? item._id;
             return {
               schemaName: baseComponent.dataBinding!.schemaName!,
-              label: String(item[tabPanelGroupBy!.groupByField] || groupValue),
+              label: String(item[groupByLabelField] ?? groupValue),
               isPaginated: true,
               constantFilter: {
-                [tabPanelGroupBy!.groupByObjectId]: groupValue,
+                [groupByGroupedField]: groupValue,
               },
               tableConfig: getTableConfig(baseComponent.table, baseComponent.props),
             };
           });
 
+          const manualTabs = (tabs || []).map((tab: TabContent) => ({
+            schemaName: tab.components[0]?.dataBinding?.schemaName || "",
+            label: tab.title,
+            isPaginated: true,
+            tableConfig: getTableConfig(
+              tab.components[0]?.table,
+              tab.components[0]?.props,
+            ),
+          }));
           const allTabsConfig = [
-            ...tabs!.slice(0, tabWithGroupByIndex).map((tab: TabContent) => ({
-              schemaName: tab.components[0]?.dataBinding?.schemaName || "",
-              label: tab.title,
-              isPaginated: true,
-              tableConfig: getTableConfig(
-                tab.components[0]?.table,
-                tab.components[0]?.props,
-              ),
-            })),
             ...dynamicTabs,
-            ...tabs!.slice(tabWithGroupByIndex + 1).map((tab: TabContent) => ({
-              schemaName: tab.components[0]?.dataBinding?.schemaName || "",
-              label: tab.title,
-              isPaginated: true,
-              tableConfig: getTableConfig(
-                tab.components[0]?.table,
-                tab.components[0]?.props,
-              ),
-            })),
+            ...manualTabs,
           ];
 
           return <GenericTabPage tabs={allTabsConfig} />;
