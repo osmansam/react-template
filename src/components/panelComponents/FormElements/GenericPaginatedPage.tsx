@@ -31,6 +31,7 @@ import {
 } from "../../../utils/dynamic";
 import {
   RawContainer,
+  evaluateRowCondition,
   fieldToInput,
   getFieldLabel,
   getMatchingRowClassNames,
@@ -42,7 +43,10 @@ import {
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
 import {
+  getComputedLabelValue,
+  getProgressBarValue,
   getTableCellClassName,
+  getTableDataFieldNames,
   getTableDisplayName,
   getTableLinkConfig,
 } from "../../../utils/tableConfig";
@@ -304,7 +308,7 @@ type Props = {
   actionsEnabled?: boolean;
   isHeader?: boolean;
   constantFilter?: Record<string, unknown>; // Constant filter that won't be editable
-  customTitle?: string; // Custom title for the table
+  customTitle?: string;
   tableConfig?: TableComponentConfig;
   dataBinding?: DataBinding;
 };
@@ -316,8 +320,8 @@ export default function GenericPaginatedPage({
   actionsEnabled = true,
   isHeader = false,
   constantFilter,
-  customTitle,
   tableConfig,
+  customTitle,
   dataBinding,
 }: Props) {
   const { t } = useTranslation();
@@ -325,6 +329,7 @@ export default function GenericPaginatedPage({
   const { user } = useUserContext();
   const rawContainers = useGetContainers();
   const [currentPage, setCurrentPage] = useState(1);
+  console.log(tableConfig);
   // Local selection state for this table instance
   const [selectedRows, setSelectedRows] = useState<GenericItem[]>([]);
   const [isSelectionActive, setIsSelectionActive] = useState(false);
@@ -367,17 +372,19 @@ export default function GenericPaginatedPage({
       schemaName: dataBinding?.schemaName || schemaName,
       pipelineName: dataBinding?.pipelineName,
       workflowName: dataBinding?.workflowName,
-      fields: tableConfig?.columns
-        ?.map((column) => column.field)
-        .filter(Boolean),
+      fields: getTableDataFieldNames(
+        tableConfig,
+        container?.fields?.map((field) => field.name),
+      ),
       params: dataBinding?.params,
     }),
-    [dataBinding, schemaName, tableConfig?.columns],
+    [container?.fields, dataBinding, schemaName, tableConfig],
   );
   const schemaActionsEnabled = actionsEnabled && tableBinding.kind === "schema";
   const configuredFilterInputs = tableConfig?.filterPanel?.inputs;
-  const filterSelectionDataMap =
-    useFilterPanelSelectionData(configuredFilterInputs);
+  const filterSelectionDataMap = useFilterPanelSelectionData(
+    configuredFilterInputs,
+  );
   const configuredFilterDefaults = useMemo(
     () => getFilterDefaultValues(configuredFilterInputs),
     [configuredFilterInputs],
@@ -540,6 +547,71 @@ export default function GenericPaginatedPage({
             getMatchingRowClassNames(row, rowKeyClassName);
         }
 
+        const columnConfig = tableConfig?.columns?.find(
+          (column) => column.field === f.name,
+        );
+        if (columnConfig?.type === "computedLabel") {
+          const getComputedValue = (row: GenericItem) =>
+            getComputedLabelValue(
+              tableConfig,
+              f.name,
+              row,
+              evaluateRowCondition,
+            );
+
+          if (rowKeyClassName) {
+            rowKey.className = (row: GenericItem) =>
+              getMatchingRowClassNames(
+                { ...row, [f.name]: getComputedValue(row) },
+                rowKeyClassName,
+              );
+          }
+
+          rowKey.node = (row: GenericItem) => (
+            <span>{getComputedValue(row)}</span>
+          );
+          return rowKey;
+        }
+
+        if (columnConfig?.type === "progressBar") {
+          rowKey.node = (row: GenericItem) => {
+            const progress = getProgressBarValue(
+              tableConfig,
+              f.name,
+              row,
+              evaluateRowCondition,
+            );
+            if (!progress) return <span>-</span>;
+
+            return (
+              <span className="inline-flex items-center gap-3 align-middle">
+                <span
+                  className="inline-flex overflow-hidden rounded-full"
+                  style={{
+                    width: progress.width,
+                    height: progress.height,
+                    backgroundColor: progress.trackColor,
+                  }}
+                >
+                  <span
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${progress.percent}%`,
+                      backgroundColor: progress.color,
+                    }}
+                  />
+                </span>
+                {progress.showValue && (
+                  <span className="text-sm font-medium text-neutral-500">
+                    {progress.value}/{progress.max}
+                  </span>
+                )}
+              </span>
+            );
+          };
+          return rowKey;
+        }
+
         if (rowKey.isBoolean) {
           rowKey.node = (row: GenericItem) => (
             <CheckSwitch
@@ -667,7 +739,9 @@ export default function GenericPaginatedPage({
       .filter((f) => !constantFilterKeys.includes(f.name))
       .map((f) => ({
         key: t(getTableDisplayName(tableConfig, f) || getFieldLabel(f)),
-        isSortable: true,
+        isSortable:
+          tableConfig?.columns?.find((column) => column.field === f.name)
+            ?.type !== "computedLabel",
         correspondingKey: f.name,
       }));
     return schemaActionsEnabled
@@ -1682,7 +1756,12 @@ export default function GenericPaginatedPage({
       closeFilters: () => setShowFilters(false),
       isApplyButtonActive: true,
     }),
-    [showFilters, hasFilterPanelInputs, filterPanelInputs, filterPanelFormElements],
+    [
+      showFilters,
+      hasFilterPanelInputs,
+      filterPanelInputs,
+      filterPanelFormElements,
+    ],
   );
 
   const selectionActions = useMemo(
@@ -1802,7 +1881,7 @@ export default function GenericPaginatedPage({
   return (
     <>
       {isHeader && <Header />}
-      <div className="w-[95%] mx-auto">
+      <div className="w-full mx-auto">
         <GenericTable
           rowKeys={rowKeys}
           actions={actions}

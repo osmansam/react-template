@@ -86,19 +86,6 @@ const customFilterOption = (
   return normalizedLabel.includes(normalizedSearch);
 };
 
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" && window.innerWidth < breakpoint
-  );
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < breakpoint);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [breakpoint]);
-
-  return isMobile;
-}
 const SelectInput = ({
   label,
   options,
@@ -121,7 +108,6 @@ const SelectInput = ({
   const [isSearchable, setIsSearchable] = useState(false);
   const [isDownIconClicked, setIsDownIconClicked] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile(768);
 
   const sortedOptions = useMemo(() => {
     if (isSortDisabled) return options;
@@ -159,11 +145,17 @@ const SelectInput = ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     menu: (base: any) => ({
       ...base,
+      zIndex: 60,
       borderRadius: "0.625rem",
       border: "1px solid #e5e5e5",
       boxShadow:
         "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.04)",
       overflow: "hidden",
+    }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999,
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     menuList: (base: any) => ({
@@ -350,8 +342,11 @@ const SelectInput = ({
               }}
               isDisabled={isReadOnly}
               menuShouldScrollIntoView={true}
-              menuPlacement={isMobile ? "bottom" : "auto"}
-              menuPosition={isMobile ? "absolute" : "fixed"}
+              menuPlacement="auto"
+              menuPosition="fixed"
+              menuPortalTarget={
+                typeof document !== "undefined" ? document.body : undefined
+              }
             />
           ) : (
             <Select
@@ -376,8 +371,11 @@ const SelectInput = ({
               }}
               isDisabled={isReadOnly}
               menuShouldScrollIntoView={true}
-              menuPlacement={isMobile ? "bottom" : "auto"}
-              menuPosition={isMobile ? "absolute" : "fixed"}
+              menuPlacement="auto"
+              menuPosition="fixed"
+              menuPortalTarget={
+                typeof document !== "undefined" ? document.body : undefined
+              }
               isClearable={false}
               backspaceRemovesValue={true}
             />

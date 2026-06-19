@@ -44,9 +44,37 @@ export interface TableLinkConfig {
   type?: LinkType;
 }
 
+export type TableColumnType = "field" | "computedLabel" | "progressBar";
+
+export interface TableComputedLabelRule {
+  condition?: string;
+  value?: string;
+}
+
+export interface TableProgressBarColorRule {
+  condition?: string;
+  color?: string;
+}
+
+export interface TableProgressBarConfig {
+  sourceField?: string;
+  max?: number;
+  maxField?: string;
+  color?: string;
+  trackColor?: string;
+  height?: number;
+  width?: number;
+  showValue?: boolean;
+  colorRules?: TableProgressBarColorRule[];
+}
+
 export interface TableColumnConfig {
   field: string;
+  type?: TableColumnType;
   displayName?: string;
+  computedLabelRules?: TableComputedLabelRule[];
+  fallbackValue?: string;
+  progressBar?: TableProgressBarConfig;
   cellClassName?: RowClassConfig[];
   link?: TableLinkConfig;
 }
@@ -174,11 +202,33 @@ export interface TableActionConfig {
 }
 
 export interface TableComponentConfig {
+  title?: string;
   columns?: TableColumnConfig[];
   rows?: TableRowsConfig;
   cache?: TableCacheConfig;
   actions?: TableActionConfig[];
   filterPanel?: TableFilterPanelConfig;
+}
+
+export type InfoBlocksSource = "static" | "schema" | "pipeline" | "workflow";
+
+export interface InfoBlockColorRule {
+  condition?: string;
+  color?: string;
+}
+
+export interface InfoBlockItemConfig {
+  title?: string;
+  value?: string;
+  footer?: string;
+  color?: string;
+  titleColorRules?: InfoBlockColorRule[];
+  footerColorRules?: InfoBlockColorRule[];
+}
+
+export interface InfoBlocksConfig {
+  source?: InfoBlocksSource;
+  items?: InfoBlockItemConfig[];
 }
 
 export type ComponentType =
@@ -188,6 +238,7 @@ export type ComponentType =
   | "text"
   | "custom"
   | "calendar"
+  | "infoBlocks"
   // Chart types
   | "barChart"
   | "lineChart"

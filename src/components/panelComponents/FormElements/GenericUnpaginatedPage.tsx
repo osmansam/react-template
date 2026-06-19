@@ -23,6 +23,7 @@ import {
 import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
 import {
   RawContainer,
+  evaluateRowCondition,
   fieldToInput,
   getFieldLabel,
   getMatchingRowClassNames,
@@ -34,6 +35,8 @@ import {
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
 import {
+  getComputedLabelValue,
+  getProgressBarValue,
   getTableCellClassName,
   getTableDisplayName,
   getTableLinkConfig,
@@ -295,6 +298,7 @@ type Props = {
   excludeFields?: string[];
   actionsEnabled?: boolean;
   isHeader?: boolean;
+  customTitle?: string;
   tableConfig?: TableComponentConfig;
 };
 
@@ -304,6 +308,7 @@ export default function GenericUnpaginatedPage({
   excludeFields,
   actionsEnabled = true,
   isHeader = false,
+  customTitle,
   tableConfig,
 }: Props) {
   const { t } = useTranslation();
@@ -322,8 +327,9 @@ export default function GenericUnpaginatedPage({
   const [filterFormElements, setFilterFormElements] =
     useState<FormElementsState>({});
   const configuredFilterInputs = tableConfig?.filterPanel?.inputs;
-  const filterSelectionDataMap =
-    useFilterPanelSelectionData(configuredFilterInputs);
+  const filterSelectionDataMap = useFilterPanelSelectionData(
+    configuredFilterInputs,
+  );
   const configuredFilterDefaults = useMemo(
     () => getFilterDefaultValues(configuredFilterInputs),
     [configuredFilterInputs],
@@ -426,6 +432,24 @@ export default function GenericUnpaginatedPage({
     let fields = container.fields
       .map(normalizeField)
       .filter(isDisplayablePrimitive);
+
+    if (tableConfig?.columns?.length) {
+      fields = tableConfig.columns
+        .map((column) => {
+          const field = fields.find((item) => item.name === column.field);
+          return (
+            field || {
+              name: column.field,
+              type: "string",
+              frontend: column.displayName
+                ? { displayName: column.displayName }
+                : undefined,
+            }
+          );
+        })
+        .filter((field): field is Field => Boolean(field?.name));
+    }
+
     if (includeFields?.length) {
       fields = includeFields
         .map((name) => fields.find((f) => f.name === name))
@@ -451,7 +475,7 @@ export default function GenericUnpaginatedPage({
     });
 
     return fields;
-  }, [container, includeFields, excludeFields, user]);
+  }, [container, includeFields, excludeFields, user, tableConfig]);
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
@@ -501,6 +525,69 @@ export default function GenericUnpaginatedPage({
         if (rowKeyClassName) {
           rowKey.className = (row: GenericItem) =>
             getMatchingRowClassNames(row, rowKeyClassName);
+        }
+
+        const columnConfig = tableConfig?.columns?.find(
+          (column) => column.field === f.name,
+        );
+        if (columnConfig?.type === "computedLabel") {
+          const getComputedValue = (row: GenericItem) =>
+            getComputedLabelValue(
+              tableConfig,
+              f.name,
+              row,
+              evaluateRowCondition,
+            );
+
+          if (rowKeyClassName) {
+            rowKey.className = (row: GenericItem) =>
+              getMatchingRowClassNames(
+                { ...row, [f.name]: getComputedValue(row) },
+                rowKeyClassName,
+              );
+          }
+
+          rowKey.node = (row: GenericItem) => <span>{getComputedValue(row)}</span>;
+          return rowKey;
+        }
+
+        if (columnConfig?.type === "progressBar") {
+          rowKey.node = (row: GenericItem) => {
+            const progress = getProgressBarValue(
+              tableConfig,
+              f.name,
+              row,
+              evaluateRowCondition,
+            );
+            if (!progress) return <span>-</span>;
+
+            return (
+              <span className="inline-flex items-center gap-3 align-middle">
+                <span
+                  className="inline-flex overflow-hidden rounded-full"
+                  style={{
+                    width: progress.width,
+                    height: progress.height,
+                    backgroundColor: progress.trackColor,
+                  }}
+                >
+                  <span
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${progress.percent}%`,
+                      backgroundColor: progress.color,
+                    }}
+                  />
+                </span>
+                {progress.showValue && (
+                  <span className="text-sm font-medium text-neutral-500">
+                    {progress.value}/{progress.max}
+                  </span>
+                )}
+              </span>
+            );
+          };
+          return rowKey;
         }
 
         // Add node function for boolean fields
@@ -621,7 +708,9 @@ export default function GenericUnpaginatedPage({
   const columns = useMemo(() => {
     const baseCols = displayFields.map((f) => ({
       key: t(getTableDisplayName(tableConfig, f) || getFieldLabel(f)),
-      isSortable: true,
+      isSortable:
+        tableConfig?.columns?.find((column) => column.field === f.name)
+          ?.type !== "computedLabel",
       correspondingKey: f.name,
     }));
     if (actionsEnabled) {
@@ -1557,14 +1646,14 @@ export default function GenericUnpaginatedPage({
   return (
     <>
       {isHeader && <Header />}
-      <div className="w-[95%] mx-auto">
+      <div className="w-full mx-auto">
         <GenericTable
           rowKeys={rowKeys}
           actions={actions}
           columns={columns}
           rows={rows || []}
           rowStyleFunction={rowStyleFunction}
-          title={t(humanize(schemaName))}
+          title={customTitle || t(humanize(schemaName))}
           addButton={addButton}
           isCollapsible={false}
           isActionsActive={actionsEnabled}
