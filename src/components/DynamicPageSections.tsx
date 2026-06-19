@@ -8,6 +8,7 @@ import {
   TabContent,
 } from "../types/page";
 import { useGetSelection } from "../utils/dynamic";
+import { RouteParams, resolveRouteParamValue } from "../utils/routeParams";
 import type { ChartType } from "./charts/DynamicChart";
 import GenericPaginatedPage from "./panelComponents/FormElements/GenericPaginatedPage";
 import GenericTabPage from "./panelComponents/FormElements/GenericTabPage";
@@ -82,7 +83,10 @@ const getTableConfig = (
     ? (props as TableComponentConfig)
     : undefined);
 
-const MixedTabPanel: React.FC<{ tabs: TabContent[] }> = ({ tabs }) => {
+const MixedTabPanel: React.FC<{
+  tabs: TabContent[];
+  routeParams: RouteParams;
+}> = ({ tabs, routeParams }) => {
   const [activeTab, setActiveTab] = useState(0);
 
   const unifiedTabs = useMemo(
@@ -94,12 +98,16 @@ const MixedTabPanel: React.FC<{ tabs: TabContent[] }> = ({ tabs }) => {
         content: (
           <div className="flex flex-col gap-4">
             {tab.components.map((comp) => (
-              <RenderComponent key={comp.id} component={comp} />
+              <RenderComponent
+                key={comp.id}
+                component={comp}
+                routeParams={routeParams}
+              />
             ))}
           </div>
         ),
       })),
-    [tabs],
+    [routeParams, tabs],
   );
 
   return (
@@ -112,9 +120,16 @@ const MixedTabPanel: React.FC<{ tabs: TabContent[] }> = ({ tabs }) => {
   );
 };
 
-const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
-  ({ component }) => {
+const RenderComponent: React.FC<{
+  component: ComponentBlock;
+  routeParams: RouteParams;
+}> = React.memo(
+  ({ component, routeParams }) => {
     const { type, dataBinding, tabs, groupBy, title, props } = component;
+    const resolvedDataBinding = useMemo(
+      () => resolveRouteParamValue(dataBinding, routeParams),
+      [dataBinding, routeParams],
+    );
     const tableConfig = getTableConfig(component.table, props);
     const firstTableTabIndex =
       tabs?.findIndex((tab) => tab.components[0]?.type === "table") ?? -1;
@@ -137,7 +152,7 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
         : undefined;
     const templateSchemaName =
       templateComponent?.dataBinding?.schemaName ||
-      dataBinding?.schemaName ||
+      resolvedDataBinding?.schemaName ||
       "";
     const groupByGroupedSchema =
       tabPanelGroupBy?.groupedSchemaName || templateSchemaName;
@@ -170,14 +185,16 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
 
     switch (type) {
       case "table":
-        return dataBinding?.schemaName &&
-          ["schema", "pipeline", "workflow"].includes(dataBinding.kind) ? (
+        return resolvedDataBinding?.schemaName &&
+          ["schema", "pipeline", "workflow"].includes(
+            resolvedDataBinding.kind,
+          ) ? (
           <GenericPaginatedPage
-            schemaName={dataBinding.schemaName}
+            schemaName={resolvedDataBinding.schemaName}
             isHeader={false}
             tableConfig={tableConfig}
-            dataBinding={dataBinding}
-            actionsEnabled={dataBinding.kind === "schema"}
+            dataBinding={resolvedDataBinding}
+            actionsEnabled={resolvedDataBinding.kind === "schema"}
           />
         ) : (
           <NoticePanel>
@@ -207,26 +224,39 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
 
           const dynamicTabs = selectionData.map((item) => {
             const groupValue = item[groupByValueField] ?? item._id;
+            const resolvedBaseBinding = resolveRouteParamValue(
+              baseComponent.dataBinding,
+              routeParams,
+            );
             return {
-              schemaName: baseComponent.dataBinding!.schemaName!,
+              schemaName: resolvedBaseBinding!.schemaName!,
               label: String(item[groupByLabelField] ?? groupValue),
               isPaginated: true,
               constantFilter: {
                 [groupByGroupedField]: groupValue,
               },
+              dataBinding: resolvedBaseBinding,
               tableConfig: getTableConfig(baseComponent.table, baseComponent.props),
             };
           });
 
-          const manualTabs = (tabs || []).map((tab: TabContent) => ({
-            schemaName: tab.components[0]?.dataBinding?.schemaName || "",
-            label: tab.title,
-            isPaginated: true,
-            tableConfig: getTableConfig(
-              tab.components[0]?.table,
-              tab.components[0]?.props,
-            ),
-          }));
+          const manualTabs = (tabs || []).map((tab: TabContent) => {
+            const tabComponent = tab.components[0];
+            const tabBinding = resolveRouteParamValue(
+              tabComponent?.dataBinding,
+              routeParams,
+            );
+            return {
+              schemaName: tabBinding?.schemaName || "",
+              label: tab.title,
+              isPaginated: true,
+              dataBinding: tabBinding,
+              tableConfig: getTableConfig(
+                tabComponent?.table,
+                tabComponent?.props,
+              ),
+            };
+          });
           const allTabsConfig = [
             ...dynamicTabs,
             ...manualTabs,
@@ -245,20 +275,28 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
           if (allTabsAreTables) {
             return (
               <GenericTabPage
-                tabs={tabs.map((tab) => ({
-                  schemaName: tab.components[0]?.dataBinding?.schemaName || "",
-                  label: tab.title,
-                  isPaginated: true,
-                  tableConfig: getTableConfig(
-                    tab.components[0]?.table,
-                    tab.components[0]?.props,
-                  ),
-                }))}
+                tabs={tabs.map((tab) => {
+                  const tabComponent = tab.components[0];
+                  const tabBinding = resolveRouteParamValue(
+                    tabComponent?.dataBinding,
+                    routeParams,
+                  );
+                  return {
+                    schemaName: tabBinding?.schemaName || "",
+                    label: tab.title,
+                    isPaginated: true,
+                    dataBinding: tabBinding,
+                    tableConfig: getTableConfig(
+                      tabComponent?.table,
+                      tabComponent?.props,
+                    ),
+                  };
+                })}
               />
             );
           }
 
-          return <MixedTabPanel tabs={tabs} />;
+          return <MixedTabPanel tabs={tabs} routeParams={routeParams} />;
         }
 
         return (
@@ -267,14 +305,15 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
           </NoticePanel>
         );
       case "calendar":
-        return dataBinding?.kind === "schema" && dataBinding.schemaName ? (
+        return resolvedDataBinding?.kind === "schema" &&
+          resolvedDataBinding.schemaName ? (
           <Suspense fallback={<LoadingPanel message="Loading calendar..." />}>
             <DynamicCalendar
               config={{
                 title,
                 height: props?.height as number | undefined,
                 width: props?.width as string | undefined,
-                schemaName: dataBinding.schemaName,
+                schemaName: resolvedDataBinding.schemaName,
                 fieldMappings: props?.fieldMappings as
                   | {
                       id?: string;
@@ -328,9 +367,9 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
             <NoticePanel tone="error">Invalid chart type: {type}</NoticePanel>
           );
         }
-        return dataBinding?.kind === "pipeline" &&
-          dataBinding.schemaName &&
-          dataBinding.pipelineName ? (
+        return resolvedDataBinding?.kind === "pipeline" &&
+          resolvedDataBinding.schemaName &&
+          resolvedDataBinding.pipelineName ? (
           <Suspense fallback={<LoadingPanel message="Loading chart..." />}>
             <DynamicChart
               config={{
@@ -343,9 +382,9 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
                   | undefined,
                 dataBinding: {
                   kind: "pipeline",
-                  schemaName: dataBinding.schemaName,
-                  pipelineName: dataBinding.pipelineName,
-                  params: dataBinding.params,
+                  schemaName: resolvedDataBinding.schemaName,
+                  pipelineName: resolvedDataBinding.pipelineName,
+                  params: resolvedDataBinding.params,
                 },
               }}
             />
@@ -364,7 +403,10 @@ const RenderComponent: React.FC<{ component: ComponentBlock }> = React.memo(
   },
 );
 
-const GridCellView: React.FC<{ cell: GridCell }> = React.memo(({ cell }) => {
+const GridCellView: React.FC<{
+  cell: GridCell;
+  routeParams: RouteParams;
+}> = React.memo(({ cell, routeParams }) => {
   const { row, column, rowSpan = 1, colSpan = 1, components } = cell;
   const sortedComponents = [...components].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
@@ -378,15 +420,22 @@ const GridCellView: React.FC<{ cell: GridCell }> = React.memo(({ cell }) => {
     >
       <div className="flex h-full flex-col">
         {sortedComponents.map((component) => (
-          <RenderComponent key={component.id} component={component} />
+          <RenderComponent
+            key={component.id}
+            component={component}
+            routeParams={routeParams}
+          />
         ))}
       </div>
     </div>
   );
 });
 
-const GridSectionView: React.FC<{ grid: GridSection }> = React.memo(
-  ({ grid }) => {
+const GridSectionView: React.FC<{
+  grid: GridSection;
+  routeParams: RouteParams;
+}> = React.memo(
+  ({ grid, routeParams }) => {
     const { columns, gap = 16, cells } = grid;
 
     if (!cells?.length) {
@@ -407,7 +456,7 @@ const GridSectionView: React.FC<{ grid: GridSection }> = React.memo(
         }}
       >
         {cells.map((cell) => (
-          <GridCellView key={cell.id} cell={cell} />
+          <GridCellView key={cell.id} cell={cell} routeParams={routeParams} />
         ))}
       </div>
     );
@@ -426,11 +475,17 @@ const normalizeGrid = (section: PageSection): GridSection | null => {
   return null;
 };
 
-export const PageSectionView: React.FC<{ section: PageSection }> = ({
-  section,
-}) => {
+export const PageSectionView: React.FC<{
+  section: PageSection;
+  routeParams: RouteParams;
+}> = ({ section, routeParams }) => {
   if (section.type === "component" && section.component) {
-    return <RenderComponent component={section.component} />;
+    return (
+      <RenderComponent
+        component={section.component}
+        routeParams={routeParams}
+      />
+    );
   }
 
   if (section.type === "tabs" && section.tabs?.tabs?.length) {
@@ -443,12 +498,12 @@ export const PageSectionView: React.FC<{ section: PageSection }> = ({
           .flatMap((tabSection) => tabSection.component ? [tabSection.component] : [])
           .filter(Boolean),
       }));
-    return <MixedTabPanel tabs={tabs} />;
+    return <MixedTabPanel tabs={tabs} routeParams={routeParams} />;
   }
 
   const grid = normalizeGrid(section);
   if (grid) {
-    return <GridSectionView grid={grid} />;
+    return <GridSectionView grid={grid} routeParams={routeParams} />;
   }
 
   return (

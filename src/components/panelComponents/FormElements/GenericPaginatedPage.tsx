@@ -1270,7 +1270,7 @@ export default function GenericPaginatedPage({
       options: bulkFieldOptions,
       placeholder: t("Select fields to edit"),
       isMultiple: true,
-      required: true,
+      required: !isBulkStepTwo,
       isDisabled: isBulkStepTwo,
     };
 
