@@ -40,9 +40,7 @@ const toNumberFilterItems = (value: FormElementValue): string[] => {
   return [String(value)];
 };
 
-const getNumberRangeValues = (
-  value: FormElementValue
-): NumberRangeValues => {
+const getNumberRangeValues = (value: FormElementValue): NumberRangeValues => {
   return toNumberFilterItems(value).reduce<NumberRangeValues>(
     (range, item) => {
       const rawValue = item.replace(numberFilterPrefixPattern, "");
@@ -53,14 +51,14 @@ const getNumberRangeValues = (
 
       return { ...range, min: rawValue };
     },
-    { min: "", max: "" }
+    { min: "", max: "" },
   );
 };
 
 const buildNumberRangeFilterValue = (
   currentValue: FormElementValue,
   bound: NumberRangeBound,
-  nextRawValue: FormElementValue
+  nextRawValue: FormElementValue,
 ): FormElementValue => {
   const currentRange = getNumberRangeValues(currentValue);
   const nextRange = {
@@ -140,14 +138,14 @@ const FilterPanel = ({
   const updateNumberRangeFilter = (
     fieldKey: string,
     bound: NumberRangeBound,
-    nextRawValue: FormElementValue
+    nextRawValue: FormElementValue,
   ) => {
     const setNextValue = (prev: FormElementsState) => ({
       ...prev,
       [fieldKey]: buildNumberRangeFilterValue(
         prev[fieldKey] ?? "",
         bound,
-        nextRawValue
+        nextRawValue,
       ),
     });
 
@@ -174,7 +172,7 @@ const FilterPanel = ({
     fieldKey: string,
     value: FormElementValue,
     limits: NumberRangeLimits,
-    isOnClearActive = true
+    isOnClearActive = true,
   ) => {
     const safeLimits =
       limits.max > limits.min
@@ -187,12 +185,12 @@ const FilterPanel = ({
     const minValue = clamp(
       toFiniteNumber(currentRange.min, safeLimits.min),
       safeLimits.min,
-      safeLimits.max
+      safeLimits.max,
     );
     const maxValue = clamp(
       toFiniteNumber(currentRange.max, safeLimits.max),
       safeLimits.min,
-      safeLimits.max
+      safeLimits.max,
     );
     const safeMinValue = Math.min(minValue, maxValue);
     const safeMaxValue = Math.max(minValue, maxValue);
@@ -211,7 +209,7 @@ const FilterPanel = ({
           updateNumberRangeFilter(
             fieldKey,
             "min",
-            Math.min(nextValue, safeMaxValue)
+            Math.min(nextValue, safeMaxValue),
           );
           return;
         }
@@ -219,7 +217,7 @@ const FilterPanel = ({
         updateNumberRangeFilter(
           fieldKey,
           "max",
-          Math.max(nextValue, safeMinValue)
+          Math.max(nextValue, safeMinValue),
         );
       };
 
@@ -236,13 +234,13 @@ const FilterPanel = ({
             </GenericButton>
           )}
           <span
-            className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded bg-neutral-900 px-2 py-0.5 text-xs text-white shadow-sm"
+            className="pointer-events-none absolute top-0 z-2 -translate-x-1/2 rounded bg-neutral-900 px-2 py-0.5 text-xs text-white shadow-sm"
             style={{ left: `${minLabelPercent}%` }}
           >
             {safeMinValue}
           </span>
           <span
-            className="pointer-events-none absolute bottom-0 z-10 -translate-x-1/2 rounded bg-neutral-900 px-2 py-0.5 text-xs text-white shadow-sm"
+            className="pointer-events-none absolute bottom-0 z-2 -translate-x-1/2 rounded bg-neutral-900 px-2 py-0.5 text-xs text-white shadow-sm"
             style={{ left: `${maxLabelPercent}%` }}
           >
             {safeMaxValue}
@@ -326,7 +324,7 @@ const FilterPanel = ({
           (key: string) =>
           (
             selectedValue: SingleValue<OptionType> | MultiValue<OptionType>,
-            actionMeta: ActionMeta<OptionType>
+            actionMeta: ActionMeta<OptionType>,
           ) => {
             if (
               actionMeta.action === "select-option" ||
@@ -379,7 +377,7 @@ const FilterPanel = ({
               let valueForCallback: string | string[] = "";
               if (Array.isArray(selectedValue)) {
                 valueForCallback = selectedValue.map((option) =>
-                  String(option.value)
+                  String(option.value),
                 );
               } else if (selectedValue && !Array.isArray(selectedValue)) {
                 valueForCallback = String((selectedValue as OptionType).value);
@@ -403,7 +401,7 @@ const FilterPanel = ({
                     min: input.min ?? input.minNumber ?? 0,
                     max: input.max ?? 1000,
                   },
-                  input?.isOnClearActive ?? true
+                  input?.isOnClearActive ?? true,
                 )}
               </div>
             )}
@@ -441,7 +439,7 @@ const FilterPanel = ({
                 label={
                   input.required && input.label
                     ? input.label
-                    : input.label ?? ""
+                    : (input.label ?? "")
                 }
                 placeholder={input.placeholder ?? ""}
                 onChange={(val) => handleChange(input.formKey)(val ?? "")}
@@ -468,13 +466,13 @@ const FilterPanel = ({
                         return (
                           Array.isArray(formValue) &&
                           (formValue as (string | number)[]).includes(
-                            option.value
+                            option.value,
                           )
                         );
                       }) || []
                     : input.options?.find(
                         (option) =>
-                          option.value === tempFormElements[input.formKey]
+                          option.value === tempFormElements[input.formKey],
                       ) || null
                 }
                 label={input.label ?? ""}
@@ -503,7 +501,7 @@ const FilterPanel = ({
                 label={
                   input.required && input.label
                     ? input.label
-                    : input.label ?? ""
+                    : (input.label ?? "")
                 }
                 onChange={handleChange(input.formKey)}
                 requiredField={input.required}
@@ -531,7 +529,7 @@ const FilterPanel = ({
                 label={
                   input.required && input.label
                     ? input.label
-                    : input.label ?? ""
+                    : (input.label ?? "")
                 }
                 onChange={handleChange(input.formKey)}
                 requiredField={input.required}

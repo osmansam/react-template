@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useMemo, useState } from "react";
 import {
   ComponentBlock,
+  DistributionBlocksConfig,
   GridCell,
   GridSection,
   InfoBlocksConfig,
@@ -13,6 +14,7 @@ import { resolveRouteParamValue, RouteParams } from "../utils/routeParams";
 import type { ChartType } from "./charts/DynamicChart";
 import GenericPaginatedPage from "./panelComponents/FormElements/GenericPaginatedPage";
 import GenericTabPage from "./panelComponents/FormElements/GenericTabPage";
+import DistributionBlocks from "./panelComponents/FormElements/DistributionBlocks";
 import InfoBlocks from "./panelComponents/FormElements/InfoBlocks";
 import UnifiedTabPanel from "./panelComponents/TabPanel/UnifiedTabPanel";
 
@@ -352,6 +354,16 @@ const RenderComponent: React.FC<{
       return (
         <InfoBlocks
           config={props?.infoBlocks as InfoBlocksConfig | undefined}
+          dataBinding={resolvedDataBinding}
+        />
+      );
+    case "distributionBlocks":
+      return (
+        <DistributionBlocks
+          title={title}
+          config={
+            props?.distributionBlocks as DistributionBlocksConfig | undefined
+          }
           dataBinding={resolvedDataBinding}
         />
       );

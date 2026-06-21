@@ -88,6 +88,7 @@ export interface TableCacheConfig {
 }
 
 export type TableActionKind =
+  | "create"
   | "edit"
   | "delete"
   | "update"
@@ -206,6 +207,7 @@ export interface TableComponentConfig {
   columns?: TableColumnConfig[];
   rows?: TableRowsConfig;
   cache?: TableCacheConfig;
+  addButton?: TableActionConfig;
   actions?: TableActionConfig[];
   filterPanel?: TableFilterPanelConfig;
 }
@@ -231,6 +233,18 @@ export interface InfoBlocksConfig {
   items?: InfoBlockItemConfig[];
 }
 
+export interface DistributionBlockItemConfig {
+  label?: string;
+  value?: string;
+  percent?: string;
+  color?: string;
+}
+
+export interface DistributionBlocksConfig {
+  source?: InfoBlocksSource;
+  items?: DistributionBlockItemConfig[];
+}
+
 export type ComponentType =
   | "table"
   | "tabPanel"
@@ -239,6 +253,7 @@ export type ComponentType =
   | "custom"
   | "calendar"
   | "infoBlocks"
+  | "distributionBlocks"
   // Chart types
   | "barChart"
   | "lineChart"

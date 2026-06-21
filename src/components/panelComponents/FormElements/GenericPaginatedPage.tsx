@@ -962,6 +962,45 @@ export default function GenericPaginatedPage({
     useState<TableActionConfig | null>(null);
   const [rowToAction, setRowToAction] = useState<GenericItem | null>(null);
 
+  const configuredAddButtonAction =
+    tableConfig?.addButton?.enabled !== false
+      ? tableConfig?.addButton
+      : tableConfig?.actions?.find(
+          (action) => action.kind === "create" && action.enabled !== false,
+        );
+
+  const addButtonActionId = configuredAddButtonAction
+    ? getActionId(configuredAddButtonAction, 0)
+    : "create";
+
+  const actionSelectionDataMap = useActionFormSelectionData([
+    ...(configuredAddButtonAction ? [configuredAddButtonAction] : []),
+    ...(tableConfig?.actions || []).filter((action) => action.kind !== "create"),
+  ]);
+
+  const addButtonDefaults = configuredAddButtonAction
+    ? getActionDefaultValues(configuredAddButtonAction)
+    : {};
+  const addButtonConstants = configuredAddButtonAction
+    ? parseActionConstantValues(configuredAddButtonAction)
+    : {};
+  const addButtonInputs = configuredAddButtonAction
+    ? buildActionInputs(
+        configuredAddButtonAction,
+        inputs,
+        addButtonActionId,
+        actionSelectionDataMap,
+      )
+    : inputs;
+  const addButtonFormKeys =
+    configuredAddButtonAction?.formFields !== undefined
+      ? buildActionFormKeys(configuredAddButtonAction, addButtonInputs)
+      : formKeys.filter((formKey) =>
+          new Set(addButtonInputs.map((input) => input.formKey)).has(
+            formKey.key,
+          ),
+        );
+
   const handleSubmitItem = useCallback(
     (item: GenericItem | UpdatePayload<GenericItem>) => {
       if ("id" in item && "updates" in item) {
@@ -980,32 +1019,56 @@ export default function GenericPaginatedPage({
         );
       } else {
         // Create operation - merge constantFilter into new item
+        const configuredCreateValues = {
+          ...addButtonDefaults,
+          ...(item as Record<string, unknown>),
+          ...addButtonConstants,
+        };
         const mergedItem = constantFilter
-          ? { ...(item as Record<string, unknown>), ...constantFilter }
-          : item;
+          ? { ...configuredCreateValues, ...constantFilter }
+          : configuredCreateValues;
         createDynamicItem(mergedItem as GenericItem);
       }
     },
-    [updateDynamicItem, createDynamicItem, constantFilter, constantFilterKeys],
+    [
+      updateDynamicItem,
+      createDynamicItem,
+      constantFilter,
+      constantFilterKeys,
+      addButtonDefaults,
+      addButtonConstants,
+    ],
   );
 
   const addButton = useMemo(
     () => ({
-      name: t("Add"),
+      name: configuredAddButtonAction?.label || t("Add"),
       isModal: true,
       modal: (
         <GenericAddEditPanel
           isOpen={isAddOpen}
           close={() => setIsAddOpen(false)}
-          inputs={inputs}
-          formKeys={formKeys}
+          inputs={addButtonInputs}
+          formKeys={addButtonFormKeys}
           submitItem={handleSubmitItem}
+          buttonName={
+            configuredAddButtonAction?.buttonName ||
+            configuredAddButtonAction?.label ||
+            undefined
+          }
           topClassName="flex flex-col gap-2"
           itemToEdit={
-            constantFilter
+            constantFilter ||
+            Object.keys(addButtonDefaults).length > 0 ||
+            Object.keys(addButtonConstants).length > 0
               ? {
                   id: "",
-                  updates: { ...constantFilter, _id: "" } as GenericItem,
+                  updates: {
+                    ...addButtonDefaults,
+                    ...addButtonConstants,
+                    ...(constantFilter || {}),
+                    _id: "",
+                  } as GenericItem,
                 }
               : undefined
           }
@@ -1015,19 +1078,29 @@ export default function GenericPaginatedPage({
       setIsModal: setIsAddOpen,
       isPath: false,
       icon: null,
-      className: "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
+      className:
+        configuredAddButtonAction?.buttonClassName ||
+        configuredAddButtonAction?.className ||
+        "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
     }),
-    [t, isAddOpen, inputs, formKeys, handleSubmitItem, constantFilter],
-  );
-
-  const actionSelectionDataMap = useActionFormSelectionData(
-    tableConfig?.actions || [],
+    [
+      t,
+      configuredAddButtonAction,
+      isAddOpen,
+      addButtonInputs,
+      addButtonFormKeys,
+      handleSubmitItem,
+      constantFilter,
+      addButtonDefaults,
+      addButtonConstants,
+    ],
   );
 
   const actions = useMemo(() => {
     if (!schemaActionsEnabled) return [];
 
     const configuredActions = (tableConfig?.actions || [])
+      .filter((action) => action.kind !== "create")
       .filter((action) => action.enabled !== false)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const hasConfiguredActions = Array.isArray(tableConfig?.actions);
