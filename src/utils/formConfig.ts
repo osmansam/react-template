@@ -1,18 +1,18 @@
+import {
+    FormKeyType,
+    FormKeyTypeEnum,
+    GenericInputType,
+    InputTypes,
+    OptionType,
+} from "../components/panelComponents/shared/types";
 import { FormElementValue, FormElementsState } from "../types";
 import {
-  FormActionConfig,
-  FormAreaKey,
-  FormComponentConfig,
-  FormFieldConfig,
-  FormObjectListConfig,
+    FormActionConfig,
+    FormAreaKey,
+    FormComponentConfig,
+    FormFieldConfig,
+    FormObjectListConfig,
 } from "../types/page";
-import {
-  FormKeyType,
-  FormKeyTypeEnum,
-  GenericInputType,
-  InputTypes,
-  OptionType,
-} from "../components/panelComponents/shared/types";
 import { evaluateRowCondition } from "./genericPageHelpers";
 
 export type EmbeddedFormObject = Record<string, unknown>;
@@ -274,7 +274,10 @@ export const resolveFormTemplate = (
 ): string => {
   if (!template?.trim()) return "";
   return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, key: string) => {
-    const value = item[key.trim()];
+    const trimmed = key.trim();
+    const label = item[`${trimmed}Label`];
+    if (label !== undefined && label !== null) return String(label);
+    const value = item[trimmed];
     return value === undefined || value === null ? "" : String(value);
   });
 };
@@ -286,6 +289,10 @@ export const getObjectDisplayText = (
 ): string => {
   const resolvedTemplate = resolveFormTemplate(template, item);
   if (resolvedTemplate) return resolvedTemplate;
+  if (field) {
+    const label = item[`${field}Label`];
+    if (label !== undefined && label !== null) return String(label);
+  }
   const value = field ? item[field] : undefined;
   return value === undefined || value === null ? "" : String(value);
 };

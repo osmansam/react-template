@@ -92,7 +92,12 @@ export interface OptionType {
   bgColor?: string;
   textColor?: string;
   sourceItem?: Record<string, unknown>;
-  [key: string]: string | number | boolean | Record<string, unknown> | undefined;
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | Record<string, unknown>
+    | undefined;
 }
 
 export interface PanelFilterType {
@@ -204,4 +209,9 @@ export interface NavigationType {
   path: string;
   additionalSubmitFunction?: () => void;
   canBeClicked: boolean;
+}
+export interface DateRangeFilterType {
+  startDate: string;
+  endDate: string;
+  onChange: (start: string, end: string) => void;
 }
