@@ -20,6 +20,7 @@ import UnifiedTabPanel from "./panelComponents/TabPanel/UnifiedTabPanel";
 
 const DynamicCalendar = lazy(() => import("./calendar/DynamicCalendar"));
 const DynamicChart = lazy(() => import("./charts/DynamicChart"));
+const DynamicForm = lazy(() => import("./forms/DynamicForm"));
 
 const LoadingPanel = ({ message }: { message: string }) => (
   <div className="flex min-h-32 items-center justify-center rounded border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
@@ -186,6 +187,18 @@ const RenderComponent: React.FC<{
   );
 
   switch (type) {
+    case "form": {
+      const formConfig =
+        component.form ||
+        (props?.form as ComponentBlock["form"] | undefined);
+      return formConfig ? (
+        <DynamicForm form={formConfig} title={title} />
+      ) : (
+        <NoticePanel tone="warning">
+          Form component requires form configuration.
+        </NoticePanel>
+      );
+    }
     case "table":
       return resolvedDataBinding?.schemaName &&
         ["schema", "pipeline", "workflow"].includes(

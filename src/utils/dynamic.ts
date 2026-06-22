@@ -551,6 +551,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   }) => executeWorkflowMutation.mutate(payload);
   return {
     createDynamicItem,
+    createMutation,
     createMultipleDynamicItem,
     createManyMutation,
     updateDynamicItem,

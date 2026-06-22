@@ -212,6 +212,101 @@ export interface TableComponentConfig {
   filterPanel?: TableFilterPanelConfig;
 }
 
+export type FormAreaKey = "top" | "main" | "bottom" | "left" | "right";
+export type FormFieldWidth = "full" | "half" | "third";
+export type FormLayoutVariant = "modal" | "page";
+
+export interface FormAreaConfig {
+  key: FormAreaKey;
+  title?: string;
+  order?: number;
+  className?: string;
+}
+
+export interface FormLayoutConfig {
+  variant?: FormLayoutVariant;
+  columns?: 1 | 2 | 3;
+  areas?: FormAreaConfig[];
+}
+
+export interface FormFieldConfig extends TableActionFormFieldConfig {
+  area?: FormAreaKey;
+  order?: number;
+  width?: FormFieldWidth;
+}
+
+export interface FormObjectListDisplayConfig {
+  primaryField?: string;
+  primaryTemplate?: string;
+  secondaryField?: string;
+  secondaryTemplate?: string;
+  imageField?: string;
+}
+
+export type FormObjectActionKind =
+  | "editObject"
+  | "removeObject"
+  | "increment"
+  | "decrement";
+
+export interface FormObjectActionConfig {
+  kind: FormObjectActionKind;
+  label?: string;
+  icon?: string;
+  position?: "start" | "end";
+  field?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+export type FormActionKind = "addObject" | "submit";
+
+export interface FormActionConfig {
+  kind: FormActionKind;
+  label?: string;
+  buttonName?: string;
+  area?: FormAreaKey;
+  targetObjectList?: string;
+  sourceFields?: string[];
+  clearSourceFields?: string[];
+  preserveSourceFields?: string[];
+  enabled?: boolean;
+  order?: number;
+}
+
+export interface FormObjectListConfig {
+  key: string;
+  title?: string;
+  area?: FormAreaKey;
+  source?: "embedded";
+  itemFields?: string[];
+  addAction?: FormActionConfig;
+  display?: FormObjectListDisplayConfig;
+  actions?: FormObjectActionConfig[];
+}
+
+export type FormSubmitMode = "create" | "createMany" | "workflow";
+
+export interface FormSubmitConfig {
+  mode?: FormSubmitMode;
+  buttonName?: string;
+  constantValues?: Record<string, unknown>;
+  bulkObjectListKey?: string;
+  workflowSchema?: string;
+  workflowName?: string;
+}
+
+export interface FormComponentConfig {
+  title?: string;
+  schemaName: string;
+  layout?: FormLayoutConfig;
+  fields?: FormFieldConfig[];
+  objectLists?: FormObjectListConfig[];
+  actions?: FormActionConfig[];
+  submit?: FormSubmitConfig;
+}
+
 export type InfoBlocksSource = "static" | "schema" | "pipeline" | "workflow";
 
 export interface InfoBlockColorRule {
@@ -290,6 +385,7 @@ export interface ComponentBlock {
   dataBinding?: DataBinding;
   groupBy?: GroupBy; // Grouping configuration for table components
   table?: TableComponentConfig;
+  form?: FormComponentConfig;
   isAuthorized?: boolean;
   authorizeRole?: string[];
   tabs?: TabContent[]; // For tabPanel type
