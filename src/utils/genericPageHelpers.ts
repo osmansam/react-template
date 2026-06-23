@@ -3,7 +3,8 @@ import {
   FormKeyTypeEnum,
   InputTypes,
 } from "../components/panelComponents/shared/types";
-import { ContainerModel, Field, Types } from "./api/container";
+import { TableActionConfig } from "../types/page";
+import { ContainerModel, Field, Frontend, Types } from "./api/container";
 
 type GenericItem = Record<string, unknown> & { _id: string };
 type ComparableValue = string | number | boolean | null | undefined;
@@ -12,6 +13,64 @@ type RowClassRule = {
   className?: string;
   Condition?: string;
   ClassName?: string;
+};
+type ActionFormFieldConfig = NonNullable<TableActionConfig["formFields"]>[number];
+type RawActionFormFieldConfig = Partial<ActionFormFieldConfig> & {
+  FormKey?: string;
+  Type?: ActionFormFieldConfig["type"];
+  FormKeyType?: ActionFormFieldConfig["formKeyType"];
+  Label?: string;
+  Placeholder?: string;
+  Required?: boolean;
+  RequiredCondition?: string;
+  DisabledCondition?: string;
+  IsDisabled?: boolean;
+  IsMultiple?: boolean;
+  IsNumberButtonsActive?: boolean;
+  OptionsSource?: ActionFormFieldConfig["optionsSource"];
+  StaticOptions?: ActionFormFieldConfig["staticOptions"];
+  StaticOptionsJson?: string;
+  SourceSchemaName?: string;
+  SourceValueField?: string;
+  SourceLabelField?: string;
+  SourceFilterCondition?: string;
+  InvalidateKeys?: string[];
+  DefaultValue?: ActionFormFieldConfig["defaultValue"];
+  Min?: number;
+  Max?: number;
+  MinLength?: number;
+  MaxLength?: number;
+  Pattern?: string;
+  ValidationMessage?: string;
+};
+type RawActionConfig = Partial<TableActionConfig> & {
+  ID?: string;
+  Key?: string;
+  Kind?: TableActionConfig["kind"];
+  Label?: string;
+  ButtonName?: string;
+  Icon?: string;
+  Order?: number;
+  Enabled?: boolean;
+  ModalType?: TableActionConfig["modalType"];
+  FormFields?: RawActionFormFieldConfig[];
+  Fields?: string[];
+  ExcludeFields?: string[];
+  FieldOverrides?: TableActionConfig["fieldOverrides"];
+  ConstantValues?: Record<string, unknown>;
+  ConstantValuesJson?: string;
+  DisabledCondition?: string;
+  HiddenCondition?: string;
+  RequiredCondition?: string;
+  ConfirmTitle?: string;
+  ConfirmText?: string;
+  Submit?: TableActionConfig["submit"];
+  Path?: string;
+  LinkTemplate?: string;
+  LinkType?: TableActionConfig["linkType"];
+  ClassName?: string;
+  ButtonClassName?: string;
+  IsButton?: boolean;
 };
 
 const toComparableValue = (value: unknown): ComparableValue => {
@@ -25,6 +84,12 @@ const toComparableValue = (value: unknown): ComparableValue => {
     return value;
   }
 
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (record._id !== undefined) return String(record._id);
+    if (record.id !== undefined) return String(record.id);
+  }
+
   return String(value);
 };
 
@@ -33,7 +98,12 @@ const compareValues = (
   right: ComparableValue,
   operator: ">=" | "<=" | ">" | "<",
 ) => {
-  if (left === null || left === undefined || right === null || right === undefined) {
+  if (
+    left === null ||
+    left === undefined ||
+    right === null ||
+    right === undefined
+  ) {
     return false;
   }
 
@@ -99,10 +169,11 @@ export type RawField = {
       condition: string;
       className: string;
     }[];
-    invalidateKeys?: {
-      key: string;
-      defaultValue: string | boolean | number | undefined | string[] | number[];
-    }[];
+    invalidateKeys?: string[];
+    linkTemplate?: string;
+    linkLabelField?: string;
+    linkType?: string;
+    actions?: RawActionConfig[];
   };
   Frontend?: {
     DisplayName?: string;
@@ -114,13 +185,11 @@ export type RawField = {
       Condition: string;
       ClassName: string;
     }[];
-    invalidateKeys?: {
-      key: string;
-      defaultValue: string | boolean | number | undefined | string[] | number[];
-    }[];
+    invalidateKeys?: string[];
     linkTemplate?: string;
     linkLabelField?: string;
     linkType?: string;
+    Actions?: RawActionConfig[];
   };
   populationSettings?: RawPopulationSettings;
   PopulationSettings?: RawPopulationSettings;
@@ -148,6 +217,8 @@ export type RawContainer = {
   DynamicApis?: unknown[];
   isAuthContainer?: boolean;
   IsAuthContainer?: boolean;
+  isRegisterActive?: boolean;
+  IsRegisterActive?: boolean;
   populationArray?: unknown[];
   PopulationArray?: unknown[];
   populatedRoutes?: string[];
@@ -158,10 +229,8 @@ export type RawContainer = {
       condition: string;
       className: string;
     }[];
-    invalidateKeys?: {
-      key: string;
-      defaultValue: string | boolean | number | undefined | string[] | number[];
-    }[];
+    invalidateKeys?: string[];
+    actions?: RawActionConfig[];
   };
   Frontend?: {
     DisplayName?: string;
@@ -169,12 +238,82 @@ export type RawContainer = {
       Condition: string;
       ClassName: string;
     }[];
-    invalidateKeys?: {
-      key: string;
-      defaultValue: string | boolean | number | undefined | string[] | number[];
-    }[];
+    invalidateKeys?: string[];
+    Actions?: RawActionConfig[];
   };
 };
+
+const normalizeActionFormFieldConfig = (
+  field: RawActionFormFieldConfig,
+): ActionFormFieldConfig => ({
+  formKey: field.formKey ?? field.FormKey ?? "",
+  type: (field.type ?? field.Type ?? "text") as ActionFormFieldConfig["type"],
+  formKeyType: field.formKeyType ?? field.FormKeyType,
+  label: field.label ?? field.Label,
+  placeholder: field.placeholder ?? field.Placeholder,
+  required: field.required ?? field.Required,
+  requiredCondition: field.requiredCondition ?? field.RequiredCondition,
+  disabledCondition: field.disabledCondition ?? field.DisabledCondition,
+  isDisabled: field.isDisabled ?? field.IsDisabled,
+  isMultiple: field.isMultiple ?? field.IsMultiple,
+  isNumberButtonsActive:
+    field.isNumberButtonsActive ?? field.IsNumberButtonsActive,
+  optionsSource: field.optionsSource ?? field.OptionsSource,
+  staticOptions: field.staticOptions ?? field.StaticOptions,
+  staticOptionsJson: field.staticOptionsJson ?? field.StaticOptionsJson,
+  sourceSchemaName: field.sourceSchemaName ?? field.SourceSchemaName,
+  sourceValueField: field.sourceValueField ?? field.SourceValueField,
+  sourceLabelField: field.sourceLabelField ?? field.SourceLabelField,
+  sourceFilterCondition:
+    field.sourceFilterCondition ?? field.SourceFilterCondition,
+  invalidateKeys: field.invalidateKeys ?? field.InvalidateKeys,
+  defaultValue: field.defaultValue ?? field.DefaultValue,
+  min: field.min ?? field.Min,
+  max: field.max ?? field.Max,
+  minLength: field.minLength ?? field.MinLength,
+  maxLength: field.maxLength ?? field.MaxLength,
+  pattern: field.pattern ?? field.Pattern,
+  validationMessage: field.validationMessage ?? field.ValidationMessage,
+});
+
+const normalizeActionFormFields = (
+  fields: RawActionFormFieldConfig[] | undefined,
+): TableActionConfig["formFields"] | undefined =>
+  fields?.map(normalizeActionFormFieldConfig);
+
+const normalizeActionConfig = (
+  action: RawActionConfig,
+): TableActionConfig => ({
+  id: action.id ?? action.ID,
+  key: action.key ?? action.Key,
+  kind: (action.kind ?? action.Kind ?? "update") as TableActionConfig["kind"],
+  label: action.label ?? action.Label,
+  buttonName: action.buttonName ?? action.ButtonName,
+  icon: action.icon ?? action.Icon,
+  order: action.order ?? action.Order,
+  enabled: action.enabled ?? action.Enabled,
+  modalType: action.modalType ?? action.ModalType,
+  formFields:
+    normalizeActionFormFields(action.formFields as RawActionFormFieldConfig[]) ??
+    normalizeActionFormFields(action.FormFields),
+  fields: action.fields ?? action.Fields,
+  excludeFields: action.excludeFields ?? action.ExcludeFields,
+  fieldOverrides: action.fieldOverrides ?? action.FieldOverrides,
+  constantValues: action.constantValues ?? action.ConstantValues,
+  constantValuesJson: action.constantValuesJson ?? action.ConstantValuesJson,
+  disabledCondition: action.disabledCondition ?? action.DisabledCondition,
+  hiddenCondition: action.hiddenCondition ?? action.HiddenCondition,
+  requiredCondition: action.requiredCondition ?? action.RequiredCondition,
+  confirmTitle: action.confirmTitle ?? action.ConfirmTitle,
+  confirmText: action.confirmText ?? action.ConfirmText,
+  submit: action.submit ?? action.Submit,
+  path: action.path ?? action.Path,
+  linkTemplate: action.linkTemplate ?? action.LinkTemplate,
+  linkType: action.linkType ?? action.LinkType,
+  className: action.className ?? action.ClassName,
+  buttonClassName: action.buttonClassName ?? action.ButtonClassName,
+  isButton: action.isButton ?? action.IsButton,
+});
 
 /**
  * Humanize a string by converting camelCase/snake_case to Title Case
@@ -188,15 +327,10 @@ export const humanize = (key: string) =>
     .replace(/^./, (c) => c.toUpperCase());
 
 /**
- * Get display label for a field - uses Frontend.DisplayName if available,
- * then populationSettings.displayLabel, otherwise humanizes the field name
+ * Get display label for a field - uses Frontend.DisplayName if available, otherwise humanizes the field name
  */
 export const getFieldLabel = (field: Field): string => {
-  return (
-    field.frontend?.displayName ||
-    field.populationSettings?.displayLabel ||
-    humanize(field.name)
-  );
+  return field.frontend?.displayName || humanize(field.name);
 };
 
 /**
@@ -219,34 +353,36 @@ export const normalizeField = (f: RawField): Field => {
       normalizeField(c)
     ),
     frontend:
-      f.frontend ??
-      (f.Frontend
-        ? {
-            displayName: f.Frontend.DisplayName,
-            rowClassName: f.Frontend.RowClassName?.map((rc) => ({
-              condition: rc.Condition,
-              className: rc.ClassName,
-            })),
-            rowKeyClassName: f.Frontend.RowKeyClassName?.map((rc) => ({
-              condition: rc.Condition,
-              className: rc.ClassName,
-            })),
-            invalidateKeys:
-              f.Frontend.invalidateKeys?.map((key) => ({
-                key: String(key),
-                defaultValue: undefined,
-              })) ?? [],
-            linkTemplate: f.Frontend.linkTemplate,
-            linkLabelField: f.Frontend.linkLabelField,
-            linkType: f.Frontend.linkType as
-              | "external"
-              | "internal"
-              | "email"
-              | "phone"
-              | "file"
-              | undefined,
-          }
-        : undefined),
+      f.frontend
+        ? ({
+            ...f.frontend,
+            linkType: f.frontend.linkType as Frontend["linkType"],
+            actions: (f.frontend.actions || []).map(normalizeActionConfig),
+          } as Frontend)
+        : f.Frontend
+          ? ({
+              displayName: f.Frontend.DisplayName,
+              rowClassName: f.Frontend.RowClassName?.map((rc) => ({
+                condition: rc.Condition,
+                className: rc.ClassName,
+              })),
+              rowKeyClassName: f.Frontend.RowKeyClassName?.map((rc) => ({
+                condition: rc.Condition,
+                className: rc.ClassName,
+              })),
+              invalidateKeys: f.Frontend.invalidateKeys || [],
+              linkTemplate: f.Frontend.linkTemplate,
+              linkLabelField: f.Frontend.linkLabelField,
+              linkType: f.Frontend.linkType as
+                | "external"
+                | "internal"
+                | "email"
+                | "phone"
+                | "file"
+                | undefined,
+              actions: (f.Frontend.Actions || []).map(normalizeActionConfig),
+            } as Frontend)
+          : undefined,
     populationSettings: rawPopSettings
       ? {
           fieldName: rawPopSettings.fieldName ?? rawPopSettings.FieldName ?? "",
@@ -274,6 +410,7 @@ export const normalizeField = (f: RawField): Field => {
  * Normalize a container from raw API response to standard ContainerModel type
  */
 export const normalizeContainer = (c: RawContainer): ContainerModel => ({
+  id: c._id ?? c.ID ?? "", // Add required id field
   _id: c._id ?? c.ID,
   schemaName: c.schemaName ?? c.SchemaName ?? "",
   fields: (c.fields ?? c.Fields ?? []).map((f: RawField) => normalizeField(f)),
@@ -291,21 +428,28 @@ export const normalizeContainer = (c: RawContainer): ContainerModel => ({
     c.DynamicApis ??
     []) as ContainerModel["dynamicApis"],
   isAuthContainer: c.isAuthContainer ?? c.IsAuthContainer ?? false,
+  isRegisterActive: c.isRegisterActive ?? c.IsRegisterActive ?? false,
   populationArray: (c.populationArray ??
     c.PopulationArray ??
     []) as ContainerModel["populationArray"],
   populatedRoutes: c.populatedRoutes ?? c.PopulatedRoutes ?? [],
   frontend:
-    c.frontend ??
-    (c.Frontend
-      ? {
-          displayName: c.Frontend.DisplayName,
-          rowClassName: c.Frontend.RowClassName?.map((rc) => ({
-            condition: rc.Condition,
-            className: rc.ClassName,
-          })),
-        }
-      : undefined),
+    c.frontend
+      ? ({
+          ...c.frontend,
+          actions: (c.frontend.actions || []).map(normalizeActionConfig),
+        } as Frontend)
+      : c.Frontend
+        ? ({
+            displayName: c.Frontend.DisplayName,
+            rowClassName: c.Frontend.RowClassName?.map((rc) => ({
+              condition: rc.Condition,
+              className: rc.ClassName,
+            })),
+            invalidateKeys: c.Frontend.invalidateKeys || [],
+            actions: (c.Frontend.Actions || []).map(normalizeActionConfig),
+          } as Frontend)
+        : undefined,
 });
 
 /**
@@ -520,6 +664,14 @@ const evaluateSimpleRowCondition = (
     const [lhs, rhs] = condition.split("<");
     if (!lhs || rhs === undefined) return false;
     const result = compareValues(parseValue(row, lhs), parseValue(row, rhs), "<");
+    return result;
+  }
+
+  // Handle equality (==)
+  if (condition.includes("==")) {
+    const [lhs, rhs] = condition.split("==");
+    if (!lhs || rhs === undefined) return false;
+    const result = parseValue(row, lhs) == parseValue(row, rhs);
     return result;
   }
 

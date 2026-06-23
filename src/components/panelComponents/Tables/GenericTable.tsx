@@ -101,8 +101,8 @@ type Props<T> = {
   localSetSelectedRows?: (rows: T[]) => void;
   localIsSelectionActive?: boolean;
   localSetIsSelectionActive?: (isActive: boolean) => void;
-  currentPage: number;
-  setCurrentPage: (page: number) => void;
+  currentPage?: number;
+  setCurrentPage?: (page: number) => void;
 };
 
 const GenericTable = <T,>({
@@ -152,8 +152,8 @@ const GenericTable = <T,>({
   localSetSelectedRows,
   localIsSelectionActive,
   localSetIsSelectionActive,
-  currentPage,
-  setCurrentPage,
+  currentPage = 1,
+  setCurrentPage = () => undefined,
 }: Props<T>) => {
   const { t } = useTranslation();
 
@@ -734,7 +734,7 @@ const GenericTable = <T,>({
                   key={keyIndex}
                   className={`px-4 py-3 min-w-20 ${columnClassName}`}
                 >
-                  {rowKey.node(row)}
+                  <span className={computedClassName}>{rowKey.node(row)}</span>
                 </td>
               );
             }

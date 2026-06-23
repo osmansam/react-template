@@ -9,6 +9,7 @@ import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { useGeneralContext } from "../../../context/General.context";
 import { FormElementsState, NO_IMAGE_URL, OptionType } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
+import { evaluateRowCondition } from "../../../utils/genericPageHelpers";
 import {
   validateField,
   ValidationRules,
@@ -28,6 +29,58 @@ import SelectInput from "./SelectInput";
 import TabInput from "./TabInput";
 import TabInputScreen from "./TabInputScreen";
 import TextInput from "./TextInput";
+
+
+const resolveOptionFilterCondition = (
+  condition: string | undefined,
+  formElements: FormElementsState,
+): string => {
+  if (!condition?.trim()) return "";
+  return condition.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, key: string) => {
+    const value = formElements[key.trim()];
+    if (value === undefined || value === null || value === "") return '""';
+    return typeof value === "number" || typeof value === "boolean"
+      ? String(value)
+      : JSON.stringify(String(value));
+  });
+};
+
+const getFilteredOptions = (
+  input: GenericInputType,
+  formElements: FormElementsState,
+): OptionType[] => {
+  const options = input.options || [];
+  if (!input.sourceFilterCondition?.trim()) return options;
+
+  const resolvedCondition = resolveOptionFilterCondition(
+    input.sourceFilterCondition,
+    formElements,
+  );
+
+  return options.filter((option) => {
+    const sourceItem = option.sourceItem;
+    if (!sourceItem) return true;
+    return evaluateRowCondition(sourceItem as Record<string, unknown> & { _id: string }, resolvedCondition);
+  });
+};
+
+const normalizeCondition = (condition: string) =>
+  condition
+    .replace(/\\u003c/gi, "<")
+    .replace(/\\u003e/gi, ">")
+    .replace(/\\u0026/gi, "&");
+
+const evaluateFormCondition = (
+  condition: string | undefined,
+  formElements: FormElementsState,
+) =>
+  Boolean(
+    condition?.trim() &&
+      evaluateRowCondition(
+        formElements as Record<string, unknown> & { _id: string },
+        normalizeCondition(condition),
+      ),
+  );
 
 type Props<T> = {
   isOpen: boolean;
@@ -134,40 +187,49 @@ const GenericAddEditPanel = <T,>({
   const nonImageInputs = inputs.filter(
     (input) => input.type !== InputTypes.IMAGE
   );
-  const initialState = formKeys.reduce<FormElementsState>(
-    (acc, { key, type }) => {
-      let defaultValue;
-      switch (type) {
-        case FormKeyTypeEnum.STRING:
-          defaultValue = "";
-          break;
-        case FormKeyTypeEnum.COLOR:
-          defaultValue = "#ffffff";
-          break;
-        case FormKeyTypeEnum.NUMBER:
-          defaultValue = null;
-          break;
-        case FormKeyTypeEnum.BOOLEAN:
-          defaultValue = false;
-          break;
-        case FormKeyTypeEnum.DATE:
-          defaultValue = "";
-          break;
-        case FormKeyTypeEnum.STRING_ARRAY:
-        case FormKeyTypeEnum.INT_ARRAY:
-        case FormKeyTypeEnum.NUMBER_ARRAY:
-          defaultValue = "";
-          break;
-        default:
-          defaultValue = null;
-      }
-      acc[key] = defaultValue;
-      return acc;
-    },
-    {}
+  const formKeysSignature = JSON.stringify(formKeys);
+  const constantValuesSignature = JSON.stringify(constantValues ?? null);
+  const itemToEditSignature = JSON.stringify(itemToEdit ?? null);
+  const initialState = useMemo(
+    () =>
+      formKeys.reduce<FormElementsState>((acc, { key, type }) => {
+        let defaultValue;
+        switch (type) {
+          case FormKeyTypeEnum.STRING:
+            defaultValue = "";
+            break;
+          case FormKeyTypeEnum.COLOR:
+            defaultValue = "#ffffff";
+            break;
+          case FormKeyTypeEnum.NUMBER:
+            defaultValue = null;
+            break;
+          case FormKeyTypeEnum.BOOLEAN:
+            defaultValue = false;
+            break;
+          case FormKeyTypeEnum.DATE:
+            defaultValue = "";
+            break;
+          case FormKeyTypeEnum.STRING_ARRAY:
+          case FormKeyTypeEnum.INT_ARRAY:
+          case FormKeyTypeEnum.NUMBER_ARRAY:
+            defaultValue = "";
+            break;
+          default:
+            defaultValue = null;
+        }
+        acc[key] = defaultValue;
+        return acc;
+      }, {}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [formKeysSignature],
   );
-  const mergedInitialState = { ...initialState, ...constantValues };
-  const [formElements, setFormElements] = useState(() => {
+  const mergedInitialState = useMemo(
+    () => ({ ...initialState, ...constantValues }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [initialState, constantValuesSignature],
+  );
+  const buildInitialFormElements = useCallback(() => {
     if (itemToEdit) {
       const updates = itemToEdit.updates as unknown as FormElementsState;
 
@@ -192,7 +254,22 @@ const GenericAddEditPanel = <T,>({
       };
     }
     return mergedInitialState;
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    constantValuesSignature,
+    formKeysSignature,
+    initialState,
+    itemToEditSignature,
+    mergedInitialState,
+  ]);
+  const [formElements, setFormElements] = useState(buildInitialFormElements);
+  useEffect(() => {
+    if (isOpen) {
+      setFormElements(buildInitialFormElements());
+      setFieldErrors({});
+      setAttemptedSubmit(false);
+    }
+  }, [buildInitialFormElements, isOpen]);
   const handleClose = useCallback(() => {
     setIsExtraModalOpen?.(false);
     close?.();
@@ -564,6 +641,16 @@ const GenericAddEditPanel = <T,>({
                   (rawValue === undefined || rawValue === null)
                     ? false
                     : rawValue;
+                const inputOptions = getFilteredOptions(input, formElements);
+                const isConditionDisabled = evaluateFormCondition(
+                  input.disabledCondition,
+                  formElements,
+                );
+                const isConditionRequired = evaluateFormCondition(
+                  input.requiredCondition,
+                  formElements,
+                );
+                const isInputRequired = input.required || isConditionRequired;
                 const handleChange = (key: string) => (value: string) => {
                   const changedInput = inputs.find(
                     (input) => input.formKey === key
@@ -634,12 +721,16 @@ const GenericAddEditPanel = <T,>({
                 ) {
                   return null;
                 }
-                if (!input?.isDisabled) {
-                  const showError =
-                    attemptedSubmit &&
-                    input.required &&
-                    isValueEmpty(formElements[input.formKey]);
-                  return (
+                const isInputDisabled =
+                  input.isDisabled || isConditionDisabled || false;
+                if (isInputDisabled) {
+                  return null;
+                }
+                const showError =
+                  attemptedSubmit &&
+                  isInputRequired &&
+                  isValueEmpty(formElements[input.formKey]);
+                return (
                     <div
                       onClick={(e) => e.stopPropagation()}
                       key={input.formKey}
@@ -650,7 +741,7 @@ const GenericAddEditPanel = <T,>({
                           key={input.formKey + resetTextInput}
                           value={value}
                           label={
-                            input.required && input.label
+                            isInputRequired && input.label
                               ? input.label
                               : input.label ?? ""
                           }
@@ -659,12 +750,13 @@ const GenericAddEditPanel = <T,>({
                             handleChange(input.formKey)(val ?? "")
                           }
                           isArrowsEnabled={input.isArrowsEnabled ?? false}
-                          requiredField={input.required}
+                          requiredField={isInputRequired}
                           isOnClearActive={input?.isOnClearActive ?? true}
                           isDateInitiallyOpen={
                             input.isDateInitiallyOpen ?? false
                           }
                           isTopFlexRow={input.isTopFlexRow ?? false}
+                          disabled={isInputDisabled}
                           isReadOnly={input.isReadOnly ?? false}
                           onClear={() => {
                             handleInputClear(input);
@@ -682,13 +774,13 @@ const GenericAddEditPanel = <T,>({
                           type={input.type}
                           value={value}
                           label={
-                            input.required && input.label
+                            isInputRequired && input.label
                               ? input.label
                               : input.label ?? ""
                           }
                           placeholder={input.placeholder ?? ""}
                           onChange={handleChange(input.formKey)}
-                          requiredField={input.required}
+                          requiredField={isInputRequired}
                           isOnClearActive={input?.isOnClearActive ?? true}
                           isNumberButtonsActive={
                             input?.isNumberButtonsActive ?? false
@@ -697,8 +789,10 @@ const GenericAddEditPanel = <T,>({
                             input.isDateInitiallyOpen ?? false
                           }
                           isTopFlexRow={input.isTopFlexRow ?? false}
-                          minNumber={input?.minNumber ?? 0}
+                          minNumber={input?.min ?? input?.minNumber ?? 0}
+                          maxNumber={input?.max}
                           isDebounce={input?.isDebounce ?? false}
+                          disabled={isInputDisabled}
                           isReadOnly={input.isReadOnly ?? false}
                           isMinNumber={input?.isMinNumber ?? true}
                           error={fieldErrors[input.formKey]}
@@ -712,13 +806,15 @@ const GenericAddEditPanel = <T,>({
                           key={input.formKey}
                           value={value}
                           label={
-                            input.required && input.label
+                            isInputRequired && input.label
                               ? input.label
                               : input.label ?? ""
                           }
                           onChange={handleChange(input.formKey)}
-                          requiredField={input.required}
-                          isReadOnly={input.isReadOnly ?? false}
+                          requiredField={isInputRequired}
+                          isReadOnly={
+                            input.isReadOnly || isInputDisabled || false
+                          }
                         />
                       )}
                       {input.type === InputTypes.MONTHYEAR && (
@@ -726,13 +822,15 @@ const GenericAddEditPanel = <T,>({
                           key={input.formKey}
                           value={value}
                           label={
-                            input.required && input.label
+                            isInputRequired && input.label
                               ? input.label
                               : input.label ?? ""
                           }
                           onChange={handleChange(input.formKey)}
-                          requiredField={input.required}
-                          isReadOnly={input.isReadOnly ?? false}
+                          requiredField={isInputRequired}
+                          isReadOnly={
+                            input.isReadOnly || isInputDisabled || false
+                          }
                         />
                       )}
                       {input.type === InputTypes.SELECT && (
@@ -744,29 +842,29 @@ const GenericAddEditPanel = <T,>({
                           }
                           value={
                             (input.isMultiple
-                              ? input.options?.filter((option) =>
+                              ? inputOptions.filter((option) =>
                                   formElements[input.formKey]?.includes(
                                     option.value
                                   )
                                 )
-                              : input?.options?.find(
+                              : inputOptions.find(
                                   (option) =>
                                     option?.value ===
                                     formElements[input.formKey]
                                 )) ?? null
                           }
                           label={
-                            input.required && input.label
+                            isInputRequired && input.label
                               ? input.label
                               : input.label ?? ""
                           }
                           suggestedOption={input?.suggestedOption}
                           isSortDisabled={input.isSortDisabled ?? false}
                           isAutoFill={input?.isAutoFill}
-                          options={input.options ?? []}
+                          options={inputOptions}
                           placeholder={input.placeholder ?? ""}
                           isMultiple={input.isMultiple ?? false}
-                          requiredField={input.required}
+                          requiredField={isInputRequired}
                           onChange={handleChangeForSelect(input.formKey)}
                           isTopFlexRow={input.isTopFlexRow ?? false}
                           onChangeTrigger={
@@ -787,7 +885,9 @@ const GenericAddEditPanel = <T,>({
                               : undefined
                           }
                           isOnClearActive={input?.isOnClearActive ?? true}
-                          isReadOnly={input.isReadOnly ?? false}
+                          isReadOnly={
+                            input.isReadOnly || isInputDisabled || false
+                          }
                           onClear={() => {
                             handleInputClear(input);
                           }}
@@ -797,28 +897,30 @@ const GenericAddEditPanel = <T,>({
                         <TabInput
                           key={input.formKey + formElements[input.formKey]}
                           value={
-                            input.options?.find(
+                            inputOptions.find(
                               (option) =>
                                 option?.value === formElements[input.formKey]
                             ) ?? null
                           }
                           label={
-                            input.required && input.label
+                            isInputRequired && input.label
                               ? input.label
                               : input.label ?? ""
                           }
                           suggestedOption={input?.suggestedOption || null}
                           formKey={input.formKey}
-                          options={input.options ?? []}
+                          options={inputOptions}
                           placeholder={input.placeholder ?? ""}
                           invalidateKeys={input.invalidateKeys}
-                          requiredField={input.required}
+                          requiredField={isInputRequired}
                           setFormElements={setFormElements}
                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           setForm={setForm as any}
                           formElements={formElements}
                           isTopFlexRow={input.isTopFlexRow ?? false}
-                          isReadOnly={input.isReadOnly ?? false}
+                          isReadOnly={
+                            input.isReadOnly || isInputDisabled || false
+                          }
                           onClear={() => {
                             handleInputClear(input);
                           }}
@@ -831,7 +933,7 @@ const GenericAddEditPanel = <T,>({
                         >
                           <div className="flex items-center">
                             <H6>{input.label}</H6>
-                            {input.required && (
+                            {isInputRequired && (
                               <>
                                 <span className="text-red-400">*</span>
                                 <span className="text-xs text-gray-400">
@@ -900,6 +1002,9 @@ const GenericAddEditPanel = <T,>({
                                 handleChange(input.formKey)(e.target.value)
                               }
                               placeholder={input.placeholder}
+                              disabled={
+                                input.isReadOnly || isInputDisabled || false
+                              }
                               className={`border text-base border-gray-300 rounded-md p-2 w-full ${input.inputClassName}`}
                             />
                             {formElements[input.formKey] && (
@@ -922,7 +1027,6 @@ const GenericAddEditPanel = <T,>({
                       )}
                     </div>
                   );
-                }
               })}
             </div>
           </div>

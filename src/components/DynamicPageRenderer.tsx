@@ -1,4 +1,5 @@
 import React from "react";
+import { useParams } from "react-router-dom";
 import { PageSection } from "../types/page";
 import "./dynamic-page-renderer.css";
 import { PageSectionView } from "./DynamicPageSections";
@@ -19,6 +20,8 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
   sections,
   className = "",
 }) => {
+  const routeParams = useParams();
+
   if (!sections || sections.length === 0) {
     return (
       <>
@@ -41,6 +44,7 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
             <PageSectionView
               key={section.id || section.grid?.cells[0]?.id || `section-${index}`}
               section={section}
+              routeParams={routeParams}
             />
           ))}
         </div>

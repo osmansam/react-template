@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { IconType } from "react-icons";
 // import { GiGreatPyramid } from "react-icons/gi";
 import { useGeneralContext } from "../../../context/General.context";
-import { TableComponentConfig } from "../../../types/page";
+import { DataBinding, TableComponentConfig } from "../../../types/page";
 import { getIconByName } from "../../../utils/menuIcons";
 import UnifiedTabPanel from "../TabPanel/UnifiedTabPanel";
 import GenericPaginatedPage from "./GenericPaginatedPage";
@@ -18,7 +18,9 @@ type TabConfig = {
   actionsEnabled?: boolean;
   isPaginated?: boolean; // Add isPaginated prop, default true
   constantFilter?: Record<string, unknown>; // Constant filter that won't be editable
+  customTitle?: string;
   tableConfig?: TableComponentConfig;
+  dataBinding?: DataBinding;
 };
 
 type Props = {
@@ -68,8 +70,9 @@ export default function GenericTabPage({
               excludeFields={t.excludeFields}
               actionsEnabled={t.actionsEnabled ?? true}
               constantFilter={t.constantFilter}
-              customTitle={label}
+              customTitle={t.customTitle || label}
               tableConfig={t.tableConfig}
+              dataBinding={t.dataBinding}
             />
           ) : (
             <GenericUnpaginatedPage
@@ -77,12 +80,13 @@ export default function GenericTabPage({
               includeFields={t.includeFields}
               excludeFields={t.excludeFields}
               actionsEnabled={t.actionsEnabled ?? true}
+              customTitle={t.customTitle || label}
               tableConfig={t.tableConfig}
             />
           ),
         };
       }),
-    [tabs]
+    [tabs],
   );
 
   return (

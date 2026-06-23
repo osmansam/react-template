@@ -1,4 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  startTransition,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { useGeneralContext } from "../../../context/General.context";
@@ -23,20 +30,27 @@ const TabPanel: React.FC<Props> = ({
   tabs,
   activeTab,
   setActiveTab,
-  additionalOpenAction,
   topClassName,
   filters,
   isLanguageChange = true,
 }) => {
   const { t } = useTranslation();
-  const adjustedTabs = tabs
-    .filter((item) => !item.isDisabled)
-    .map((tab, index) => {
-      return {
-        ...tab,
-        adjustedNumber: index,
-      };
-    });
+  const adjustedTabs = useMemo(
+    () =>
+      tabs
+        .filter((item) => !item.isDisabled)
+        .map((tab, index) => {
+          return {
+            ...tab,
+            adjustedNumber: index,
+          };
+        }),
+    [tabs],
+  );
+  const activeAdjustedTab = useMemo(
+    () => adjustedTabs.find((tab) => tab.adjustedNumber === activeTab),
+    [activeTab, adjustedTabs],
+  );
 
   const [indicatorStyle, setIndicatorStyle] = useState<{
     width: number;
@@ -46,6 +60,7 @@ const TabPanel: React.FC<Props> = ({
   const [showRightButton, setShowRightButton] = useState(false);
   const tabsRef = useRef<(HTMLDivElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const hasPositionedActiveTabRef = useRef(false);
   const { i18n } = useTranslation();
   const { resetGeneralContext } = useGeneralContext();
 
@@ -66,8 +81,7 @@ const TabPanel: React.FC<Props> = ({
       });
     }
   };
-  useEffect(() => {
-    additionalOpenAction?.();
+  useLayoutEffect(() => {
     if (tabsRef.current[activeTab] && containerRef.current) {
       const activeTabElement = tabsRef.current[activeTab];
       if (activeTabElement) {
@@ -79,8 +93,9 @@ const TabPanel: React.FC<Props> = ({
           containerRef.current.offsetWidth / 2;
         containerRef.current.scroll({
           left: leftScrollPosition,
-          behavior: "smooth",
+          behavior: hasPositionedActiveTabRef.current ? "smooth" : "auto",
         });
+        hasPositionedActiveTabRef.current = true;
       }
     }
 
@@ -90,7 +105,7 @@ const TabPanel: React.FC<Props> = ({
           0
       );
     }
-  }, [activeTab, tabs.length, i18n.language]);
+  }, [activeTab, adjustedTabs, i18n.language, setActiveTab]);
 
   useEffect(() => {
     checkScrollButtons();
@@ -107,12 +122,12 @@ const TabPanel: React.FC<Props> = ({
 
   const handleTabChange = (tab: Tab) => {
     additionalClickAction && additionalClickAction();
-    resetGeneralContext();
-    adjustedTabs
-      ?.find((tab) => tab.adjustedNumber === activeTab)
-      ?.onCloseAction?.();
     setActiveTab(tab?.adjustedNumber ?? tab.number);
-    tab?.onOpenAction?.();
+    startTransition(() => {
+      resetGeneralContext();
+      activeAdjustedTab?.onCloseAction?.();
+      tab?.onOpenAction?.();
+    });
   };
 
   return (
@@ -187,14 +202,9 @@ const TabPanel: React.FC<Props> = ({
           </div>
         )}
       </div>
-      {adjustedTabs.find((tab) => tab.adjustedNumber === activeTab)?.content &&
-        !adjustedTabs.find((tab) => tab.adjustedNumber === activeTab)
-          ?.isDisabled && (
+      {activeAdjustedTab?.content && !activeAdjustedTab?.isDisabled && (
           <div className={`${topClassName ? "pt-3" : "py-6"}`}>
-            {
-              adjustedTabs.find((tab) => tab.adjustedNumber === activeTab)
-                ?.content
-            }
+            {activeAdjustedTab.content}
           </div>
         )}
     </div>

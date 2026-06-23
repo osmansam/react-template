@@ -122,7 +122,7 @@ export const useDynamicPages = () => {
         const route: DynamicRoute = {
           name: page.name,
           path,
-          isOnSidebar: true,
+          isOnSidebar: page.isOnSidebar !== false,
           icon: page.icon,
         };
 
@@ -142,7 +142,7 @@ export const useDynamicPages = () => {
                   {
                     name: page.name,
                     path,
-                    isOnSidebar: true,
+                    isOnSidebar: page.isOnSidebar !== false,
                     icon: page.icon,
                     tabs: tabs.length > 0 ? tabs : undefined,
                     element: createPageElement(page.sections),

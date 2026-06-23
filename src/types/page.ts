@@ -2,12 +2,18 @@
  * Types matching the Go backend PageModel structure
  */
 
-export type BindingKind = "schema" | "pipeline" | "api" | "function";
+export type BindingKind =
+  | "schema"
+  | "pipeline"
+  | "workflow"
+  | "api"
+  | "function";
 
 export interface DataBinding {
   kind: BindingKind;
   schemaName?: string;
   pipelineName?: string;
+  workflowName?: string;
   apiName?: string;
   functionName?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,6 +23,12 @@ export interface DataBinding {
 export interface GroupBy {
   groupByObjectId: string; // Schema name to group by (e.g., "can")
   groupByField: string; // Field name to display from grouped object (e.g., "name")
+  groupedSchemaName?: string;
+  groupedField?: string;
+  sourceSchemaName?: string;
+  sourceValueField?: string;
+  sourceLabelField?: string;
+  filterField?: string;
 }
 
 export type LinkType = "external" | "internal" | "email" | "phone" | "file";
@@ -32,9 +44,37 @@ export interface TableLinkConfig {
   type?: LinkType;
 }
 
+export type TableColumnType = "field" | "computedLabel" | "progressBar";
+
+export interface TableComputedLabelRule {
+  condition?: string;
+  value?: string;
+}
+
+export interface TableProgressBarColorRule {
+  condition?: string;
+  color?: string;
+}
+
+export interface TableProgressBarConfig {
+  sourceField?: string;
+  max?: number;
+  maxField?: string;
+  color?: string;
+  trackColor?: string;
+  height?: number;
+  width?: number;
+  showValue?: boolean;
+  colorRules?: TableProgressBarColorRule[];
+}
+
 export interface TableColumnConfig {
   field: string;
+  type?: TableColumnType;
   displayName?: string;
+  computedLabelRules?: TableComputedLabelRule[];
+  fallbackValue?: string;
+  progressBar?: TableProgressBarConfig;
   cellClassName?: RowClassConfig[];
   link?: TableLinkConfig;
 }
@@ -47,16 +87,268 @@ export interface TableCacheConfig {
   invalidateKeys?: string[];
 }
 
+export type TableActionKind =
+  | "create"
+  | "edit"
+  | "delete"
+  | "update"
+  | "link"
+  | "defaults";
+export type TableActionModalType = "none" | "confirm" | "form";
+export type TableActionInputType =
+  | "text"
+  | "date"
+  | "number"
+  | "select"
+  | "textarea"
+  | "image"
+  | "password"
+  | "time"
+  | "color"
+  | "checkbox"
+  | "hour"
+  | "monthYear"
+  | "defaults";
+export type TableActionFormKeyType =
+  | "string"
+  | "number"
+  | "color"
+  | "date"
+  | "boolean"
+  | "checkbox"
+  | "stringArray"
+  | "numberArray"
+  | "intArray";
+export type TableActionOptionsSource = "static" | "schema";
+
+export interface TableActionFieldConfig {
+  field: string;
+  required?: boolean;
+  disabledCondition?: string;
+}
+
+export interface TableActionFormOptionConfig {
+  value: string | number;
+  label: string;
+}
+
+export interface TableActionFormFieldConfig {
+  formKey: string;
+  type: TableActionInputType;
+  formKeyType?: TableActionFormKeyType;
+  label?: string;
+  placeholder?: string;
+  required?: boolean;
+  requiredCondition?: string;
+  disabledCondition?: string;
+  isDisabled?: boolean;
+  isMultiple?: boolean;
+  isNumberButtonsActive?: boolean;
+  optionsSource?: TableActionOptionsSource;
+  staticOptions?: TableActionFormOptionConfig[];
+  staticOptionsJson?: string;
+  sourceSchemaName?: string;
+  sourceValueField?: string;
+  sourceLabelField?: string;
+  sourceFilterCondition?: string;
+  invalidateKeys?: string[];
+  defaultValue?: string | number | boolean | string[] | number[];
+  min?: number;
+  max?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  validationMessage?: string;
+}
+
+export type TableFilterPanelInputConfig = TableActionFormFieldConfig;
+
+export interface TableFilterPanelConfig {
+  inputs?: TableFilterPanelInputConfig[];
+}
+
+export interface TableActionSubmitConfig {
+  workflowName?: string;
+  workflowSchema?: string;
+}
+
+export interface TableActionConfig {
+  id?: string;
+  key?: string;
+  kind: TableActionKind;
+  label?: string;
+  buttonName?: string;
+  icon?: string;
+  order?: number;
+  enabled?: boolean;
+  modalType?: TableActionModalType;
+  formFields?: TableActionFormFieldConfig[];
+  fields?: string[];
+  excludeFields?: string[];
+  fieldOverrides?: TableActionFieldConfig[];
+  constantValues?: Record<string, unknown>;
+  constantValuesJson?: string;
+  disabledCondition?: string;
+  hiddenCondition?: string;
+  requiredCondition?: string;
+  confirmTitle?: string;
+  confirmText?: string;
+  submit?: TableActionSubmitConfig;
+  path?: string;
+  linkTemplate?: string;
+  linkType?: LinkType;
+  className?: string;
+  buttonClassName?: string;
+  isButton?: boolean;
+}
+
 export interface TableComponentConfig {
+  title?: string;
   columns?: TableColumnConfig[];
   rows?: TableRowsConfig;
   cache?: TableCacheConfig;
+  addButton?: TableActionConfig;
+  actions?: TableActionConfig[];
+  filterPanel?: TableFilterPanelConfig;
+}
+
+export type FormAreaKey = "top" | "main" | "bottom" | "left" | "right";
+export type FormFieldWidth = "full" | "half" | "third";
+export type FormLayoutVariant = "modal" | "page";
+
+export interface FormAreaConfig {
+  key: FormAreaKey;
+  title?: string;
+  order?: number;
+  className?: string;
+}
+
+export interface FormLayoutConfig {
+  variant?: FormLayoutVariant;
+  columns?: 1 | 2 | 3;
+  areas?: FormAreaConfig[];
+}
+
+export interface FormFieldConfig extends TableActionFormFieldConfig {
+  area?: FormAreaKey;
+  order?: number;
+  width?: FormFieldWidth;
+}
+
+export interface FormObjectListDisplayConfig {
+  primaryField?: string;
+  primaryTemplate?: string;
+  secondaryField?: string;
+  secondaryTemplate?: string;
+  imageField?: string;
+}
+
+export type FormObjectActionKind =
+  | "editObject"
+  | "removeObject"
+  | "increment"
+  | "decrement";
+
+export interface FormObjectActionConfig {
+  kind: FormObjectActionKind;
+  label?: string;
+  icon?: string;
+  position?: "start" | "end";
+  field?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+export type FormActionKind = "addObject" | "submit";
+
+export interface FormActionConfig {
+  kind: FormActionKind;
+  label?: string;
+  buttonName?: string;
+  area?: FormAreaKey;
+  targetObjectList?: string;
+  sourceFields?: string[];
+  clearSourceFields?: string[];
+  preserveSourceFields?: string[];
+  enabled?: boolean;
+  order?: number;
+}
+
+export interface FormObjectListConfig {
+  key: string;
+  title?: string;
+  area?: FormAreaKey;
+  source?: "embedded";
+  itemFields?: string[];
+  addAction?: FormActionConfig;
+  display?: FormObjectListDisplayConfig;
+  actions?: FormObjectActionConfig[];
+}
+
+export type FormSubmitMode = "create" | "createMany" | "workflow";
+
+export interface FormSubmitConfig {
+  mode?: FormSubmitMode;
+  buttonName?: string;
+  constantValues?: Record<string, unknown>;
+  bulkObjectListKey?: string;
+  workflowSchema?: string;
+  workflowName?: string;
+}
+
+export interface FormComponentConfig {
+  title?: string;
+  schemaName: string;
+  layout?: FormLayoutConfig;
+  fields?: FormFieldConfig[];
+  objectLists?: FormObjectListConfig[];
+  actions?: FormActionConfig[];
+  submit?: FormSubmitConfig;
+}
+
+export type InfoBlocksSource = "static" | "schema" | "pipeline" | "workflow";
+
+export interface InfoBlockColorRule {
+  condition?: string;
+  color?: string;
+}
+
+export interface InfoBlockItemConfig {
+  title?: string;
+  value?: string;
+  footer?: string;
+  color?: string;
+  titleColorRules?: InfoBlockColorRule[];
+  footerColorRules?: InfoBlockColorRule[];
+}
+
+export interface InfoBlocksConfig {
+  source?: InfoBlocksSource;
+  items?: InfoBlockItemConfig[];
+}
+
+export interface DistributionBlockItemConfig {
+  label?: string;
+  value?: string;
+  percent?: string;
+  color?: string;
+}
+
+export interface DistributionBlocksConfig {
+  source?: InfoBlocksSource;
+  items?: DistributionBlockItemConfig[];
 }
 
 export type ComponentType =
   | "table"
   | "tabPanel"
-  | "calendar" // Dynamic Calendar Component
+  | "form"
+  | "text"
+  | "custom"
+  | "calendar"
+  | "infoBlocks"
+  | "distributionBlocks"
   // Chart types
   | "barChart"
   | "lineChart"
@@ -74,21 +366,26 @@ export type ComponentType =
   | "streamChart"
   | "waffleChart"
   | "circlePackingChart";
-// Future types: "form" | "text" | "custom"
 
 export interface TabContent {
+  id?: string; // Tab identifier for operations like Excel upload
   title: string;
+  icon?: string;
   components: ComponentBlock[];
 }
+
+// Alias for backend compatibility
+export type TabPanelTab = TabContent;
 
 export interface ComponentBlock {
   id: string;
   type: ComponentType;
   title?: string;
-  order: number;
+  order?: number;
   dataBinding?: DataBinding;
   groupBy?: GroupBy; // Grouping configuration for table components
   table?: TableComponentConfig;
+  form?: FormComponentConfig;
   isAuthorized?: boolean;
   authorizeRole?: string[];
   tabs?: TabContent[]; // For tabPanel type
@@ -123,7 +420,7 @@ export interface TabsSection {
   tabs: PageTab[];
 }
 
-export type SectionType = "grid" | "tabs" | "component";
+export type SectionType = "grid" | "component" | "tabs";
 
 export interface PageSection {
   id?: string;
@@ -138,17 +435,18 @@ export interface PageSection {
 }
 
 export interface PageModel {
-  _id?: string;
   id?: string;
+  _id?: string;
+  parentPageId?: string;
   name: string;
   icon?: string;
   slug?: string;
-  parentPageId?: string | null;
   order?: number;
   isGroupOnly?: boolean;
+  isOnSidebar?: boolean;
   isAuthenticated?: boolean;
   isAuthorized?: boolean;
   authorizeRole?: string[];
-  sections: PageSection[]; // Matches Go backend Section model; flat grid sections are still accepted.
+  sections: PageSection[];
   subPage?: PageModel; // Nested sub-page
 }

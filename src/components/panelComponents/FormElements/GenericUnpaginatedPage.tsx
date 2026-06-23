@@ -1,7 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FiEdit } from "react-icons/fi";
-import { HiOutlineTrash } from "react-icons/hi2";
 import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { LinkCell } from "../../../components/LinkCell";
@@ -9,8 +8,12 @@ import { useGeneralContext } from "../../../context/General.context";
 import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
-import { TableComponentConfig } from "../../../types/page";
-import { UpdatePayload } from "../../../utils/api";
+import {
+  TableActionConfig,
+  TableActionFormFieldConfig,
+  TableComponentConfig,
+} from "../../../types/page";
+import { UpdatePayload, get } from "../../../utils/api";
 import {
   ContainerModel,
   Field,
@@ -20,31 +23,274 @@ import {
 import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
 import {
   RawContainer,
+  evaluateRowCondition,
   fieldToInput,
-  getMatchingRowClassNames,
   getFieldLabel,
+  getMatchingRowClassNames,
   humanize,
   isDisplayablePrimitive,
   normalizeContainer,
   normalizeField,
   tailwindBgToStyle,
 } from "../../../utils/genericPageHelpers";
+import { getIconByName } from "../../../utils/menuIcons";
 import {
+  getComputedLabelValue,
+  getProgressBarValue,
   getTableCellClassName,
   getTableDisplayName,
   getTableLinkConfig,
 } from "../../../utils/tableConfig";
+import {
+  buildConfiguredFilterInputs,
+  getFilterDefaultValues,
+  useFilterPanelSelectionData,
+} from "../../../utils/tableFilters";
 import {
   isFieldRequired,
   parseValidationRules,
 } from "../../../utils/validationHelper";
 import { Header } from "../../header/Header";
 import SwitchButton from "../common/SwitchButton";
-import { FormKeyTypeEnum, InputTypes } from "../shared/types";
+import { FormKeyTypeEnum, GenericInputType, InputTypes } from "../shared/types";
 import GenericTable from "../Tables/GenericTable";
 import GenericAddEditPanel from "./GenericAddEditPanel";
 
 type GenericItem = Record<string, unknown> & { _id: string };
+
+const getActionId = (action: TableActionConfig, index: number) =>
+  action.id || action.key || `${action.kind}-${index}`;
+
+type ActionSelectDataMap = Map<string, GenericItem[]>;
+
+const getSelectionFieldName = (field: TableActionFormFieldConfig) =>
+  field.sourceLabelField || field.sourceValueField || "_id";
+
+const actionQs = (params: Record<string, unknown>) =>
+  new URLSearchParams(
+    Object.entries(params)
+      .filter(
+        ([, value]) => value !== undefined && value !== null && value !== "",
+      )
+      .map(([key, value]) => [key, String(value)]),
+  ).toString();
+
+const useActionFormSelectionData = (
+  actions: TableActionConfig[] = [],
+): ActionSelectDataMap => {
+  const schemaSelectFields = actions.flatMap((action, actionIndex) =>
+    (action.formFields || [])
+      .filter(
+        (field) =>
+          field.type === "select" &&
+          field.optionsSource === "schema" &&
+          field.sourceSchemaName,
+      )
+      .map((field) => ({
+        actionId: getActionId(action, actionIndex),
+        field,
+      })),
+  );
+
+  const queryResults = useQueries({
+    queries: schemaSelectFields.map(({ field }) => {
+      const fieldName = getSelectionFieldName(field);
+      return {
+        queryKey: [
+          "dynamic",
+          field.sourceSchemaName,
+          "selection",
+          fieldName,
+          "action-options",
+        ],
+        queryFn: () =>
+          get<GenericItem[]>({
+            path: `/dynamic/selection?${actionQs({
+              schemaName: field.sourceSchemaName,
+              fieldName,
+            })}`,
+          }),
+        enabled: Boolean(field.sourceSchemaName && fieldName),
+        staleTime: Infinity,
+      };
+    }),
+  });
+
+  return schemaSelectFields.reduce<ActionSelectDataMap>((map, item, index) => {
+    const rawData = queryResults[index]?.data;
+    const items = Array.isArray(rawData)
+      ? rawData
+      : (rawData as { data?: GenericItem[]; items?: GenericItem[] } | undefined)
+          ?.data ||
+        (rawData as { data?: GenericItem[]; items?: GenericItem[] } | undefined)
+          ?.items ||
+        [];
+    map.set(`${item.actionId}:${item.field.formKey}`, items);
+    return map;
+  }, new Map());
+};
+
+const parseActionConstantValues = (
+  action: TableActionConfig,
+): Record<string, unknown> => {
+  if (action.constantValues) return action.constantValues;
+  if (!action.constantValuesJson?.trim()) return {};
+
+  try {
+    const parsed = JSON.parse(action.constantValuesJson);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+};
+
+const actionInputType = (type: string | undefined): InputTypes => {
+  const normalized = (type || "text").toLowerCase();
+  if (normalized === "number") return InputTypes.NUMBER;
+  if (normalized === "select") return InputTypes.SELECT;
+  if (normalized === "textarea") return InputTypes.TEXTAREA;
+  if (normalized === "checkbox" || normalized === "boolean")
+    return InputTypes.CHECKBOX;
+  if (normalized === "date") return InputTypes.DATE;
+  if (normalized === "time") return InputTypes.TIME;
+  if (normalized === "color") return InputTypes.COLOR;
+  return InputTypes.TEXT;
+};
+
+const actionFormKeyType = (field: TableActionFormFieldConfig): string => {
+  if (field.formKeyType) return field.formKeyType;
+  if (field.isMultiple) return FormKeyTypeEnum.STRING_ARRAY;
+  if (field.type === "number") return FormKeyTypeEnum.NUMBER;
+  if (field.type === "checkbox") return FormKeyTypeEnum.BOOLEAN;
+  return FormKeyTypeEnum.STRING;
+};
+
+const getStaticActionOptions = (field: TableActionFormFieldConfig) => {
+  if (field.staticOptions?.length) return field.staticOptions;
+  if (!field.staticOptionsJson?.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(field.staticOptionsJson);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const getActionFieldOptions = (
+  actionId: string,
+  field: TableActionFormFieldConfig,
+  selectDataMap: ActionSelectDataMap,
+  fallback?: GenericInputType,
+) => {
+  if (field.type !== "select") return [];
+  if (field.optionsSource !== "schema") return getStaticActionOptions(field);
+
+  const valueField = field.sourceValueField || "_id";
+  const labelField = field.sourceLabelField || valueField;
+  return (selectDataMap.get(`${actionId}:${field.formKey}`) || []).map(
+    (item) => ({
+      value: String(item[valueField] ?? item._id ?? ""),
+      label: String(item[labelField] ?? item[valueField] ?? item._id ?? ""),
+      sourceItem: item,
+    }),
+  );
+};
+const buildActionInputs = (
+  action: TableActionConfig,
+  fallbackInputs: GenericInputType[],
+  actionId: string,
+  selectDataMap: ActionSelectDataMap,
+): GenericInputType[] => {
+  if (action.formFields !== undefined) {
+    return action.formFields.map((field) => {
+      const fallback = fallbackInputs.find(
+        (input) => input.formKey === field.formKey,
+      );
+      return {
+        ...(fallback || {}),
+        type: actionInputType(field.type),
+        formKey: field.formKey,
+        label: field.label || fallback?.label || field.formKey,
+        placeholder:
+          field.placeholder ||
+          fallback?.placeholder ||
+          field.label ||
+          field.formKey,
+        required: field.required ?? fallback?.required ?? false,
+        requiredCondition: field.requiredCondition,
+        disabledCondition: field.disabledCondition,
+        isDisabled: field.isDisabled ?? fallback?.isDisabled,
+        isMultiple: field.isMultiple ?? fallback?.isMultiple,
+        isNumberButtonsActive:
+          field.isNumberButtonsActive ?? fallback?.isNumberButtonsActive,
+        options: getActionFieldOptions(
+          actionId,
+          field,
+          selectDataMap,
+          fallback,
+        ),
+        sourceFilterCondition: field.sourceFilterCondition,
+        invalidateKeys: field.invalidateKeys?.map((key) => ({
+          key,
+          defaultValue: "",
+        })),
+        min: field.min ?? fallback?.min,
+        max: field.max ?? fallback?.max,
+        minLength: field.minLength ?? fallback?.minLength,
+        maxLength: field.maxLength ?? fallback?.maxLength,
+        pattern: field.pattern ?? fallback?.pattern,
+        validationMessage:
+          field.validationMessage ?? fallback?.validationMessage,
+      };
+    });
+  }
+
+  return fallbackInputs;
+};
+
+const buildActionFormKeys = (
+  action: TableActionConfig,
+  actionInputs: GenericInputType[],
+) => {
+  if (action.formFields !== undefined) {
+    return action.formFields.map((field) => ({
+      key: field.formKey,
+      type: actionFormKeyType(field),
+    }));
+  }
+
+  return actionInputs.map((input) => ({
+    key: input.formKey,
+    type:
+      input.type === InputTypes.NUMBER
+        ? FormKeyTypeEnum.NUMBER
+        : FormKeyTypeEnum.STRING,
+  }));
+};
+
+const getActionDefaultValues = (
+  action: TableActionConfig,
+): Record<string, unknown> =>
+  (action.formFields || []).reduce<Record<string, unknown>>((values, field) => {
+    if (field.formKey && field.defaultValue !== undefined) {
+      values[field.formKey] = field.defaultValue;
+    }
+    return values;
+  }, {});
+
+const resolveActionTemplate = (
+  template: string | undefined,
+  row: GenericItem | null,
+): string => {
+  if (!template || !row) return template || "";
+  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, key: string) => {
+    const value = row[key.trim()];
+    return value === null || value === undefined ? "" : String(value);
+  });
+};
 
 type Props = {
   schemaName: string;
@@ -52,6 +298,7 @@ type Props = {
   excludeFields?: string[];
   actionsEnabled?: boolean;
   isHeader?: boolean;
+  customTitle?: string;
   tableConfig?: TableComponentConfig;
 };
 
@@ -61,6 +308,7 @@ export default function GenericUnpaginatedPage({
   excludeFields,
   actionsEnabled = true,
   isHeader = false,
+  customTitle,
   tableConfig,
 }: Props) {
   const { t } = useTranslation();
@@ -71,10 +319,39 @@ export default function GenericUnpaginatedPage({
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isCustomActionOpen, setIsCustomActionOpen] = useState(false);
+  const [activeCustomAction, setActiveCustomAction] =
+    useState<TableActionConfig | null>(null);
   const [rowToAction, setRowToAction] = useState<GenericItem | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterFormElements, setFilterFormElements] =
     useState<FormElementsState>({});
+  const configuredFilterInputs = tableConfig?.filterPanel?.inputs;
+  const filterSelectionDataMap = useFilterPanelSelectionData(
+    configuredFilterInputs,
+  );
+  const configuredFilterDefaults = useMemo(
+    () => getFilterDefaultValues(configuredFilterInputs),
+    [configuredFilterInputs],
+  );
+
+  useEffect(() => {
+    if (!Object.keys(configuredFilterDefaults).length) return;
+
+    setFilterFormElements((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      Object.entries(configuredFilterDefaults).forEach(([key, value]) => {
+        if (next[key] === undefined) {
+          next[key] = value as FormElementsState[string];
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [configuredFilterDefaults]);
 
   const items = useGetDynamicItems<GenericItem>(schemaName, filterFormElements);
   const rawContainers = useGetContainers();
@@ -96,7 +373,10 @@ export default function GenericUnpaginatedPage({
       const rowClassName = tableConfig?.rows?.className;
 
       if (rowClassName) {
-        Object.assign(styles, tailwindBgToStyle(getMatchingRowClassNames(row, rowClassName)));
+        Object.assign(
+          styles,
+          tailwindBgToStyle(getMatchingRowClassNames(row, rowClassName)),
+        );
         return styles;
       }
 
@@ -104,7 +384,9 @@ export default function GenericUnpaginatedPage({
       if (container?.frontend?.rowClassName) {
         Object.assign(
           styles,
-          tailwindBgToStyle(getMatchingRowClassNames(row, container.frontend.rowClassName)),
+          tailwindBgToStyle(
+            getMatchingRowClassNames(row, container.frontend.rowClassName),
+          ),
         );
       }
 
@@ -113,7 +395,9 @@ export default function GenericUnpaginatedPage({
         if (field.frontend?.rowClassName) {
           Object.assign(
             styles,
-            tailwindBgToStyle(getMatchingRowClassNames(row, field.frontend.rowClassName)),
+            tailwindBgToStyle(
+              getMatchingRowClassNames(row, field.frontend.rowClassName),
+            ),
           );
         }
       });
@@ -137,6 +421,7 @@ export default function GenericUnpaginatedPage({
     createDynamicItem,
     createMultipleDynamicItem,
     updateDynamicItem,
+    executeWorkflow,
     deleteDynamicItem,
     deleteMultipleDynamicItem,
     updateMultipleDynamicItem,
@@ -147,6 +432,24 @@ export default function GenericUnpaginatedPage({
     let fields = container.fields
       .map(normalizeField)
       .filter(isDisplayablePrimitive);
+
+    if (tableConfig?.columns?.length) {
+      fields = tableConfig.columns
+        .map((column) => {
+          const field = fields.find((item) => item.name === column.field);
+          return (
+            field || {
+              name: column.field,
+              type: "string",
+              frontend: column.displayName
+                ? { displayName: column.displayName }
+                : undefined,
+            }
+          );
+        })
+        .filter((field): field is Field => Boolean(field?.name));
+    }
+
     if (includeFields?.length) {
       fields = includeFields
         .map((name) => fields.find((f) => f.name === name))
@@ -172,7 +475,7 @@ export default function GenericUnpaginatedPage({
     });
 
     return fields;
-  }, [container, includeFields, excludeFields, user]);
+  }, [container, includeFields, excludeFields, user, tableConfig]);
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
@@ -222,6 +525,69 @@ export default function GenericUnpaginatedPage({
         if (rowKeyClassName) {
           rowKey.className = (row: GenericItem) =>
             getMatchingRowClassNames(row, rowKeyClassName);
+        }
+
+        const columnConfig = tableConfig?.columns?.find(
+          (column) => column.field === f.name,
+        );
+        if (columnConfig?.type === "computedLabel") {
+          const getComputedValue = (row: GenericItem) =>
+            getComputedLabelValue(
+              tableConfig,
+              f.name,
+              row,
+              evaluateRowCondition,
+            );
+
+          if (rowKeyClassName) {
+            rowKey.className = (row: GenericItem) =>
+              getMatchingRowClassNames(
+                { ...row, [f.name]: getComputedValue(row) },
+                rowKeyClassName,
+              );
+          }
+
+          rowKey.node = (row: GenericItem) => <span>{getComputedValue(row)}</span>;
+          return rowKey;
+        }
+
+        if (columnConfig?.type === "progressBar") {
+          rowKey.node = (row: GenericItem) => {
+            const progress = getProgressBarValue(
+              tableConfig,
+              f.name,
+              row,
+              evaluateRowCondition,
+            );
+            if (!progress) return <span>-</span>;
+
+            return (
+              <span className="inline-flex items-center gap-3 align-middle">
+                <span
+                  className="inline-flex overflow-hidden rounded-full"
+                  style={{
+                    width: progress.width,
+                    height: progress.height,
+                    backgroundColor: progress.trackColor,
+                  }}
+                >
+                  <span
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${progress.percent}%`,
+                      backgroundColor: progress.color,
+                    }}
+                  />
+                </span>
+                {progress.showValue && (
+                  <span className="text-sm font-medium text-neutral-500">
+                    {progress.value}/{progress.max}
+                  </span>
+                )}
+              </span>
+            );
+          };
+          return rowKey;
         }
 
         // Add node function for boolean fields
@@ -342,7 +708,9 @@ export default function GenericUnpaginatedPage({
   const columns = useMemo(() => {
     const baseCols = displayFields.map((f) => ({
       key: t(getTableDisplayName(tableConfig, f) || getFieldLabel(f)),
-      isSortable: true,
+      isSortable:
+        tableConfig?.columns?.find((column) => column.field === f.name)
+          ?.type !== "computedLabel",
       correspondingKey: f.name,
     }));
     if (actionsEnabled) {
@@ -508,12 +876,31 @@ export default function GenericUnpaginatedPage({
     };
   }, [t, isAddOpen, inputs, formKeys, handleSubmitItem]);
 
+  const actionSelectionDataMap = useActionFormSelectionData(
+    tableConfig?.actions || [],
+  );
+
   const actions = useMemo(() => {
     if (!actionsEnabled) return [];
-    return [
-      {
-        name: t("Delete"),
-        icon: <HiOutlineTrash />,
+
+    const configuredActions = (tableConfig?.actions || [])
+      .filter((action) => action.enabled !== false)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const hasConfiguredActions = Array.isArray(tableConfig?.actions);
+    const hasConfiguredDeleteAction = configuredActions.some(
+      (action) => action.kind === "delete",
+    );
+    const hasConfiguredEditAction = configuredActions.some(
+      (action) => action.kind === "edit",
+    );
+
+    const buildDeleteAction = (deleteActionConfig?: TableActionConfig) => {
+      const DeleteIcon = getIconByName(
+        deleteActionConfig?.icon || "HiOutlineTrash",
+      );
+      return {
+        name: deleteActionConfig?.label || t("Delete"),
+        icon: <DeleteIcon />,
         setRow: setRowToAction as (value: GenericItem) => void,
         modal: rowToAction ? (
           <ConfirmationDialog
@@ -523,25 +910,48 @@ export default function GenericUnpaginatedPage({
               deleteDynamicItem(rowToAction._id);
               setIsDeleteOpen(false);
             }}
-            title={t("Delete")}
-            text={t("GeneralDeleteMessage")}
+            title={deleteActionConfig?.confirmTitle || t("Delete")}
+            text={deleteActionConfig?.confirmText || t("GeneralDeleteMessage")}
           />
         ) : null,
-        className: "text-red-500 cursor-pointer text-2xl ml-auto",
+        className:
+          deleteActionConfig?.className ||
+          "text-red-500 cursor-pointer text-2xl ",
         isModal: true,
         isModalOpen: isDeleteOpen,
         setIsModal: setIsDeleteOpen,
         isPath: false,
-      },
-      {
-        name: t("Edit"),
-        icon: <FiEdit />,
-        className: "text-blue-500 cursor-pointer text-xl mr-auto",
+      };
+    };
+
+    const buildEditAction = (editActionConfig?: TableActionConfig) => {
+      const EditIcon = getIconByName(editActionConfig?.icon || "FiEdit");
+      const editActionId = editActionConfig
+        ? getActionId(editActionConfig, 0)
+        : "edit-0";
+      const editDefaultValues = editActionConfig
+        ? getActionDefaultValues(editActionConfig)
+        : {};
+      const editInputs = buildActionInputs(
+        editActionConfig || { kind: "edit" },
+        inputs,
+        editActionId,
+        actionSelectionDataMap,
+      );
+      const editInputKeys = new Set(editInputs.map((input) => input.formKey));
+      const editFormKeys =
+        editActionConfig?.formFields !== undefined
+          ? buildActionFormKeys(editActionConfig, editInputs)
+          : formKeys.filter((formKey) => editInputKeys.has(formKey.key));
+      return {
+        name: editActionConfig?.label || t("Edit"),
+        icon: <EditIcon />,
+        className:
+          editActionConfig?.className || "text-blue-500 cursor-pointer text-xl",
         isModal: true,
         setRow: setRowToAction as (value: GenericItem) => void,
         modal: rowToAction
           ? (() => {
-              // Normalize the row data to extract IDs from populated fields
               const normalizedUpdates = { ...rowToAction };
               displayFields.forEach((f) => {
                 const fieldType = (f.type || "").toLowerCase();
@@ -552,7 +962,6 @@ export default function GenericUnpaginatedPage({
                   normalizedUpdates[f.name] &&
                   typeof normalizedUpdates[f.name] === "object"
                 ) {
-                  // Extract the _id from the populated object
                   const populatedValue = normalizedUpdates[f.name] as Record<
                     string,
                     unknown
@@ -564,7 +973,6 @@ export default function GenericUnpaginatedPage({
                   normalizedUpdates[f.name] &&
                   Array.isArray(normalizedUpdates[f.name])
                 ) {
-                  // Extract array of _ids from populated objects
                   const populatedArray = normalizedUpdates[f.name] as Array<
                     Record<string, unknown>
                   >;
@@ -578,14 +986,18 @@ export default function GenericUnpaginatedPage({
                 <GenericAddEditPanel
                   isOpen={isEditOpen}
                   close={() => setIsEditOpen(false)}
-                  inputs={inputs}
-                  formKeys={formKeys}
+                  inputs={editInputs}
+                  formKeys={editFormKeys}
                   submitItem={handleSubmitItem}
                   isEditMode
+                  buttonName={editActionConfig?.buttonName || t("Edit")}
                   topClassName="flex flex-col gap-2"
                   itemToEdit={{
                     id: rowToAction._id,
-                    updates: normalizedUpdates,
+                    updates: {
+                      ...normalizedUpdates,
+                      ...editDefaultValues,
+                    },
                   }}
                 />
               );
@@ -594,18 +1006,150 @@ export default function GenericUnpaginatedPage({
         isModalOpen: isEditOpen,
         setIsModal: setIsEditOpen,
         isPath: false,
-      },
-    ];
+      };
+    };
+
+    const buildCustomAction = (action: TableActionConfig, index: number) => {
+      const actionId = getActionId(action, index);
+      const ActionIcon = getIconByName(action.icon || "FiCheck");
+      const constantValues = parseActionConstantValues(action);
+      const defaultValues = getActionDefaultValues(action);
+      const actionInputs = buildActionInputs(
+        action,
+        inputs,
+        actionId,
+        actionSelectionDataMap,
+      );
+      const actionFormKeys = buildActionFormKeys(action, actionInputs);
+      const workflowSubmit = action.submit;
+      const isWorkflowAction = Boolean(
+        workflowSubmit?.workflowName && workflowSubmit?.workflowSchema,
+      );
+      const isFormAction = action.modalType === "form";
+      const isActiveAction =
+        activeCustomAction &&
+        getActionId(activeCustomAction, index) === actionId;
+
+      return {
+        name: action.label || t("Action"),
+        icon: <ActionIcon />,
+        className:
+          action.className || "text-emerald-600 cursor-pointer text-xl ",
+        isButton: action.isButton,
+        buttonClassName: action.buttonClassName,
+        setRow: setRowToAction as (value: GenericItem) => void,
+        onClick: (row: GenericItem) => {
+          setActiveCustomAction(action);
+          if (isFormAction) return;
+
+          if (action.kind === "link") {
+            const path = resolveActionTemplate(
+              action.linkTemplate || action.path,
+              row,
+            );
+            if (path) window.location.href = path;
+            return;
+          }
+
+          if (action.kind === "update") {
+            if (isWorkflowAction) {
+              executeWorkflow({
+                workflowName: workflowSubmit?.workflowName || "",
+                workflowSchema: workflowSubmit?.workflowSchema,
+                record: { ...row, ...constantValues },
+                oldRecord: row,
+              });
+              return;
+            }
+            updateDynamicItem(row._id, constantValues as Partial<GenericItem>);
+          }
+        },
+        modal:
+          isFormAction && rowToAction && isActiveAction ? (
+            <GenericAddEditPanel
+              isOpen={isCustomActionOpen}
+              close={() => setIsCustomActionOpen(false)}
+              inputs={actionInputs}
+              formKeys={actionFormKeys}
+              submitItem={(item) => {
+                if ("id" in item && "updates" in item) {
+                  const record = {
+                    ...rowToAction,
+                    ...(item.updates as Record<string, unknown>),
+                    ...constantValues,
+                  };
+                  if (isWorkflowAction) {
+                    executeWorkflow({
+                      workflowName: workflowSubmit?.workflowName || "",
+                      workflowSchema: workflowSubmit?.workflowSchema,
+                      record,
+                      oldRecord: rowToAction,
+                    });
+                  } else {
+                    updateDynamicItem(
+                      item.id as string | number,
+                      record as Partial<GenericItem>,
+                    );
+                  }
+                }
+                setIsCustomActionOpen(false);
+              }}
+              isEditMode
+              buttonName={action.buttonName || action.label || t("Update")}
+              topClassName="flex flex-col gap-2"
+              itemToEdit={{
+                id: rowToAction._id,
+                updates: {
+                  ...rowToAction,
+                  ...defaultValues,
+                  ...constantValues,
+                },
+              }}
+            />
+          ) : null,
+        isModal: isFormAction,
+        isModalOpen: isCustomActionOpen,
+        setIsModal: setIsCustomActionOpen,
+        isPath: false,
+      };
+    };
+
+    if (!hasConfiguredActions) {
+      return [buildDeleteAction(), buildEditAction()];
+    }
+
+    return configuredActions
+      .flatMap((action, index) => {
+        if (action.kind === "defaults") {
+          return [
+            !hasConfiguredDeleteAction ? buildDeleteAction() : null,
+            !hasConfiguredEditAction ? buildEditAction() : null,
+          ];
+        }
+        if (action.kind === "delete") return buildDeleteAction(action);
+        if (action.kind === "edit") return buildEditAction(action);
+        return buildCustomAction(action, index);
+      })
+      .filter((action): action is NonNullable<typeof action> =>
+        Boolean(action),
+      );
   }, [
     t,
     rowToAction,
     isDeleteOpen,
     isEditOpen,
+    isCustomActionOpen,
+    activeCustomAction,
     deleteDynamicItem,
+    updateDynamicItem,
+    executeWorkflow,
     handleSubmitItem,
     inputs,
     formKeys,
     actionsEnabled,
+    displayFields,
+    tableConfig?.actions,
+    actionSelectionDataMap,
   ]);
 
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -656,7 +1200,7 @@ export default function GenericUnpaginatedPage({
       options: bulkFieldOptions,
       placeholder: t("Select fields to edit"),
       isMultiple: true,
-      required: true,
+      required: !isBulkStepTwo,
       isDisabled: isBulkStepTwo,
     };
 
@@ -909,7 +1453,7 @@ export default function GenericUnpaginatedPage({
   ]);
 
   const filterPanelInputs = useMemo(() => {
-    return displayFields
+    const defaultInputs = displayFields
       .filter((f) => {
         const fieldType = (f.type || "").toLowerCase();
         // Exclude id, image fields from filters
@@ -976,34 +1520,49 @@ export default function GenericUnpaginatedPage({
           required: false,
         };
       });
-  }, [displayFields, t, selectionDataMap]);
+    return buildConfiguredFilterInputs(
+      configuredFilterInputs,
+      defaultInputs,
+      filterSelectionDataMap,
+    );
+  }, [
+    displayFields,
+    t,
+    selectionDataMap,
+    configuredFilterInputs,
+    filterSelectionDataMap,
+  ]);
+  const hasFilterPanelInputs = filterPanelInputs.length > 0;
 
   const filters = useMemo(
-    () => [
-      {
-        label: t("Show Filters"),
-        isUpperSide: true,
-        node: (
-          <SwitchButton
-            checked={showFilters}
-            onChange={() => setShowFilters(!showFilters)}
-          />
-        ),
-      },
-    ],
-    [t, showFilters],
+    () =>
+      hasFilterPanelInputs
+        ? [
+            {
+              label: t("Show Filters"),
+              isUpperSide: true,
+              node: (
+                <SwitchButton
+                  checked={showFilters}
+                  onChange={() => setShowFilters(!showFilters)}
+                />
+              ),
+            },
+          ]
+        : [],
+    [t, showFilters, hasFilterPanelInputs],
   );
 
   const filterPanel = useMemo(
     () => ({
-      isFilterPanelActive: showFilters,
+      isFilterPanelActive: showFilters && hasFilterPanelInputs,
       inputs: filterPanelInputs,
       formElements: filterFormElements,
       setFormElements: setFilterFormElements,
       closeFilters: () => setShowFilters(false),
       isApplyButtonActive: true,
     }),
-    [showFilters, filterPanelInputs, filterFormElements],
+    [showFilters, hasFilterPanelInputs, filterPanelInputs, filterFormElements],
   );
 
   const selectionActions = useMemo(
@@ -1012,7 +1571,7 @@ export default function GenericUnpaginatedPage({
         name: t("Delete Selected"),
         isButton: true,
         buttonClassName:
-          "px-2 ml-auto bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
+          "px-2 bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
         isModal: true,
         className: "cursor-pointer",
         isDisabled: !actionsEnabled || !selectedRows?.length,
@@ -1034,7 +1593,7 @@ export default function GenericUnpaginatedPage({
         name: t("Edit Selected"),
         isButton: true,
         buttonClassName:
-          "px-2 ml-auto bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
+          "px-2  bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
         isModal: true,
         className: "cursor-pointer",
         modal: isBulkEditOpen ? (
@@ -1087,14 +1646,14 @@ export default function GenericUnpaginatedPage({
   return (
     <>
       {isHeader && <Header />}
-      <div className="w-[95%] mx-auto">
+      <div className="w-full mx-auto">
         <GenericTable
           rowKeys={rowKeys}
           actions={actions}
           columns={columns}
           rows={rows || []}
           rowStyleFunction={rowStyleFunction}
-          title={t(humanize(schemaName))}
+          title={customTitle || t(humanize(schemaName))}
           addButton={addButton}
           isCollapsible={false}
           isActionsActive={actionsEnabled}

@@ -1,1 +1,0 @@
-import{l as s,m as r,g as o,D as i,E as b}from"./index-BkAtBOG2.js";var D=r,n=s,v="[object Date]";function _(a){return n(a)&&D(a)==v}var c=_,g=c,d=b,e=i,t=e&&e.isDate,j=t?d(t):g,m=j;const I=o(m);export{I as O};

@@ -1,5 +1,7 @@
 import React from "react";
+import { useParams } from "react-router-dom";
 import { ComponentBlock, DataBinding } from "../../types/layout";
+import { resolveRouteParamValue } from "../../utils/routeParams";
 import DynamicChart, { ChartType } from "../charts/DynamicChart";
 
 type PrimitivePropValue =
@@ -99,7 +101,7 @@ export const ChartView: React.FC<
   // Remove params from dataBinding since they're chart config, not pipeline params
   const updatedBinding:
     | {
-        kind: "schema" | "pipeline" | "api";
+        kind: "schema" | "pipeline" | "workflow" | "api";
         schemaName?: string;
         pipelineName?: string;
       }
@@ -278,6 +280,11 @@ export const RenderComponent: React.FC<{ block: ComponentBlock }> = ({
   block,
 }) => {
   const { type, title, dataBinding, props = {} } = block;
+  const routeParams = useParams();
+  const resolvedDataBinding = React.useMemo(
+    () => resolveRouteParamValue(dataBinding, routeParams),
+    [dataBinding, routeParams],
+  );
 
   // Check if this is a chart type (barChart, lineChart, etc.)
   const chartType = componentTypeToChartType(type);
@@ -285,7 +292,7 @@ export const RenderComponent: React.FC<{ block: ComponentBlock }> = ({
     return (
       <ChartView
         title={title}
-        binding={dataBinding}
+        binding={resolvedDataBinding}
         chartType={chartType}
         {...props}
       />
@@ -294,19 +301,19 @@ export const RenderComponent: React.FC<{ block: ComponentBlock }> = ({
 
   switch (type) {
     case "table":
-      return <TableView title={title} binding={dataBinding} {...props} />;
+      return <TableView title={title} binding={resolvedDataBinding} {...props} />;
 
     case "chart":
-      return <ChartView title={title} binding={dataBinding} {...props} />;
+      return <ChartView title={title} binding={resolvedDataBinding} {...props} />;
 
     case "form":
-      return <FormView title={title} binding={dataBinding} {...props} />;
+      return <FormView title={title} binding={resolvedDataBinding} {...props} />;
 
     case "text":
       return <TextBlock title={title} {...props} />;
 
     case "kpi":
-      return <KPIBlock title={title} binding={dataBinding} {...props} />;
+      return <KPIBlock title={title} binding={resolvedDataBinding} {...props} />;
 
     case "custom":
       return <CustomComponent title={title} {...props} />;
