@@ -36,17 +36,19 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
   return (
     <>
       <Header />
-      <div className={`dynamic-page-renderer mt-10 ${className}`}>
+      <div className={`dynamic-page-renderer ${className}`}>
         <div className="sections-container space-y-6">
           {[...sections]
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
             .map((section, index) => (
-            <PageSectionView
-              key={section.id || section.grid?.cells[0]?.id || `section-${index}`}
-              section={section}
-              routeParams={routeParams}
-            />
-          ))}
+              <PageSectionView
+                key={
+                  section.id || section.grid?.cells[0]?.id || `section-${index}`
+                }
+                section={section}
+                routeParams={routeParams}
+              />
+            ))}
         </div>
       </div>
     </>

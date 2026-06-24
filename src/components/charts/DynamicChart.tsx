@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { lazy, Suspense, useMemo } from "react";
-import { useGetPipeline } from "../../utils/dynamic";
+import { useGetPipeline, useGetWorkflowData } from "../../utils/dynamic";
 
 export type ChartType =
   | "bar"
@@ -273,12 +273,40 @@ export default function DynamicChart({ config }: DynamicChartProps) {
     [axisBottom, axisLeft, chartOptions, indexBy, keys, margin],
   );
 
+  const isWorkflow = dataBinding?.kind === "workflow";
+
   // Fetch data from pipeline (only pass non-chart params)
-  const data = useGetPipeline<unknown>(
-    schemaName,
-    pipelineName,
-    Object.keys(pipelineParams).length > 0 ? pipelineParams : undefined
+  const pipelineData = useGetPipeline<unknown>(
+    isWorkflow ? "" : schemaName,
+    isWorkflow ? "" : pipelineName,
+    !isWorkflow && Object.keys(pipelineParams).length > 0 ? pipelineParams : undefined
   );
+
+  const workflowData = useGetWorkflowData<unknown>(
+    isWorkflow
+      ? {
+          schemaName,
+          workflowName: dataBinding?.workflowName || "",
+          params: pipelineParams,
+        }
+      : {},
+    pipelineParams,
+  );
+
+  const data = useMemo(() => {
+    const rawData = isWorkflow ? workflowData : pipelineData;
+    if (!rawData) return null;
+    if (Array.isArray(rawData)) return rawData;
+    if (typeof rawData === "object") {
+      const arrayField =
+        (rawData as any).items ||
+        (rawData as any).data ||
+        (rawData as any).list;
+      if (Array.isArray(arrayField)) return arrayField;
+      return [rawData];
+    }
+    return null;
+  }, [isWorkflow, pipelineData, workflowData]);
 
   // Get the chart component dynamically
   const ChartComponent = useMemo(() => getChartComponent(type), [type]);
