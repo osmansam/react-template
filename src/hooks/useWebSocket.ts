@@ -1,7 +1,7 @@
 // useWebSocket.ts
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useUserContext } from "../context/User.context";
+import { shouldInvalidateDynamicQuery } from "../utils/dynamicQueryKeys";
 
 type WSInvalidateEvent =
   | { type: "invalidate"; schema: string; userId?: string; ts?: number }
@@ -53,7 +53,6 @@ function toWsUrl(
 
 export function useWebSocket() {
   const queryClient = useQueryClient();
-  const { user } = useUserContext();
   const wsRef = useRef<WebSocket | null>(null);
   const stateRef = useRef({ userClosed: false, delay: 1000 });
 
@@ -116,31 +115,11 @@ export function useWebSocket() {
           // Handle schema invalidate event
           if (msg?.type !== "invalidate" || !msg?.schema) return;
 
-          // Skip invalidation if this event was triggered by the current user
-          // (they already have optimistic updates)
-          // Try to get userId from context first, fallback to localStorage
-          let currentUserId = user?._id;
-          if (!currentUserId) {
-            const storedUser = localStorage.getItem("user");
-            if (storedUser) {
-              try {
-                const parsedUser = JSON.parse(storedUser);
-                currentUserId = parsedUser._id;
-              } catch {
-                // ignore parse errors
-              }
-            }
-          }
-
-          if (msg.userId && currentUserId && msg.userId === currentUserId) {
-            return;
-          }
-
           console.log("WS invalidating queries for schema:", msg.schema);
           await queryClient.invalidateQueries({
-            queryKey: ["dynamic", msg.schema],
-            type: "all",
-            exact: false,
+            predicate: (query) =>
+              shouldInvalidateDynamicQuery(query.queryKey, msg.schema),
+            refetchType: "active",
           });
 
           // (Optional) be extra-safe: directly hit array keys you know exist
