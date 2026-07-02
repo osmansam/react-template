@@ -44,7 +44,19 @@ export interface TableLinkConfig {
   type?: LinkType;
 }
 
-export type TableColumnType = "field" | "computedLabel" | "progressBar";
+export type TableColumnType =
+  | "field"
+  | "computedLabel"
+  | "progressBar"
+  | "number"
+  | "currency"
+  | "percentage"
+  | "growthPercentage"
+  | "date"
+  | "boolean"
+  | "image"
+  | "badge"
+  | "array";
 
 export interface TableComputedLabelRule {
   condition?: string;
@@ -326,6 +338,9 @@ export interface InfoBlockItemConfig {
 export interface InfoBlocksConfig {
   source?: InfoBlocksSource;
   items?: InfoBlockItemConfig[];
+  isDynamic?: boolean;
+  dynamicLimit?: number;
+  dynamicItem?: InfoBlockItemConfig;
 }
 
 export interface DistributionBlockItemConfig {
@@ -338,6 +353,9 @@ export interface DistributionBlockItemConfig {
 export interface DistributionBlocksConfig {
   source?: InfoBlocksSource;
   items?: DistributionBlockItemConfig[];
+  isDynamic?: boolean;
+  dynamicLimit?: number;
+  dynamicItem?: DistributionBlockItemConfig;
 }
 
 export type ComponentType =

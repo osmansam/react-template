@@ -12,17 +12,35 @@ import {
 type InfoBlocksProps = {
   config?: InfoBlocksConfig;
   dataBinding?: DataBinding;
+  resolvedParams?: Record<string, unknown>;
 };
 
-const InfoBlocks: React.FC<InfoBlocksProps> = ({ config, dataBinding }) => {
+const CURATED_COLORS = [
+  "#4f46e5", // Indigo
+  "#06b6d4", // Cyan
+  "#10b981", // Emerald
+  "#f59e0b", // Amber
+  "#ec4899", // Pink
+  "#8b5cf6", // Purple
+  "#f97316", // Orange
+  "#14b8a6", // Teal
+  "#3b82f6", // Blue
+  "#6366f1", // Indigo Light
+];
+
+const InfoBlocks: React.FC<InfoBlocksProps> = ({ config, dataBinding, resolvedParams }) => {
   const source = config?.source || "static";
+  const isDynamic = config?.isDynamic || false;
+  const limit = isDynamic ? (config?.dynamicLimit || 50) : 1;
+
   const shouldFetchTable =
     source !== "static" &&
     source !== "workflow" &&
     Boolean(dataBinding?.schemaName);
+
   const payload = useGetTableSourceItems<Record<string, unknown>>(
     1,
-    1,
+    limit,
     shouldFetchTable
       ? {
           kind: dataBinding?.kind as "schema" | "pipeline" | "workflow",
@@ -33,7 +51,9 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({ config, dataBinding }) => {
         }
       : {},
     {},
+    resolvedParams,
   );
+
   const workflowData = useGetWorkflowData<Record<string, unknown>>(
     source === "workflow"
       ? {
@@ -42,6 +62,7 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({ config, dataBinding }) => {
           params: dataBinding?.params,
         }
       : {},
+    resolvedParams,
   );
 
   const context = useMemo<Record<string, unknown>>(() => {
@@ -61,31 +82,75 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({ config, dataBinding }) => {
     };
   }, [payload, source, workflowData]);
 
-  const items = (config?.items || []).slice(0, 5);
+  const resolvedItems = useMemo(() => {
+    if (!isDynamic) {
+      return (config?.items || []).slice(0, 5);
+    }
 
-  if (items.length === 0) return null;
+    let dataList: Record<string, unknown>[] = [];
+    if (source === "workflow") {
+      if (Array.isArray(workflowData)) {
+        dataList = workflowData;
+      } else if (workflowData && typeof workflowData === "object") {
+        const arrayField =
+          (workflowData as any).items ||
+          (workflowData as any).data ||
+          (workflowData as any).list;
+        if (Array.isArray(arrayField)) {
+          dataList = arrayField;
+        } else {
+          dataList = [workflowData];
+        }
+      }
+    } else {
+      dataList = payload?.items || [];
+    }
+
+    const dynamicItem = config?.dynamicItem;
+    if (!dynamicItem) return [];
+
+    const maxLimit = config?.dynamicLimit || 50;
+    return dataList.slice(0, maxLimit).map((dataItem, index) => {
+      const rawColor = resolveTemplate(dynamicItem.color || "", dataItem) || dynamicItem.color;
+      const color = rawColor?.toLowerCase() === "random"
+        ? CURATED_COLORS[index % CURATED_COLORS.length]
+        : rawColor;
+      return {
+        title: resolveTemplate(dynamicItem.title || "", dataItem),
+        value: resolveTemplate(dynamicItem.value || "", dataItem),
+        footer: resolveTemplate(dynamicItem.footer || "", dataItem),
+        color,
+        titleColorRules: dynamicItem.titleColorRules,
+        footerColorRules: dynamicItem.footerColorRules,
+        itemContext: dataItem,
+      };
+    });
+  }, [isDynamic, config?.items, config?.dynamicItem, config?.dynamicLimit, source, workflowData, payload?.items]);
+
+  if (resolvedItems.length === 0) return null;
 
   return (
     <div
-      className="grid gap-3"
+      className="grid gap-4"
       style={{
-        gridTemplateColumns: "repeat(auto-fit, minmax(min(190px, 100%), 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(170px, 100%), 1fr))",
       }}
     >
-      {items.map((item, index) => {
+      {resolvedItems.map((item, index) => {
+        const itemContext = (item as any).itemContext || context;
         const color = item.color?.trim();
         const titleColor = resolveConditionalColor(
           item.titleColorRules,
-          context,
+          itemContext,
         );
         const footerColor = resolveConditionalColor(
           item.footerColorRules,
-          context,
+          itemContext,
         );
         return (
           <div
             key={`${item.title || "info-block"}-${index}`}
-            className="group relative min-h-[96px] overflow-hidden rounded-lg border border-neutral-200/80 bg-white px-5 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.08)]"
+            className="group relative min-h-[86px] overflow-hidden rounded-lg border border-neutral-200/80 bg-white px-4.5 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.08)]"
             style={
               color
                 ? {
@@ -95,21 +160,21 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({ config, dataBinding }) => {
                 : undefined
             }
           >
-            <div className="flex h-full min-w-0 flex-col justify-between gap-2">
+            <div className="flex h-full min-w-0 flex-col justify-between gap-1.5">
               <div
-                className="truncate text-[13px] font-medium leading-5 text-neutral-500"
+                className="truncate text-xs font-semibold uppercase tracking-wider text-neutral-500"
                 style={titleColor ? { color: titleColor } : undefined}
               >
-                {resolveTemplate(item.title, context)}
+                {resolveTemplate(item.title, itemContext)}
               </div>
-              <div className="truncate text-[28px] font-semibold leading-8 tracking-normal text-neutral-950 tabular-nums">
-                {resolveTemplate(item.value, context)}
+              <div className="truncate text-2xl font-bold leading-8 tracking-tight text-neutral-950 tabular-nums">
+                {resolveTemplate(item.value, itemContext)}
               </div>
               <div
-                className="truncate text-[13px] font-medium leading-5 text-neutral-400"
+                className="truncate text-xs font-medium leading-4 text-neutral-400"
                 style={footerColor ? { color: footerColor } : undefined}
               >
-                {resolveTemplate(item.footer, context)}
+                {resolveTemplate(item.footer, itemContext)}
               </div>
             </div>
           </div>

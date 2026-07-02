@@ -402,9 +402,11 @@ const RenderComponent: React.FC<{
           <NoticePanel tone="error">Invalid chart type: {type}</NoticePanel>
         );
       }
-      return resolvedDataBinding?.kind === "pipeline" &&
-        resolvedDataBinding.schemaName &&
-        resolvedDataBinding.pipelineName ? (
+      const hasBinding = resolvedDataBinding?.schemaName && 
+        ((resolvedDataBinding.kind === "pipeline" && resolvedDataBinding.pipelineName) || 
+         (resolvedDataBinding.kind === "workflow" && resolvedDataBinding.workflowName));
+
+      return hasBinding ? (
         <Suspense fallback={<LoadingPanel message="Loading chart..." />}>
           <DynamicChart
             config={{
@@ -416,16 +418,17 @@ const RenderComponent: React.FC<{
                 | Record<string, unknown>
                 | undefined,
               dataBinding: {
-                kind: "pipeline",
+                kind: resolvedDataBinding.kind as "pipeline" | "workflow",
                 schemaName: resolvedDataBinding.schemaName,
                 pipelineName: resolvedDataBinding.pipelineName,
+                workflowName: resolvedDataBinding.workflowName,
                 params: resolvedDataBinding.params,
               },
             }}
           />
         </Suspense>
       ) : (
-        <NoticePanel>Chart component requires pipeline binding.</NoticePanel>
+        <NoticePanel>Chart component requires pipeline or workflow binding.</NoticePanel>
       );
     }
     default:
