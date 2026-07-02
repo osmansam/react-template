@@ -29,6 +29,7 @@ import {
   useExportDynamicItems,
   useGetTableSourceItems,
 } from "../../../utils/dynamic";
+import { getTableSourceQueryKey } from "../../../utils/dynamicQueryKeys";
 import {
   RawContainer,
   evaluateRowCondition,
@@ -415,15 +416,15 @@ export default function GenericPaginatedPage({
       : filterPanelFormElements;
   }, [filterPanelFormElements, constantFilter]);
 
-  // Create the paginated query key to pass to mutations
-  const paginatedQueryKey = useMemo(
-    () => [
-      "dynamic",
-      schemaName,
-      "page",
-      { page: currentPage, limit: rowsPerPage, filters: mergedFilters },
-    ],
-    [schemaName, currentPage, rowsPerPage, mergedFilters],
+  const tableSourceQueryKey = useMemo(
+    () =>
+      getTableSourceQueryKey(
+        currentPage,
+        rowsPerPage,
+        tableBinding,
+        mergedFilters,
+      ),
+    [currentPage, rowsPerPage, tableBinding, mergedFilters],
   );
 
   const {
@@ -434,7 +435,11 @@ export default function GenericPaginatedPage({
     deleteDynamicItem,
     deleteMultipleDynamicItem,
     updateMultipleDynamicItem,
-  } = useDynamicCrud<GenericItem>(schemaName, hasImageField, paginatedQueryKey);
+  } = useDynamicCrud<GenericItem>(
+    schemaName,
+    hasImageField,
+    [...tableSourceQueryKey],
+  );
 
   const displayFields: Field[] = useMemo(() => {
     const containerFields = container?.fields || [];

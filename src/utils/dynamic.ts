@@ -4,6 +4,10 @@ import { toast } from "react-toastify";
 import { FormElementsState } from "../types";
 import { useGet } from "../utils/api/factory";
 import { axiosClient } from "./api/axiosClient";
+import {
+  DynamicTableSourceBinding,
+  getTableSourceQueryKey,
+} from "./dynamicQueryKeys";
 
 export interface DynamicPayload<T> {
   items: T[];
@@ -19,14 +23,7 @@ export interface DynamicExecutionResponse<T> {
   source?: string;
 }
 
-export type TableSourceBinding = {
-  kind?: "schema" | "pipeline" | "workflow";
-  schemaName?: string;
-  pipelineName?: string;
-  workflowName?: string;
-  fields?: string[];
-  params?: Record<string, unknown>;
-};
+export type TableSourceBinding = DynamicTableSourceBinding;
 
 const BASE = "/dynamic";
 const idempotencyKeys = new Map<string, string>();
@@ -719,15 +716,13 @@ export function useGetTableSourceItems<T>(
   const schemaName = binding.schemaName || "";
   const baseQueryUrl = `${BASE}/table-source`;
   const mergedParams = { ...(binding.params || {}), ...(resolvedParams || {}) };
-  const queryKey = [
-    "dynamic",
-    schemaName,
-    "table-source",
-    sourceType,
-    binding.pipelineName || "",
-    binding.workflowName || "",
-    { page, limit, filters, fields: binding.fields || [], params: mergedParams },
-  ] as const;
+  const queryKey = getTableSourceQueryKey(
+    page,
+    limit,
+    binding,
+    filters,
+    resolvedParams,
+  );
 
   const parts = [
     `schemaName=${schemaName}`,
