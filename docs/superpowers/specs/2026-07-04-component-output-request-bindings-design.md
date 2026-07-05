@@ -61,22 +61,43 @@ identity from its target field and label:
 Editing `field` or `label` does not change the filter ID. Page Designer does not
 reuse deleted IDs.
 
-## Declared Component Outputs
-
-Components expose only explicitly persisted outputs:
+Shared page values and component outputs use this initial value-type set:
 
 ```ts
-type ComponentOutputType =
+type RuntimeValueType =
   | "string"
   | "number"
   | "boolean"
   | "dateRange"
   | "stringArray"
   | "numberArray";
+```
 
-interface ComponentOutputDefinition {
+## Page Variables
+
+Page variables are typed, page-owned values with immutable identity:
+
+```ts
+interface PageVariableDefinition {
+  id: string;
   key: string;
-  type: ComponentOutputType;
+  type: RuntimeValueType;
+  initialValue?: unknown;
+}
+```
+
+The `id` is persisted in bindings. The unique `key` is a renameable designer
+alias. tenantPanel and autotable-Go validate `initialValue` against `type`.
+
+## Declared Component Outputs
+
+Components expose only explicitly persisted outputs:
+
+```ts
+interface ComponentOutputDefinition {
+  id: string;
+  key: string;
+  type: RuntimeValueType;
   source: ComponentOutputSource;
 }
 
@@ -99,6 +120,7 @@ an explicit output definition rather than relying on an implicit naming rule:
 
 ```json
 {
+  "id": "out_01JDEF",
   "key": "createdAtFilter",
   "type": "dateRange",
   "source": {
@@ -108,10 +130,12 @@ an explicit output definition rather than relying on an implicit naming rule:
 }
 ```
 
-The first version excludes API responses, pipeline results, workflow outputs,
-computed aggregates, selected record objects, and unrestricted object paths.
-Those values require a future schema-aware reactive dependency model. Selected
-IDs are supported because their element type is explicit and their values are
+Output IDs and keys are unique within a component. The output ID is immutable
+and persisted by consumers; the key is a renameable display alias. The first
+version excludes API responses, pipeline results, workflow outputs, computed
+aggregates, selected record objects, and unrestricted object paths. Those
+values require a future schema-aware reactive dependency model. Selected IDs
+are supported because their element type is explicit and their values are
 interaction-owned.
 
 ## Parameter Binding Contract
@@ -136,7 +160,7 @@ type ParameterBinding =
   | {
       source: "componentOutput";
       componentId: string;
-      output: string;
+      outputId: string;
       field?: "start" | "end" | "preset" | "timezone";
     }
   | {
@@ -169,7 +193,7 @@ The persisted value is structured and ID-based:
 {
   "source": "componentOutput",
   "componentId": "cmp_01JXYZ",
-  "output": "createdAtFilter",
+  "outputId": "out_01JDEF",
   "field": "start"
 }
 ```
@@ -183,9 +207,14 @@ The resolver validates `field` against the referenced definition:
 - `dateRange` permits `start`, `end`, `preset`, or `timezone`.
 - Scalar and array outputs require `field` to be omitted.
 - Page-filter fields follow the page filter's declared value type.
+- Page-variable values follow the variable's declared type.
 - Derived transforms accept only compatible date-range inputs.
 
 Validation uses the referenced model definitions, not TypeScript types alone.
+
+Date-range values use the project timezone for calendar arithmetic. `start` is
+inclusive, `end` is exclusive, and both resolve to ISO-8601 instants at the
+request boundary. `preset` is absent for custom ranges.
 
 ## Page-Owned State Versus Component Outputs
 
@@ -225,26 +254,29 @@ interface PageRuntimeState {
   >;
 }
 
-type RuntimeValue =
+type RuntimeValue<T = unknown> =
   | { status: "unavailable" }
-  | { status: "available"; value: unknown };
+  | { status: "available"; value: T };
 ```
 
 Definitions remain on the page model. Current values live only in the runtime
 store. Component adapters publish declared values:
 
 ```ts
-runtime.publishOutput(componentId, outputKey, normalizedValue);
+runtime.publishOutput(componentId, outputId, normalizedValue);
 ```
 
 Consumers subscribe through selector hooks:
 
 ```ts
-runtime.selectComponentOutput(componentId, outputKey);
+runtime.selectComponentOutput(componentId, outputId);
 ```
 
 The store uses selector-based subscriptions so changing one output does not
-rerender all page components.
+rerender all page components. Publication validates that the publisher owns the
+component ID, the output is declared on that component, the source is supported
+by the component type, and the value matches the declared output type. An
+adapter cannot publish to another component or undeclared output.
 
 ## Request Resolution
 
@@ -273,6 +305,9 @@ Missing required values never become empty strings.
 
 Text and search outputs are debounced. Select, boolean, and completed date-range
 changes publish immediately. Incomplete date ranges remain unavailable.
+Table search input remains immediate local UI state; the public table-search
+output is the trimmed, debounced value. Consumers never receive each raw
+keystroke.
 
 ## Query Keys and Refetching
 
@@ -283,12 +318,16 @@ React Query keys contain canonical resolved values, not binding definitions:
   "component-request",
   componentId,
   sourceId,
+  sourceRevision,
   canonicalize(resolvedParameters)
 ]
 ```
 
 Canonicalization recursively sorts object keys, preserves array order, converts
 instants to UTC ISO strings, retains `null`, and omits `undefined`.
+`sourceRevision` is a stable definition revision or content hash for the
+pipeline, workflow, schema query, or other source. Editing a source invalidates
+cached data even when its ID and parameters are unchanged.
 
 Only components whose resolved values change receive a new query key. WebSocket
 invalidation reruns affected requests using the latest resolved parameters.
@@ -308,12 +347,13 @@ Request results cannot publish outputs or update filters automatically.
 Therefore, two tables may safely consume one another's interaction-owned filter
 outputs; neither request result feeds the source value.
 
-Page compilation and backend page-save validation still construct the declared
-dependency graph and reject:
+Validation classifies dependency relationships:
 
-- self-dependencies whose output is request-derived;
-- missing sources or consumers;
-- future derived-output cycles.
+- an interaction-state dependency cycle is allowed because all sources are
+  user-owned and no request result feeds them;
+- a request-result dependency cycle is rejected;
+- missing sources or consumers are rejected;
+- future derived-output cycles are rejected.
 
 Request-derived component outputs are outside this delivery.
 
@@ -339,7 +379,9 @@ Request-derived component outputs are outside this delivery.
 - Add an output editor and **Expose as component output** table-filter action.
 - Add a parameter-binding picker for page filters, page variables, component
   outputs, system values, derived values, and static values.
-- Display readable aliases while persisting immutable IDs.
+- Generate immutable output and page-variable IDs.
+- Display readable aliases while persisting immutable component, output,
+  filter, and variable IDs.
 - Filter available output fields by output type.
 - Validate missing references, duplicate keys, invalid fields, incompatible
   types, and unsupported cycles before saving.
@@ -372,11 +414,20 @@ Request-derived component outputs are outside this delivery.
 - Existing route-template parameter values remain supported during migration.
 - No existing filter is automatically exposed or promoted.
 
+## Deletion Rules
+
+A referenced component, component output, table filter, page filter, or page
+variable cannot be deleted unless the same save operation removes or replaces
+every dependent binding. Removing a table filter also requires removing any
+output definition sourced from it. tenantPanel shows dependents before the
+operation; autotable-Go enforces the final page graph atomically.
+
 ## Error Handling
 
 tenantPanel and autotable-Go page validation report:
 
-- duplicate component IDs, aliases, or output keys;
+- duplicate component IDs, aliases, output IDs, output keys, variable IDs, or
+  variable keys;
 - duplicate filter IDs;
 - missing component, filter, variable, or output references;
 - output sources incompatible with the component type;
@@ -396,7 +447,9 @@ configuration errors.
 - runtime output publication and selector isolation;
 - table filter, search, and selected-ID output adapters;
 - component-ID lookup and alias independence;
+- output-ID lookup and output-key rename independence;
 - binding compilation and type/field validation;
+- publication ownership and runtime value-type validation;
 - unavailable, `null`, invalid-reference, and mismatch behavior;
 - dependency-aware query keys and refetching;
 - debounce and completed date-range behavior;
@@ -409,7 +462,7 @@ configuration errors.
 - unique alias and output-key validation;
 - exposing a table filter as an explicit output;
 - readable expression rendering from current aliases;
-- rename safety with unchanged persisted component IDs;
+- component, output, and variable rename safety with unchanged persisted IDs;
 - type-filtered field picker;
 - deletion protection and missing-reference errors;
 - legacy parameter editing.
@@ -419,6 +472,7 @@ configuration errors.
 - page-model serialization for all new contracts;
 - duplicate and missing-reference validation;
 - component/output/source compatibility;
+- output and variable ID rename safety;
 - output-field and parameter-type validation;
 - cycle validation;
 - compatibility with pages lacking the new fields;
@@ -434,6 +488,7 @@ An end-to-end page contains:
   parameters consume its start and end outputs;
 - a table-local filter change that refetches only those consumers;
 - a component alias rename that leaves persisted bindings operational;
+- an output-key rename that leaves persisted bindings operational;
 - an unavailable required output that waits without sending a request;
 - a promoted page filter that replaces the table-owned output for a genuinely
   shared reporting period.
@@ -449,4 +504,3 @@ An end-to-end page contains:
 6. Add autotable-Go page contract validation and typed execution boundaries.
 7. Add tenantPanel output and parameter-binding editors.
 8. Add promotion, migration warnings, and cross-project integration tests.
-
