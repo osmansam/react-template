@@ -812,17 +812,37 @@ const GenericTable = <T,>({
                 style={style}
               >
                 {rowKey.isImage ? (
-                  <img
-                    src={(row[rowKey.key as keyof T] as string) || imageHolder}
-                    alt="img"
-                    className="w-12 h-12 rounded-full cursor-pointer"
-                    onClick={() => {
-                      setImageModalSrc(
-                        (row[rowKey.key as keyof T] as string) ?? imageHolder,
-                      );
-                      setIsImageModalOpen(true);
-                    }}
-                  />
+                  (() => {
+                    const imageSrc =
+                      (row[rowKey.key as keyof T] as string) || imageHolder;
+                    if (!imageSrc) return <span>-</span>;
+
+                    return (
+                      <button
+                        type="button"
+                        className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2"
+                        aria-label={t("Open image preview")}
+                        onClick={() => {
+                          setImageModalSrc(imageSrc);
+                          setIsImageModalOpen(true);
+                        }}
+                      >
+                        <img
+                          src={imageSrc}
+                          alt=""
+                          className="h-16 w-16 rounded-lg object-cover shadow-sm transition-opacity hover:opacity-90"
+                          onError={(event) => {
+                            if (
+                              imageHolder &&
+                              event.currentTarget.src !== imageHolder
+                            ) {
+                              event.currentTarget.src = imageHolder;
+                            }
+                          }}
+                        />
+                      </button>
+                    );
+                  })()
                 ) : cellValue.length > tooltipLimit && isToolTipEnabled ? (
                   <CustomTooltip content={cellValue}>
                     <P1 className={computedClassName}>{displayValue}</P1>

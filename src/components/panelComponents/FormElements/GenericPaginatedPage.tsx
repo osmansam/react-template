@@ -718,17 +718,7 @@ export default function GenericPaginatedPage({
         }
 
         if (columnConfig?.type === "image") {
-          rowKey.node = (row: GenericItem) => {
-            const v = row[f.name];
-            if (!v) return <span>-</span>;
-            return (
-              <img
-                src={String(v)}
-                alt={f.name}
-                className="h-10 w-10 rounded-full object-cover"
-              />
-            );
-          };
+          rowKey.isImage = true;
           return rowKey;
         }
 
