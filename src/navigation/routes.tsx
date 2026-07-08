@@ -1,15 +1,17 @@
 import { useMemo } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { useDynamicPages } from "../hooks/useDynamicPages";
 import GoogleCallback from "../pages/GoogleCallback";
 import Login from "../pages/Login";
 import { allRoutes, PublicRoutes } from "./constants";
+import { getPreferredLandingPath } from "./landingRoute";
 import { PrivateRoutes } from "./PrivateRoutes";
 
 interface RouteConfig {
   name: string;
   path?: string;
   isOnSidebar: boolean;
+  isMainPage?: boolean;
   icon?: string;
   element?: () => JSX.Element;
   children?: RouteConfig[];
@@ -44,6 +46,12 @@ const RouterContainer = () => {
     return routes;
   }, [combinedRoutes]);
 
+  const landingPath = useMemo(
+    () => getPreferredLandingPath(combinedRoutes),
+    [combinedRoutes]
+  );
+  const tenantLandingPath = landingPath.replace(/^\/+/, "") || ".";
+
   // Show loading screen while fetching dynamic pages to prevent 404 flash
   if (isLoading) {
     return (
@@ -73,6 +81,10 @@ const RouterContainer = () => {
 
         {/* Private routes */}
         <Route element={<PrivateRoutes />}>
+          <Route
+            index
+            element={<Navigate to={tenantLandingPath} replace />}
+          />
           {flattenedRoutes.map((route) => (
             <Route
               key={route.path}
@@ -102,6 +114,7 @@ const RouterContainer = () => {
       {/* Legacy routes without tenant/project (for backward compatibility) */}
       <Route path={PublicRoutes.Login} element={<Login />} />
       <Route element={<PrivateRoutes />}>
+        <Route index element={<Navigate to={landingPath} replace />} />
         {flattenedRoutes.map((route) => (
           <Route
             key={`legacy-${route.path}`}

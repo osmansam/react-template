@@ -209,6 +209,7 @@ export interface ContainerModel {
   dynamicApis: DynamicApiModel[];
   isAuthContainer?: boolean;
   isRegisterActive?: boolean;
+  isGoogleLoginActive?: boolean;
   populationArray?: Population[];
   populatedRoutes: string[];
   indexes?: Index[]; // MongoDB indexes for performance
@@ -252,6 +253,7 @@ export interface CreateContainerPayload {
   dynamicApis?: DynamicApiModel[];
   isAuthContainer?: boolean;
   isRegisterActive?: boolean;
+  isGoogleLoginActive?: boolean;
   populatedRoutes?: string[];
   indexes?: Index[];
   rowAccess?: RowAccessRule;
@@ -266,6 +268,7 @@ export interface UpdateContainerPayload {
   indexes?: Index[];
   rowAccess?: RowAccessRule;
   isRegisterActive?: boolean;
+  isGoogleLoginActive?: boolean;
 }
 
 export interface UpdateDynamicFunctionsPayload {
@@ -466,6 +469,8 @@ export function useContainers(enabled: boolean = true) {
       container.IsAuthContainer ?? container.isAuthContainer ?? false,
     isRegisterActive:
       container.IsRegisterActive ?? container.isRegisterActive ?? false,
+    isGoogleLoginActive:
+      container.IsGoogleLoginActive ?? container.isGoogleLoginActive ?? false,
     populatedRoutes:
       container.PopulatedRoutes || container.populatedRoutes || [],
     indexes: container.Indexes || container.indexes,
@@ -542,6 +547,8 @@ export function useContainer(id: string, enabled: boolean = true) {
       container.IsAuthContainer ?? container.isAuthContainer ?? false,
     isRegisterActive:
       container.IsRegisterActive ?? container.isRegisterActive ?? false,
+    isGoogleLoginActive:
+      container.IsGoogleLoginActive ?? container.isGoogleLoginActive ?? false,
     populatedRoutes:
       container.PopulatedRoutes || container.populatedRoutes || [],
     indexes: container.Indexes || container.indexes,

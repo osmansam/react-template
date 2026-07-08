@@ -1,13 +1,19 @@
+import { useQueryClient } from "@tanstack/react-query";
 import Cookies from "js-cookie";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import {
+  redirectAfterGoogleLogin,
+  refreshAfterGoogleLogin,
+} from "./googleCallbackAuth";
 
 const GoogleCallback = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const hasProcessedCallback = useRef(false);
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
   );
@@ -15,6 +21,9 @@ const GoogleCallback = () => {
 
   useEffect(() => {
     const handleCallback = async () => {
+      if (hasProcessedCallback.current) return;
+      hasProcessedCallback.current = true;
+
       try {
         // Check if this page was opened in a popup (has window.opener)
         const isPopup = window.opener && !window.opener.closed;
@@ -42,7 +51,7 @@ const GoogleCallback = () => {
         if (accessToken) {
           const userStr = searchParams.get("user");
           const user = userStr ? JSON.parse(userStr) : undefined;
-          handleLoginSuccess(accessToken, refreshToken, user, isPopup);
+          await handleLoginSuccess(accessToken, refreshToken, user, isPopup);
           return;
         }
 
@@ -79,7 +88,7 @@ const GoogleCallback = () => {
             const data = await response.json();
 
             if (data.status === 200 && data.data?.accessToken) {
-              handleLoginSuccess(
+              await handleLoginSuccess(
                 data.data.accessToken,
                 data.data.refreshToken,
                 data.data.user,
@@ -104,7 +113,7 @@ const GoogleCallback = () => {
           if (jsonMatch) {
             const data = JSON.parse(jsonMatch[0]);
             if (data.status === 200 && data.data?.accessToken) {
-              handleLoginSuccess(
+              await handleLoginSuccess(
                 data.data.accessToken,
                 data.data.refreshToken,
                 data.data.user,
@@ -145,7 +154,7 @@ const GoogleCallback = () => {
       }
     };
 
-    const handleLoginSuccess = (
+    const handleLoginSuccess = async (
       accessToken: string,
       refreshToken: string | null | undefined,
       user: unknown,
@@ -166,6 +175,8 @@ const GoogleCallback = () => {
       if (user) {
         localStorage.setItem("user", JSON.stringify(user));
       }
+
+      await refreshAfterGoogleLogin(queryClient);
 
       toast.success(t("Logged in successfully"));
 
@@ -188,16 +199,16 @@ const GoogleCallback = () => {
         const tenant = tIndex !== -1 ? pathParts[tIndex + 1] : "";
         const project = pIndex !== -1 ? pathParts[pIndex + 1] : "";
 
-        const redirectPath =
-          tenant && project ? `/t/${tenant}/p/${project}/` : "/";
+        const buildPath = (path: string) =>
+          tenant && project ? `/t/${tenant}/p/${project}${path}` : path;
 
-        setTimeout(() => navigate(redirectPath), 500);
+        setTimeout(() => redirectAfterGoogleLogin(buildPath), 500);
       }
     };
 
     // Small delay to ensure DOM is fully loaded
     setTimeout(handleCallback, 100);
-  }, [searchParams, navigate, t]);
+  }, [searchParams, queryClient, t]);
 
   return (
     <div className="flex items-center justify-center h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">

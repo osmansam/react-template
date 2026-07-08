@@ -48,20 +48,6 @@ export function useLogin(
   const { setUser } = useUserContext();
   const queryClient = useQueryClient();
   const { buildPath } = useTenantProject();
-  const routes = useFilteredRoutes();
-
-  // Get first available page path
-  const getFirstPagePath = () => {
-    for (const route of routes) {
-      if (route.children) {
-        const firstChild = route.children.find((child) => child.path);
-        if (firstChild?.path) return firstChild.path;
-      } else if (route.path) {
-        return route.path;
-      }
-    }
-    return "/";
-  };
 
   const { mutate: login } = useMutation<
     LoginResponse,
@@ -89,9 +75,8 @@ export function useLogin(
 
       toast.success(t("Logged in successfully"));
 
-      // Redirect to first page or provided redirect path
-      const firstPagePath = getFirstPagePath();
-      const target = redirectPath || buildPath(firstPagePath);
+      // Redirect to root so freshly loaded page routes choose the configured main page
+      const target = redirectPath || buildPath("/");
       navigate(target);
     },
 

@@ -18,6 +18,7 @@ export interface DynamicRoute {
   name: string;
   path?: string;
   isOnSidebar: boolean;
+  isMainPage?: boolean;
   icon?: string;
   element?: () => JSX.Element;
   children?: DynamicRoute[];
@@ -123,6 +124,7 @@ export const useDynamicPages = () => {
           name: page.name,
           path,
           isOnSidebar: page.isOnSidebar !== false,
+          isMainPage: page.isMainPage === true,
           icon: page.icon,
         };
 
@@ -143,6 +145,7 @@ export const useDynamicPages = () => {
                     name: page.name,
                     path,
                     isOnSidebar: page.isOnSidebar !== false,
+                    isMainPage: page.isMainPage === true,
                     icon: page.icon,
                     tabs: tabs.length > 0 ? tabs : undefined,
                     element: createPageElement(page),

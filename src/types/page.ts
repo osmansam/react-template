@@ -559,6 +559,7 @@ export interface PageModel {
   order?: number;
   isGroupOnly?: boolean;
   isOnSidebar?: boolean;
+  isMainPage?: boolean;
   isAuthenticated?: boolean;
   isAuthorized?: boolean;
   authorizeRole?: string[];

@@ -3,26 +3,27 @@ import Cookies from "js-cookie";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FcGoogle } from "react-icons/fc";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { GenericButton } from "../components/panelComponents/FormElements/GenericButton";
 import TextInput from "../components/panelComponents/FormElements/TextInput";
 import { H1, H5 } from "../components/panelComponents/Typography";
 import { useUserContext } from "../context/User.context";
-import { useFilteredRoutes } from "../hooks/useFilteredRoutes";
 import { useTenantProject } from "../hooks/useTenantProject";
 import { useLogin, useRegister } from "../utils/api/auth";
 import { ContainerModel, useGetContainers } from "../utils/api/container";
 import { getFieldLabel } from "../utils/genericPageHelpers";
+import {
+  redirectAfterGoogleLogin,
+  refreshAfterGoogleLogin,
+} from "./googleCallbackAuth";
 
 const Login = () => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
   const containers = useGetContainers();
   const { buildPath } = useTenantProject();
-  const routes = useFilteredRoutes();
   const [authContainer, setAuthContainer] = useState<ContainerModel | null>(
     null,
   );
@@ -106,27 +107,10 @@ const Login = () => {
           setUser(user);
         }
 
-        // Invalidate all queries to refetch with new token
-        queryClient.invalidateQueries().then(() => {
+        refreshAfterGoogleLogin(queryClient).then(() => {
           toast.success(t("Logged in successfully"));
 
-          // Get first available page path
-          const getFirstPagePath = () => {
-            for (const route of routes) {
-              if (route.children) {
-                const firstChild = route.children.find((child) => child.path);
-                if (firstChild?.path) return firstChild.path;
-              } else if (route.path) {
-                return route.path;
-              }
-            }
-            return "/";
-          };
-
-          // Redirect to first page with tenant/project context
-          const firstPagePath = getFirstPagePath();
-          const redirectPath = buildPath(firstPagePath);
-          navigate(redirectPath);
+          redirectAfterGoogleLogin(buildPath);
 
           // Close popup
           if (popup) popup.close();
@@ -221,6 +205,7 @@ const Login = () => {
             </GenericButton>
           </form>
 
+          {authContainer.isGoogleLoginActive && (
           <div className="mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -243,6 +228,7 @@ const Login = () => {
               </button>
             </div>
           </div>
+          )}
         </div>
         <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
           {authContainer.isRegisterActive ? (
