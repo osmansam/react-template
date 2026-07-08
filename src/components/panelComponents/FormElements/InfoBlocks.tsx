@@ -13,6 +13,8 @@ type InfoBlocksProps = {
   config?: InfoBlocksConfig;
   dataBinding?: DataBinding;
   resolvedParams?: Record<string, unknown>;
+  sourceRevision?: string;
+  enabled?: boolean;
 };
 
 const CURATED_COLORS = [
@@ -28,7 +30,13 @@ const CURATED_COLORS = [
   "#6366f1", // Indigo Light
 ];
 
-const InfoBlocks: React.FC<InfoBlocksProps> = ({ config, dataBinding, resolvedParams }) => {
+const InfoBlocks: React.FC<InfoBlocksProps> = ({
+  config,
+  dataBinding,
+  resolvedParams,
+  sourceRevision = "",
+  enabled = true,
+}) => {
   const source = config?.source || "static";
   const isDynamic = config?.isDynamic || false;
   const limit = isDynamic ? (config?.dynamicLimit || 50) : 1;
@@ -52,6 +60,8 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({ config, dataBinding, resolvedPa
       : {},
     {},
     resolvedParams,
+    sourceRevision,
+    enabled && shouldFetchTable,
   );
 
   const workflowData = useGetWorkflowData<Record<string, unknown>>(
@@ -63,6 +73,8 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({ config, dataBinding, resolvedPa
         }
       : {},
     resolvedParams,
+    sourceRevision,
+    enabled && source === "workflow",
   );
 
   const context = useMemo<Record<string, unknown>>(() => {

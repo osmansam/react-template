@@ -2,11 +2,18 @@ import { useMemo, useState } from "react";
 import { IconType } from "react-icons";
 // import { GiGreatPyramid } from "react-icons/gi";
 import { useGeneralContext } from "../../../context/General.context";
-import { DataBinding, TableComponentConfig } from "../../../types/page";
+import type {
+  ComponentBlock,
+  ComponentOutputDefinition,
+  DataBinding,
+  TableComponentConfig,
+} from "../../../types/page";
+import { ComponentRequestBoundary } from "../../../pageRuntime/ComponentRequestBoundary";
 import { getIconByName } from "../../../utils/menuIcons";
 import UnifiedTabPanel from "../TabPanel/UnifiedTabPanel";
 import GenericPaginatedPage from "./GenericPaginatedPage";
 import GenericUnpaginatedPage from "./GenericUnpaginatedPage";
+import { buildTabInstanceKey } from "./tabInstanceKey";
 
 type TabConfig = {
   schemaName: string;
@@ -21,6 +28,12 @@ type TabConfig = {
   customTitle?: string;
   tableConfig?: TableComponentConfig;
   dataBinding?: DataBinding;
+  componentId?: string;
+  outputs?: ComponentOutputDefinition[];
+  instanceKey?: string;
+  component?: ComponentBlock;
+  resolvedParams?: Record<string, unknown>;
+  sourceRevision?: string;
 };
 
 type Props = {
@@ -37,6 +50,50 @@ const humanize = (key: string) =>
     .trim()
     .replace(/^./, (c) => c.toUpperCase());
 
+const PaginatedTabContent = ({
+  tab,
+  instanceKey,
+  label,
+}: {
+  tab: TabConfig;
+  instanceKey: string;
+  label: string;
+}) => {
+  const renderPage = (
+    resolvedParams = tab.resolvedParams,
+    sourceRevision = tab.sourceRevision,
+  ) => (
+    <GenericPaginatedPage
+      key={instanceKey}
+      schemaName={tab.schemaName}
+      includeFields={tab.includeFields}
+      excludeFields={tab.excludeFields}
+      actionsEnabled={tab.actionsEnabled ?? true}
+      constantFilter={tab.constantFilter}
+      customTitle={tab.customTitle || label}
+      tableConfig={tab.tableConfig}
+      dataBinding={tab.dataBinding}
+      componentId={tab.componentId}
+      outputs={tab.outputs}
+      resolvedParams={resolvedParams}
+      sourceRevision={sourceRevision}
+    />
+  );
+
+  return tab.component ? (
+    <ComponentRequestBoundary component={tab.component}>
+      {({ values, sourceRevisionFor }) =>
+        renderPage(
+          values,
+          sourceRevisionFor(tab.dataBinding?.schemaName || tab.schemaName),
+        )
+      }
+    </ComponentRequestBoundary>
+  ) : (
+    renderPage()
+  );
+};
+
 export default function GenericTabPage({
   tabs,
   allowOrientationToggle = true,
@@ -48,6 +105,7 @@ export default function GenericTabPage({
       tabs.map((t, idx) => {
         const label = t.label ?? humanize(t.schemaName);
         const isPaginated = t.isPaginated ?? true; // Default to true
+        const instanceKey = buildTabInstanceKey({ ...t, label }, idx);
 
         // Get icon from iconName string or use the icon prop
         let iconElement = undefined;
@@ -64,18 +122,15 @@ export default function GenericTabPage({
           icon: iconElement,
           isDisabled: false,
           content: isPaginated ? (
-            <GenericPaginatedPage
-              schemaName={t.schemaName}
-              includeFields={t.includeFields}
-              excludeFields={t.excludeFields}
-              actionsEnabled={t.actionsEnabled ?? true}
-              constantFilter={t.constantFilter}
-              customTitle={t.customTitle || label}
-              tableConfig={t.tableConfig}
-              dataBinding={t.dataBinding}
+            <PaginatedTabContent
+              key={instanceKey}
+              tab={t}
+              instanceKey={instanceKey}
+              label={label}
             />
           ) : (
             <GenericUnpaginatedPage
+              key={instanceKey}
               schemaName={t.schemaName}
               includeFields={t.includeFields}
               excludeFields={t.excludeFields}

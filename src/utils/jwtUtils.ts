@@ -57,17 +57,9 @@ export function isTokenExpired(token: string): boolean {
 export function validateTokenForTenantProject(
   token: string,
   urlTenantSlug: string,
-  urlProjectSlug: string
+  urlProjectSlug: string,
 ): boolean {
   const decoded = decodeJWT(token);
-
-  console.log("🔍 JWT Validation:", {
-    urlTenantSlug,
-    urlProjectSlug,
-    tokenTenantSlug: decoded?.tenantSlug,
-    tokenProjectSlug: decoded?.projectSlug,
-    decoded,
-  });
 
   if (!decoded) {
     console.warn("❌ Failed to decode JWT");

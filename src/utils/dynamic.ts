@@ -6,8 +6,15 @@ import { useGet } from "../utils/api/factory";
 import { axiosClient } from "./api/axiosClient";
 import {
   DynamicTableSourceBinding,
+  getDynamicItemsQueryEntries,
+  getDynamicItemsQueryKey,
+  getTableSourceQueryEntries,
   getTableSourceQueryKey,
+  normalizeJsonRequestValue,
+  normalizeQueryEntries,
+  serializeQueryEntries,
 } from "./dynamicQueryKeys";
+import { canonicalizeRuntimeValue } from "../pageRuntime/pageParameterResolver";
 
 export interface DynamicPayload<T> {
   items: T[];
@@ -606,6 +613,7 @@ export function useExportDynamicItems() {
 export function useGetDynamicItems<T>(
   schemaName: string,
   filters?: FormElementsState,
+  sourceRevision = "",
 ) {
   const parts = [`schemaName=${schemaName}`];
 
@@ -635,10 +643,15 @@ export function useGetDynamicItems<T>(
   }
 
   const queryString = parts.join("&");
-  const path = `${BASE}?${queryString}`;
-  const queryKey = filters
-    ? (["dynamic", schemaName, "all", filters] as const)
-    : listKey(schemaName);
+  const queryEntries = getDynamicItemsQueryEntries(schemaName, filters);
+  const path = sourceRevision
+    ? `${BASE}?${serializeQueryEntries(queryEntries)}`
+    : `${BASE}?${queryString}`;
+  const queryKey = getDynamicItemsQueryKey(
+    schemaName,
+    filters,
+    sourceRevision,
+  );
   return useGet<T[]>(path, queryKey);
 }
 
@@ -711,82 +724,53 @@ export function useGetTableSourceItems<T>(
   binding: TableSourceBinding,
   filters: FormElementsState,
   resolvedParams?: Record<string, unknown>,
+  sourceRevision = "",
+  enabled = true,
 ) {
-  const sourceType = binding.kind || "schema";
   const schemaName = binding.schemaName || "";
   const baseQueryUrl = `${BASE}/table-source`;
-  const mergedParams = { ...(binding.params || {}), ...(resolvedParams || {}) };
-  const queryKey = getTableSourceQueryKey(
+  const queryEntries = getTableSourceQueryEntries(
     page,
     limit,
     binding,
     filters,
     resolvedParams,
   );
-
-  const parts = [
-    `schemaName=${schemaName}`,
-    `sourceType=${sourceType}`,
-    binding.pipelineName && `pipelineName=${encodeURIComponent(binding.pipelineName)}`,
-    binding.workflowName && `workflowName=${encodeURIComponent(binding.workflowName)}`,
-    binding.fields?.length && `fields=${encodeURIComponent(binding.fields.join(","))}`,
-    `page=${page}`,
-    `limit=${limit}`,
-    filters.sort && `sort=${filters.sort}`,
-    filters.asc !== undefined && `asc=${filters.asc}`,
-    filters.search &&
-      `search=${
-        typeof filters.search === "string"
-          ? filters.search.trim()
-          : filters.search
-      }`,
-  ];
-
-  Object.entries({ ...mergedParams, ...filters }).forEach(
-    ([key, value]) => {
-      if (
-        !["sort", "asc", "search"].includes(key) &&
-        value !== undefined &&
-        value !== null &&
-        value !== ""
-      ) {
-        if (Array.isArray(value)) {
-          value.forEach((item) => {
-            if (item !== undefined && item !== null && item !== "") {
-              const trimmedItem =
-                typeof item === "string" ? item.trim() : String(item);
-              parts.push(`${key}=${encodeURIComponent(trimmedItem)}`);
-            }
-          });
-        } else if (value instanceof Date) {
-          parts.push(`${key}=${value.toISOString()}`);
-        } else {
-          const trimmedValue =
-            typeof value === "string" ? value.trim() : String(value);
-          parts.push(`${key}=${encodeURIComponent(trimmedValue)}`);
-        }
-      }
-    },
+  const queryKey = getTableSourceQueryKey(
+    page,
+    limit,
+    binding,
+    filters,
+    resolvedParams,
+    sourceRevision,
   );
 
-  const queryString = parts.filter(Boolean).join("&");
+  const queryString = serializeQueryEntries(queryEntries);
   const url = `${baseQueryUrl}?${queryString}`;
-  return useGet<DynamicPayload<T>>(url, queryKey, Boolean(schemaName));
+  return useGet<DynamicPayload<T>>(
+    url,
+    queryKey,
+    enabled && Boolean(schemaName),
+  );
 }
 
 export function useGetWorkflowData<T>(
   binding: Pick<TableSourceBinding, "schemaName" | "workflowName" | "params">,
   resolvedParams?: Record<string, unknown>,
+  sourceRevision = "",
+  enabled = true,
 ) {
   const schemaName = binding.schemaName || "";
   const workflowName = binding.workflowName || "";
   const mergedParams = { ...(binding.params || {}), ...(resolvedParams || {}) };
+  const normalizedRecord = normalizeJsonRequestValue(mergedParams);
   const queryKey = [
     "dynamic",
     schemaName,
     "workflow",
     workflowName,
-    mergedParams,
+    sourceRevision,
+    canonicalizeRuntimeValue(normalizedRecord),
   ] as const;
 
   const { data } = useQuery({
@@ -796,7 +780,7 @@ export function useGetWorkflowData<T>(
         `${BASE}/workflow/${encodeURIComponent(workflowName)}?${qs({
           schemaName,
         })}`,
-        { record: mergedParams },
+        { record: normalizedRecord },
         {
           headers: {
             "Content-Type": "application/json",
@@ -805,7 +789,7 @@ export function useGetWorkflowData<T>(
       );
       return response.data;
     },
-    enabled: Boolean(schemaName && workflowName),
+    enabled: enabled && Boolean(schemaName && workflowName),
   });
 
   return data?.data;
@@ -816,11 +800,20 @@ export function useGetSelection<T>(
   schemaName: string,
   fieldName: string,
   valueField?: string,
+  resolvedParams?: Record<string, unknown>,
+  sourceRevision = "",
+  requestEnabled = true,
 ) {
   // Only enable the request if both schemaName and fieldName are provided
-  const enabled = Boolean(schemaName && fieldName);
+  const enabled = requestEnabled && Boolean(schemaName && fieldName);
 
-  const path = `${BASE}/selection?${qs({ schemaName, fieldName, valueField })}`;
+  const queryEntries = normalizeQueryEntries({
+    ...(resolvedParams || {}),
+    schemaName,
+    fieldName,
+    valueField,
+  });
+  const path = `${BASE}/selection?${serializeQueryEntries(queryEntries)}`;
 
   const queryKey = [
     "dynamic",
@@ -828,6 +821,8 @@ export function useGetSelection<T>(
     "selection",
     fieldName || "",
     valueField || "",
+    sourceRevision,
+    canonicalizeRuntimeValue(queryEntries),
   ] as const;
 
   const data = useGet<T>(path, queryKey, enabled);
@@ -840,16 +835,23 @@ export function useGetPipeline<T>(
   schemaName: string,
   pipelineName: string,
   additionalParams?: Record<string, unknown>,
+  resolvedParams?: Record<string, unknown>,
+  sourceRevision = "",
+  requestEnabled = true,
 ) {
-  const hasParams = Boolean(schemaName && pipelineName);
-
-  const params: Record<string, unknown> = {
-    schemaName,
-    pipelineName,
-    ...additionalParams,
+  const hasParams = requestEnabled && Boolean(schemaName && pipelineName);
+  const requestParams = {
+    ...(additionalParams || {}),
+    ...(resolvedParams || {}),
   };
 
-  const queryString = qs(params);
+  const queryEntries = normalizeQueryEntries({
+    ...requestParams,
+    schemaName,
+    pipelineName,
+  });
+
+  const queryString = serializeQueryEntries(queryEntries);
   const path = `${BASE}/pipeline?${queryString}`;
 
   const queryKey = [
@@ -857,7 +859,8 @@ export function useGetPipeline<T>(
     schemaName || "",
     "pipeline",
     pipelineName || "",
-    additionalParams || {},
+    sourceRevision,
+    canonicalizeRuntimeValue(queryEntries),
   ] as const;
 
   const enabled = hasParams;
