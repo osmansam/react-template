@@ -9,6 +9,98 @@ export type BindingKind =
   | "api"
   | "function";
 
+export type RuntimeValueType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "date"
+  | "dateRange"
+  | "stringArray"
+  | "numberArray";
+
+export interface PageVariableDefinition {
+  id: string;
+  key: string;
+  type: RuntimeValueType;
+  initialValue?: unknown;
+}
+
+export interface PageFilterPlacement {
+  kind: "navbar" | "cell";
+  cellId?: string;
+}
+
+export interface PageFilterDefinition {
+  id: string;
+  key: string;
+  label: string;
+  type: RuntimeValueType;
+  defaultValue?: unknown;
+  defaultPreset?:
+    | "today"
+    | "yesterday"
+    | "tomorrow"
+    | "thisWeek"
+    | "lastWeek"
+    | "thisMonth"
+    | "lastMonth"
+    | "thisYear"
+    | "lastYear";
+  arraySerialization?: "comma" | "repeat";
+  placement: PageFilterPlacement;
+}
+
+export type ComponentOutputSource =
+  | {
+      kind: "tableFilter";
+      filterId: string;
+    }
+  | {
+      kind: "tableSelectedIds";
+    }
+  | {
+      kind: "tableSearch";
+    };
+
+export interface ComponentOutputDefinition {
+  id: string;
+  key: string;
+  type: RuntimeValueType;
+  source: ComponentOutputSource;
+}
+
+export type ParameterBinding =
+  | {
+      source: "static";
+      value: unknown;
+    }
+  | {
+      source: "pageFilter";
+      filterId: string;
+      field?: "value" | "start" | "end" | "preset" | "timezone";
+    }
+  | {
+      source: "pageVariable";
+      variableId: string;
+    }
+  | {
+      source: "componentOutput";
+      componentId: string;
+      outputId: string;
+      field?: "start" | "end" | "preset" | "timezone";
+    }
+  | {
+      source: "system";
+      value: "today" | "thisWeek" | "thisMonth" | "thisYear" | "now";
+      field?: "start" | "end";
+    }
+  | {
+      source: "derived";
+      input: ParameterBinding;
+      transform: "previousCalendarPeriod" | "previousEqualDuration";
+      field?: "start" | "end";
+    };
+
 export interface DataBinding {
   kind: BindingKind;
   schemaName?: string;
@@ -16,8 +108,8 @@ export interface DataBinding {
   workflowName?: string;
   apiName?: string;
   functionName?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
+  parameters?: Record<string, ParameterBinding>;
 }
 
 export interface GroupBy {
@@ -145,6 +237,7 @@ export interface TableActionFormOptionConfig {
 }
 
 export interface TableActionFormFieldConfig {
+  id?: string;
   formKey: string;
   type: TableActionInputType;
   formKeyType?: TableActionFormKeyType;
@@ -397,10 +490,12 @@ export type TabPanelTab = TabContent;
 
 export interface ComponentBlock {
   id: string;
+  stateKey?: string;
   type: ComponentType;
   title?: string;
   order?: number;
   dataBinding?: DataBinding;
+  outputs?: ComponentOutputDefinition[];
   groupBy?: GroupBy; // Grouping configuration for table components
   table?: TableComponentConfig;
   form?: FormComponentConfig;
@@ -457,6 +552,8 @@ export interface PageModel {
   _id?: string;
   parentPageId?: string;
   name: string;
+  variables?: PageVariableDefinition[];
+  filters?: PageFilterDefinition[];
   icon?: string;
   slug?: string;
   order?: number;

@@ -11,11 +11,18 @@ import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
 import { FormElementsState } from "../../../types";
 import {
+  ComponentOutputDefinition,
   DataBinding,
   TableActionConfig,
   TableActionFormFieldConfig,
   TableComponentConfig,
 } from "../../../types/page";
+import { usePageRuntimeStore } from "../../../pageRuntime/PageRuntimeProvider";
+import {
+  resolveSelectedRowIds,
+  resolveTableOutput,
+  TableOutputState,
+} from "../../../pageRuntime/tableOutputAdapter";
 import { UpdatePayload, get } from "../../../utils/api";
 import {
   ContainerModel,
@@ -312,6 +319,49 @@ type Props = {
   customTitle?: string;
   tableConfig?: TableComponentConfig;
   dataBinding?: DataBinding;
+  componentId?: string;
+  outputs?: ComponentOutputDefinition[];
+  resolvedParams?: Record<string, unknown>;
+  sourceRevision?: string;
+};
+
+const TableOutputPublisher = ({
+  componentId,
+  outputs,
+  state,
+}: {
+  componentId: string;
+  outputs: ComponentOutputDefinition[];
+  state: TableOutputState;
+}) => {
+  const store = usePageRuntimeStore();
+
+  useEffect(() => {
+    outputs.forEach((output) => {
+      const runtimeValue = resolveTableOutput(output, state);
+      if (runtimeValue.status === "available") {
+        store.publishOutput(
+          componentId,
+          componentId,
+          output.id,
+          runtimeValue.value,
+        );
+      } else {
+        store.markOutputUnavailable(componentId, componentId, output.id);
+      }
+    });
+  }, [componentId, outputs, state, store]);
+
+  useEffect(
+    () => () => {
+      outputs.forEach((output) => {
+        store.markOutputUnavailable(componentId, componentId, output.id);
+      });
+    },
+    [componentId, outputs, store],
+  );
+
+  return null;
 };
 
 export default function GenericPaginatedPage({
@@ -324,6 +374,10 @@ export default function GenericPaginatedPage({
   tableConfig,
   customTitle,
   dataBinding,
+  componentId,
+  outputs,
+  resolvedParams,
+  sourceRevision = "",
 }: Props) {
   const { t } = useTranslation();
   const { rowsPerPage } = useGeneralContext();
@@ -334,6 +388,15 @@ export default function GenericPaginatedPage({
   // Local selection state for this table instance
   const [selectedRows, setSelectedRows] = useState<GenericItem[]>([]);
   const [isSelectionActive, setIsSelectionActive] = useState(false);
+  const [isSelectionInitialized, setIsSelectionInitialized] = useState(false);
+  const handleSelectedRowsChange = useCallback((nextRows: GenericItem[]) => {
+    setIsSelectionInitialized(true);
+    setSelectedRows(nextRows);
+  }, []);
+  const handleSelectionActiveChange = useCallback((nextActive: boolean) => {
+    setIsSelectionInitialized(true);
+    setIsSelectionActive(nextActive);
+  }, []);
 
   const container: ContainerModel | undefined = useMemo(() => {
     if (!rawContainers) return undefined;
@@ -382,7 +445,37 @@ export default function GenericPaginatedPage({
     [container?.fields, dataBinding, schemaName, tableConfig],
   );
   const schemaActionsEnabled = actionsEnabled && tableBinding.kind === "schema";
+  const effectiveSourceRevision = container?.updatedAt || sourceRevision;
   const configuredFilterInputs = tableConfig?.filterPanel?.inputs;
+  const filtersById = useMemo(() => {
+    const normalized = Object.create(null) as Record<string, unknown>;
+    (configuredFilterInputs || []).forEach((filter) => {
+      if (
+        typeof filter.id === "string" &&
+        filter.id.length > 0 &&
+        filter.formKey &&
+        Object.hasOwn(filterPanelFormElements, filter.formKey)
+      ) {
+        normalized[filter.id] = filterPanelFormElements[filter.formKey];
+      }
+    });
+    return normalized;
+  }, [configuredFilterInputs, filterPanelFormElements]);
+  const selectedIds = useMemo(
+    () => resolveSelectedRowIds(selectedRows, isSelectionInitialized),
+    [isSelectionInitialized, selectedRows],
+  );
+  const tableOutputState = useMemo<TableOutputState>(
+    () => ({
+      filters: filtersById,
+      search:
+        typeof filterPanelFormElements.search === "string"
+          ? filterPanelFormElements.search
+          : String(filterPanelFormElements.search ?? ""),
+      selectedIds,
+    }),
+    [filterPanelFormElements.search, filtersById, selectedIds],
+  );
   const filterSelectionDataMap = useFilterPanelSelectionData(
     configuredFilterInputs,
   );
@@ -423,8 +516,17 @@ export default function GenericPaginatedPage({
         rowsPerPage,
         tableBinding,
         mergedFilters,
+        resolvedParams,
+        effectiveSourceRevision,
       ),
-    [currentPage, rowsPerPage, tableBinding, mergedFilters],
+    [
+      currentPage,
+      effectiveSourceRevision,
+      mergedFilters,
+      resolvedParams,
+      rowsPerPage,
+      tableBinding,
+    ],
   );
 
   const {
@@ -1014,6 +1116,8 @@ export default function GenericPaginatedPage({
     rowsPerPage,
     tableBinding,
     mergedFilters,
+    resolvedParams,
+    effectiveSourceRevision,
   );
 
   const rows = useMemo(() => itemsPayload?.items || [], [itemsPayload?.items]);
@@ -2087,6 +2191,13 @@ export default function GenericPaginatedPage({
 
   return (
     <>
+      {componentId && outputs && outputs.length > 0 && (
+        <TableOutputPublisher
+          componentId={componentId}
+          outputs={outputs}
+          state={tableOutputState}
+        />
+      )}
       {isHeader && <Header />}
       <div className="w-full mx-auto">
         <GenericTable
@@ -2117,9 +2228,9 @@ export default function GenericPaginatedPage({
           filterPanel={filterPanel}
           containerFields={container?.fields}
           localSelectedRows={selectedRows}
-          localSetSelectedRows={setSelectedRows}
+          localSetSelectedRows={handleSelectedRowsChange}
           localIsSelectionActive={isSelectionActive}
-          localSetIsSelectionActive={setIsSelectionActive}
+          localSetIsSelectionActive={handleSelectionActiveChange}
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />

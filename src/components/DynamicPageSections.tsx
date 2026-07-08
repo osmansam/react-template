@@ -5,15 +5,24 @@ import {
   GridCell,
   GridSection,
   InfoBlocksConfig,
+  PageFilterDefinition,
   PageSection,
   TabContent,
   TableComponentConfig,
 } from "../types/page";
+import {
+  ComponentRequestBoundary,
+  LoadingPanel,
+  NoticePanel,
+  type SourceRevisionResolver,
+} from "../pageRuntime/ComponentRequestBoundary";
+import PageFilterRenderer from "../pageRuntime/PageFilterRenderer";
 import { useGetSelection } from "../utils/dynamic";
 import { resolveRouteParamValue, RouteParams } from "../utils/routeParams";
 import type { ChartType } from "./charts/DynamicChart";
 import GenericPaginatedPage from "./panelComponents/FormElements/GenericPaginatedPage";
 import GenericTabPage from "./panelComponents/FormElements/GenericTabPage";
+import { canonicalizeTabKeyValue } from "./panelComponents/FormElements/tabInstanceKey";
 import DistributionBlocks from "./panelComponents/FormElements/DistributionBlocks";
 import InfoBlocks from "./panelComponents/FormElements/InfoBlocks";
 import UnifiedTabPanel from "./panelComponents/TabPanel/UnifiedTabPanel";
@@ -21,32 +30,6 @@ import UnifiedTabPanel from "./panelComponents/TabPanel/UnifiedTabPanel";
 const DynamicCalendar = lazy(() => import("./calendar/DynamicCalendar"));
 const DynamicChart = lazy(() => import("./charts/DynamicChart"));
 const DynamicForm = lazy(() => import("./forms/DynamicForm"));
-
-const LoadingPanel = ({ message }: { message: string }) => (
-  <div className="flex min-h-32 items-center justify-center rounded border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
-    {message}
-  </div>
-);
-
-const NoticePanel = ({
-  children,
-  tone = "warning",
-}: {
-  children: React.ReactNode;
-  tone?: "warning" | "error" | "empty";
-}) => {
-  const styles = {
-    warning: "border-yellow-200 bg-yellow-50 text-yellow-800",
-    error: "border-red-200 bg-red-50 text-red-700",
-    empty: "border-gray-200 bg-gray-50 text-gray-500",
-  };
-
-  return (
-    <div className={`rounded border p-4 text-sm ${styles[tone]}`}>
-      {children}
-    </div>
-  );
-};
 
 const getChartTypeFromComponentType = (
   componentType: string,
@@ -126,10 +109,18 @@ const MixedTabPanel: React.FC<{
   );
 };
 
-const RenderComponent: React.FC<{
+const RenderReadyComponent: React.FC<{
   component: ComponentBlock;
   routeParams: RouteParams;
-}> = React.memo(({ component, routeParams }) => {
+  resolvedParams: Record<string, unknown>;
+  sourceRevisionFor: SourceRevisionResolver;
+}> = React.memo(
+  ({
+    component,
+    routeParams,
+    resolvedParams,
+    sourceRevisionFor,
+  }) => {
   const { type, dataBinding, tabs, groupBy, title, props } = component;
   const resolvedDataBinding = useMemo(
     () => resolveRouteParamValue(dataBinding, routeParams),
@@ -180,10 +171,16 @@ const RenderComponent: React.FC<{
     Boolean(groupBySourceSchema) &&
     Boolean(groupByLabelField) &&
     Boolean(templateSchemaName);
+  const requestSourceRevision = sourceRevisionFor(
+    resolvedDataBinding?.schemaName,
+  );
   const selectionData = useGetSelection<Array<Record<string, unknown>>>(
     shouldFetchGrouping ? groupBySourceSchema : "",
     shouldFetchGrouping ? groupByLabelField : "",
     shouldFetchGrouping ? groupByValueField : "",
+    resolvedParams,
+    sourceRevisionFor(groupBySourceSchema),
+    shouldFetchGrouping,
   );
 
   switch (type) {
@@ -211,6 +208,10 @@ const RenderComponent: React.FC<{
           tableConfig={tableConfig}
           dataBinding={resolvedDataBinding}
           actionsEnabled={resolvedDataBinding.kind === "schema"}
+          componentId={component.id}
+          outputs={component.outputs}
+          resolvedParams={resolvedParams}
+          sourceRevision={requestSourceRevision}
         />
       ) : (
         <NoticePanel>
@@ -238,12 +239,27 @@ const RenderComponent: React.FC<{
           );
         }
 
-        const dynamicTabs = selectionData.map((item) => {
+        const dynamicTabKeys = new Set<string>();
+        const dynamicTabs = selectionData.map((item, index) => {
           const groupValue = item[groupByValueField] ?? item._id;
           const resolvedBaseBinding = resolveRouteParamValue(
             baseComponent.dataBinding,
             routeParams,
           );
+          const groupInstanceKey = `group:${canonicalizeTabKeyValue(
+            baseComponent.id || component.id,
+          )}:${canonicalizeTabKeyValue(groupValue)}`;
+          const itemId = Object.hasOwn(item, "_id") ? item._id : undefined;
+          const hasStableItemId =
+            (typeof itemId === "string" && itemId.length > 0) ||
+            (typeof itemId === "number" && Number.isFinite(itemId));
+          const candidateKey = hasStableItemId
+            ? `${groupInstanceKey}:item:${canonicalizeTabKeyValue(itemId)}`
+            : groupInstanceKey;
+          const instanceKey = dynamicTabKeys.has(candidateKey)
+            ? `${candidateKey}:index:${index}`
+            : candidateKey;
+          dynamicTabKeys.add(instanceKey);
           return {
             schemaName: resolvedBaseBinding!.schemaName!,
             label: String(item[groupByLabelField] ?? groupValue),
@@ -253,6 +269,14 @@ const RenderComponent: React.FC<{
               [groupByGroupedField]: groupValue,
             },
             dataBinding: resolvedBaseBinding,
+            componentId: baseComponent.id,
+            outputs: baseComponent.outputs,
+            instanceKey,
+            component: baseComponent.id ? baseComponent : undefined,
+            resolvedParams,
+            sourceRevision: sourceRevisionFor(
+              resolvedBaseBinding?.schemaName,
+            ),
             tableConfig: getTableConfig(
               baseComponent.table,
               baseComponent.props,
@@ -260,7 +284,7 @@ const RenderComponent: React.FC<{
           };
         });
 
-        const manualTabs = (tabs || []).map((tab: TabContent) => {
+        const manualTabs = (tabs || []).map((tab: TabContent, index) => {
           const tabComponent = tab.components[0];
           const tabBinding = resolveRouteParamValue(
             tabComponent?.dataBinding,
@@ -272,6 +296,14 @@ const RenderComponent: React.FC<{
             customTitle: tabComponent?.title || tab.title,
             isPaginated: true,
             dataBinding: tabBinding,
+            componentId: tabComponent?.id,
+            outputs: tabComponent?.outputs,
+            component: tabComponent,
+            resolvedParams,
+            sourceRevision: sourceRevisionFor(tabBinding?.schemaName),
+            instanceKey: tabComponent?.id
+              ? `component:${canonicalizeTabKeyValue(tabComponent.id)}`
+              : `manual:${canonicalizeTabKeyValue(tab.title)}:index:${index}`,
             tableConfig: getTableConfig(
               tabComponent?.table,
               tabComponent?.props,
@@ -292,7 +324,7 @@ const RenderComponent: React.FC<{
         if (allTabsAreTables) {
           return (
             <GenericTabPage
-              tabs={tabs.map((tab) => {
+              tabs={tabs.map((tab, index) => {
                 const tabComponent = tab.components[0];
                 const tabBinding = resolveRouteParamValue(
                   tabComponent?.dataBinding,
@@ -304,6 +336,16 @@ const RenderComponent: React.FC<{
                   customTitle: tabComponent?.title || tab.title,
                   isPaginated: true,
                   dataBinding: tabBinding,
+                  componentId: tabComponent?.id,
+                  outputs: tabComponent?.outputs,
+                  component: tabComponent,
+                  resolvedParams,
+                  sourceRevision: sourceRevisionFor(tabBinding?.schemaName),
+                  instanceKey: tabComponent?.id
+                    ? `component:${canonicalizeTabKeyValue(tabComponent.id)}`
+                    : `manual:${canonicalizeTabKeyValue(
+                        tab.title,
+                      )}:index:${index}`,
                   tableConfig: getTableConfig(
                     tabComponent?.table,
                     tabComponent?.props,
@@ -327,6 +369,7 @@ const RenderComponent: React.FC<{
         resolvedDataBinding.schemaName ? (
         <Suspense fallback={<LoadingPanel message="Loading calendar..." />}>
           <DynamicCalendar
+            sourceRevision={requestSourceRevision}
             config={{
               title,
               height: props?.height as number | undefined,
@@ -368,6 +411,8 @@ const RenderComponent: React.FC<{
         <InfoBlocks
           config={props?.infoBlocks as InfoBlocksConfig | undefined}
           dataBinding={resolvedDataBinding}
+          resolvedParams={resolvedParams}
+          sourceRevision={requestSourceRevision}
         />
       );
     case "distributionBlocks":
@@ -378,6 +423,8 @@ const RenderComponent: React.FC<{
             props?.distributionBlocks as DistributionBlocksConfig | undefined
           }
           dataBinding={resolvedDataBinding}
+          resolvedParams={resolvedParams}
+          sourceRevision={requestSourceRevision}
         />
       );
     case "barChart":
@@ -409,6 +456,8 @@ const RenderComponent: React.FC<{
       return hasBinding ? (
         <Suspense fallback={<LoadingPanel message="Loading chart..." />}>
           <DynamicChart
+            resolvedParams={resolvedParams}
+            sourceRevision={requestSourceRevision}
             config={{
               type: chartType,
               title,
@@ -440,13 +489,72 @@ const RenderComponent: React.FC<{
   }
 });
 
+const requestComponentTypes = new Set([
+  "table",
+  "tabPanel",
+  "calendar",
+  "infoBlocks",
+  "distributionBlocks",
+  "barChart",
+  "lineChart",
+  "pieChart",
+  "areaChart",
+  "radarChart",
+  "heatmapChart",
+  "scatterChart",
+  "funnelChart",
+  "sankeyChart",
+  "sunburstChart",
+  "treemapChart",
+  "calendarChart",
+  "bumpChart",
+  "streamChart",
+  "waffleChart",
+  "circlePackingChart",
+]);
+
+const RenderComponent: React.FC<{
+  component: ComponentBlock;
+  routeParams: RouteParams;
+}> = React.memo(({ component, routeParams }) => {
+  if (!requestComponentTypes.has(component.type)) {
+    return (
+      <RenderReadyComponent
+        component={component}
+        routeParams={routeParams}
+        resolvedParams={{}}
+        sourceRevisionFor={() => ""}
+      />
+    );
+  }
+
+  return (
+    <ComponentRequestBoundary component={component}>
+      {({ values, sourceRevisionFor }) => (
+        <RenderReadyComponent
+          component={component}
+          routeParams={routeParams}
+          resolvedParams={values}
+          sourceRevisionFor={sourceRevisionFor}
+        />
+      )}
+    </ComponentRequestBoundary>
+  );
+});
+
 const GridCellView: React.FC<{
   cell: GridCell;
+  pageFilters: PageFilterDefinition[];
   routeParams: RouteParams;
-}> = React.memo(({ cell, routeParams }) => {
+}> = React.memo(({ cell, pageFilters, routeParams }) => {
   const { row, column, rowSpan = 1, colSpan = 1, components } = cell;
   const sortedComponents = [...components].sort(
     (a, b) => (a.order ?? 0) - (b.order ?? 0),
+  );
+  const cellFilters = pageFilters.filter(
+    (filter) =>
+      filter.placement.kind === "cell" &&
+      filter.placement.cellId === cell.id,
   );
 
   return (
@@ -458,6 +566,13 @@ const GridCellView: React.FC<{
       }}
     >
       <div className="flex h-full flex-col">
+        {cellFilters.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-3">
+            {cellFilters.map((filter) => (
+              <PageFilterRenderer key={filter.id} filter={filter} />
+            ))}
+          </div>
+        )}
         {sortedComponents.map((component) => (
           <RenderComponent
             key={component.id}
@@ -472,8 +587,9 @@ const GridCellView: React.FC<{
 
 const GridSectionView: React.FC<{
   grid: GridSection;
+  pageFilters: PageFilterDefinition[];
   routeParams: RouteParams;
-}> = React.memo(({ grid, routeParams }) => {
+}> = React.memo(({ grid, pageFilters, routeParams }) => {
   const { columns, gap = 16, cells } = grid;
 
   if (!cells?.length) {
@@ -494,7 +610,12 @@ const GridSectionView: React.FC<{
       }}
     >
       {cells.map((cell) => (
-        <GridCellView key={cell.id} cell={cell} routeParams={routeParams} />
+        <GridCellView
+          key={cell.id}
+          cell={cell}
+          pageFilters={pageFilters}
+          routeParams={routeParams}
+        />
       ))}
     </div>
   );
@@ -514,8 +635,9 @@ const normalizeGrid = (section: PageSection): GridSection | null => {
 
 export const PageSectionView: React.FC<{
   section: PageSection;
+  pageFilters?: PageFilterDefinition[];
   routeParams: RouteParams;
-}> = ({ section, routeParams }) => {
+}> = ({ section, pageFilters = [], routeParams }) => {
   if (section.type === "component" && section.component) {
     return (
       <RenderComponent
@@ -542,7 +664,13 @@ export const PageSectionView: React.FC<{
 
   const grid = normalizeGrid(section);
   if (grid) {
-    return <GridSectionView grid={grid} routeParams={routeParams} />;
+    return (
+      <GridSectionView
+        grid={grid}
+        pageFilters={pageFilters}
+        routeParams={routeParams}
+      />
+    );
   }
 
   return (

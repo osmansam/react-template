@@ -43,6 +43,9 @@ export interface ChartConfig {
 
 interface DynamicChartProps {
   config: ChartConfig;
+  resolvedParams?: Record<string, unknown>;
+  sourceRevision?: string;
+  enabled?: boolean;
 }
 
 // Chart component mapping - dynamically import Nivo components
@@ -235,7 +238,12 @@ const getDefaultConfig = (type: ChartType): Record<string, unknown> => {
   }
 };
 
-export default function DynamicChart({ config }: DynamicChartProps) {
+export default function DynamicChart({
+  config,
+  resolvedParams,
+  sourceRevision = "",
+  enabled = true,
+}: DynamicChartProps) {
   const {
     type,
     schemaName: directSchemaName,
@@ -279,7 +287,12 @@ export default function DynamicChart({ config }: DynamicChartProps) {
   const pipelineData = useGetPipeline<unknown>(
     isWorkflow ? "" : schemaName,
     isWorkflow ? "" : pipelineName,
-    !isWorkflow && Object.keys(pipelineParams).length > 0 ? pipelineParams : undefined
+    !isWorkflow && Object.keys(pipelineParams).length > 0
+      ? pipelineParams
+      : undefined,
+    resolvedParams,
+    sourceRevision,
+    enabled && !isWorkflow,
   );
 
   const workflowData = useGetWorkflowData<unknown>(
@@ -290,7 +303,9 @@ export default function DynamicChart({ config }: DynamicChartProps) {
           params: pipelineParams,
         }
       : {},
-    pipelineParams,
+    resolvedParams,
+    sourceRevision,
+    enabled && isWorkflow,
   );
 
   const data = useMemo(() => {

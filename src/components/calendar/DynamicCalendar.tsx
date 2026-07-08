@@ -45,6 +45,7 @@ export interface CalendarConfig {
 
 interface DynamicCalendarProps {
   config: CalendarConfig;
+  sourceRevision?: string;
 }
 
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -86,7 +87,10 @@ const defaultFieldMappings = {
 
 type FormMode = "create" | "edit" | "view";
 
-const DynamicCalendar: React.FC<DynamicCalendarProps> = ({ config }) => {
+const DynamicCalendar: React.FC<DynamicCalendarProps> = ({
+  config,
+  sourceRevision = "",
+}) => {
   const {
     schemaName,
     fieldMappings = defaultFieldMappings,
@@ -112,7 +116,11 @@ const DynamicCalendar: React.FC<DynamicCalendarProps> = ({ config }) => {
   const [formData, setFormData] = useState<Partial<CalendarEvent>>({});
 
   // Fetch data from schema
-  const rawData = useGetDynamicItems<Record<string, unknown>>(schemaName, {});
+  const rawData = useGetDynamicItems<Record<string, unknown>>(
+    schemaName,
+    {},
+    sourceRevision,
+  );
   const { createDynamicItem, updateDynamicItem, deleteDynamicItem } =
     useDynamicCrud<CalendarEvent>(schemaName);
 

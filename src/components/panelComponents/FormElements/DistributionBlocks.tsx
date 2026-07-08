@@ -11,6 +11,8 @@ type DistributionBlocksProps = {
   config?: DistributionBlocksConfig;
   dataBinding?: DataBinding;
   resolvedParams?: Record<string, unknown>;
+  sourceRevision?: string;
+  enabled?: boolean;
 };
 
 const CURATED_COLORS = [
@@ -43,6 +45,8 @@ const DistributionBlocks: React.FC<DistributionBlocksProps> = ({
   config,
   dataBinding,
   resolvedParams,
+  sourceRevision = "",
+  enabled = true,
 }) => {
   const source = config?.source || "static";
   const isDynamic = config?.isDynamic || false;
@@ -67,6 +71,8 @@ const DistributionBlocks: React.FC<DistributionBlocksProps> = ({
       : {},
     {},
     resolvedParams,
+    sourceRevision,
+    enabled && shouldFetchTable,
   );
 
   const workflowData = useGetWorkflowData<Record<string, unknown>>(
@@ -78,6 +84,8 @@ const DistributionBlocks: React.FC<DistributionBlocksProps> = ({
         }
       : {},
     resolvedParams,
+    sourceRevision,
+    enabled && source === "workflow",
   );
 
   const context = useMemo<Record<string, unknown>>(() => {

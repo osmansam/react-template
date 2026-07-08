@@ -8,7 +8,8 @@
     "start": "vite",
     "build": "tsc && vite build",
     "serve": "vite preview",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest run"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -81,7 +82,8 @@
     "patch-package": "^8.0.1",
     "postinstall-postinstall": "^2.1.0",
     "typescript": "^5.2.2",
-    "vite": "^5.3.1"
+    "vite": "^5.3.1",
+    "vitest": "^2.1.9"
   },
   "resolutions": {
     "glob": "^11.0.0"

@@ -92,8 +92,8 @@ export const useDynamicPages = () => {
   );
 
   // Memoize element factory to prevent function recreation
-  const createPageElement = useCallback((sections: PageSection[] = []) => {
-    return () => <DynamicPageRenderer sections={sections} />;
+  const createPageElement = useCallback((page: PageModel) => {
+    return () => <DynamicPageRenderer page={page} sections={page.sections} />;
   }, []);
 
   // Helper to build hierarchical structure
@@ -131,7 +131,7 @@ export const useDynamicPages = () => {
         }
 
         if (!page.isGroupOnly && path) {
-          route.element = createPageElement(page.sections);
+          route.element = createPageElement(page);
         }
 
         if (childPages.length > 0) {
@@ -145,7 +145,7 @@ export const useDynamicPages = () => {
                     isOnSidebar: page.isOnSidebar !== false,
                     icon: page.icon,
                     tabs: tabs.length > 0 ? tabs : undefined,
-                    element: createPageElement(page.sections),
+                    element: createPageElement(page),
                   },
                 ]),
             ...childPages.map((childPage) => createRoute(childPage)),
