@@ -8,6 +8,7 @@ import { useFilteredRoutes } from "../../hooks/useFilteredRoutes";
 import { useTenantProject } from "../../hooks/useTenantProject";
 // import { Routes } from "../../navigation/constants";
 import { post } from "./index";
+import { redirectAfterAuth } from "./authRedirect";
 
 interface LoginError {
   response: {
@@ -75,9 +76,14 @@ export function useLogin(
 
       toast.success(t("Logged in successfully"));
 
-      // Redirect to root so freshly loaded page routes choose the configured main page
-      const target = redirectPath || buildPath("/");
-      navigate(target);
+      if (redirectPath) {
+        navigate(redirectPath);
+        return;
+      }
+
+      // Full page redirect reloads routes/containers with the new token, then the
+      // root route selects the configured main page.
+      redirectAfterAuth(buildPath);
     },
 
     onError,
