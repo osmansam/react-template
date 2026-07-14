@@ -48,7 +48,7 @@ export interface PageFilterParameterResolver {
   filterId: string;
   valueType: RuntimeValueType;
   arraySerialization?: "comma" | "repeat";
-  field?: "value" | "start" | "end" | "preset" | "timezone";
+  field?: "value" | "month" | "year" | "start" | "end" | "preset" | "timezone";
 }
 
 export type CompiledParameterResolver =

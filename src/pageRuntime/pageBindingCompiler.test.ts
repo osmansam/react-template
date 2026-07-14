@@ -162,6 +162,58 @@ describe("compileComponentParameters", () => {
     });
   });
 
+  it("compiles infoBlocks request parameter bindings", () => {
+    const infoBlocks = component("cmp_info", {
+      type: "infoBlocks",
+      dataBinding: {
+        kind: "pipeline",
+        schemaName: "order",
+        pipelineName: "monthlyOrderDashboard",
+        parameters: {
+          period: {
+            source: "pageFilter",
+            filterId: "pfl_period",
+            field: "month",
+          },
+        },
+      },
+      props: {
+        infoBlocks: {
+          source: "pipeline",
+          items: [],
+        },
+      },
+    });
+
+    const result = compileComponentParameters(
+      {
+        ...pageWith([infoBlocks]),
+        filters: [
+          {
+            id: "pfl_period",
+            key: "period",
+            label: "",
+            type: "monthYear",
+            defaultPreset: "currentMonthYear",
+            placement: { kind: "navbar" },
+          },
+        ],
+      },
+      "cmp_info",
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.dependencies).toEqual([
+      { kind: "pageFilter", filterId: "pfl_period" },
+    ]);
+    expect(result.resolvers.period).toEqual({
+      source: "pageFilter",
+      filterId: "pfl_period",
+      valueType: "monthYear",
+      field: "month",
+    });
+  });
+
   it("returns a structured error when the consumer component is missing", () => {
     const result = compileComponentParameters(
       pageWith([outputProducer]),

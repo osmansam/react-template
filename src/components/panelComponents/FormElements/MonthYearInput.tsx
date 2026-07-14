@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { IoIosClose } from "react-icons/io";
 import { IoChevronBackOutline, IoChevronForwardOutline } from "react-icons/io5";
 import { LuCalendar } from "react-icons/lu";
@@ -49,7 +50,14 @@ const MonthYearInput = ({
   isReadOnly = false,
 }: MonthYearInputProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState({
+    left: 0,
+    top: 0,
+    width: 288,
+  });
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   const { selectedMonth, selectedYear } = useMemo(() => {
     if (value) {
@@ -78,9 +86,11 @@ const MonthYearInput = ({
   // Close on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
       if (
         containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
+        !containerRef.current.contains(target) &&
+        !popoverRef.current?.contains(target)
       ) {
         setIsOpen(false);
       }
@@ -99,6 +109,37 @@ const MonthYearInput = ({
       return () => document.removeEventListener("keydown", handleKeyDown);
     }
   }, [isOpen]);
+
+  const updatePopoverPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger || typeof window === "undefined") return;
+
+    const rect = trigger.getBoundingClientRect();
+    const width = 288;
+    const viewportPadding = 8;
+    const left = Math.min(
+      Math.max(rect.left, viewportPadding),
+      window.innerWidth - width - viewportPadding,
+    );
+
+    setPopoverPosition({
+      left,
+      top: rect.bottom + 6,
+      width,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    updatePopoverPosition();
+    window.addEventListener("resize", updatePopoverPosition);
+    window.addEventListener("scroll", updatePopoverPosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePopoverPosition);
+      window.removeEventListener("scroll", updatePopoverPosition, true);
+    };
+  }, [isOpen, updatePopoverPosition]);
 
   const handleSelectMonth = useCallback(
     (monthIndex: number) => {
@@ -125,8 +166,80 @@ const MonthYearInput = ({
   const isCurrentMonth = (monthIndex: number) =>
     monthIndex + 1 === selectedMonth && viewYear === selectedYear;
 
+  const popover = (
+    <div
+      ref={popoverRef}
+      className={`
+        fixed z-[99999]
+        origin-top rounded-xl border border-neutral-200
+        bg-white p-4 shadow-xl shadow-neutral-900/8
+        transition-all duration-200 ease-out
+        ${
+          isOpen
+            ? "pointer-events-auto scale-100 opacity-100"
+            : "pointer-events-none scale-95 opacity-0"
+        }
+      `}
+      style={{
+        left: popoverPosition.left,
+        top: popoverPosition.top,
+        width: popoverPosition.width,
+      }}
+    >
+      {/* Year Navigator */}
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setViewYear((y) => y - 1)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+        >
+          <IoChevronBackOutline size={16} />
+        </button>
+        <span className="text-sm font-semibold text-neutral-900 tabular-nums tracking-wide">
+          {viewYear}
+        </span>
+        <button
+          type="button"
+          onClick={() => setViewYear((y) => y + 1)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+        >
+          <IoChevronForwardOutline size={16} />
+        </button>
+      </div>
+
+      {/* Month Grid */}
+      <div className="grid grid-cols-4 gap-1.5">
+        {MONTHS.map((month, index) => {
+          const active = isCurrentMonth(index);
+          return (
+            <button
+              key={month}
+              type="button"
+              onClick={() => handleSelectMonth(index)}
+              className={`
+                relative flex h-9 items-center justify-center
+                rounded-lg text-sm font-medium
+                transition-all duration-150 ease-out
+                ${
+                  active
+                    ? "bg-neutral-900 text-white shadow-sm"
+                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                }
+              `}
+            >
+              {month}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
-    <div ref={containerRef} className="flex flex-col gap-2 w-full">
+    <div
+      ref={containerRef}
+      className="relative flex w-full flex-col gap-2"
+    >
       {/* Label */}
       {label && (
         <label className="text-sm font-medium text-neutral-700">
@@ -138,9 +251,13 @@ const MonthYearInput = ({
       {/* Trigger */}
       <div className="relative">
         <button
+          ref={triggerRef}
           type="button"
           disabled={isReadOnly}
-          onClick={() => setIsOpen((prev) => !prev)}
+          onClick={() => {
+            updatePopoverPosition();
+            setIsOpen((prev) => !prev);
+          }}
           className={`
             group flex w-full items-center justify-between gap-2
             rounded-lg border bg-white px-3.5 py-2.5
@@ -198,67 +315,7 @@ const MonthYearInput = ({
           </span>
         </button>
 
-        {/* Popover */}
-        <div
-          className={`
-            absolute left-0 top-full z-50 mt-1.5 w-72
-            origin-top rounded-xl border border-neutral-200
-            bg-white p-4 shadow-xl shadow-neutral-900/8
-            transition-all duration-200 ease-out
-            ${
-              isOpen
-                ? "pointer-events-auto scale-100 opacity-100"
-                : "pointer-events-none scale-95 opacity-0"
-            }
-          `}
-        >
-          {/* Year Navigator */}
-          <div className="mb-3 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setViewYear((y) => y - 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-            >
-              <IoChevronBackOutline size={16} />
-            </button>
-            <span className="text-sm font-semibold text-neutral-900 tabular-nums tracking-wide">
-              {viewYear}
-            </span>
-            <button
-              type="button"
-              onClick={() => setViewYear((y) => y + 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-            >
-              <IoChevronForwardOutline size={16} />
-            </button>
-          </div>
-
-          {/* Month Grid */}
-          <div className="grid grid-cols-4 gap-1.5">
-            {MONTHS.map((month, index) => {
-              const active = isCurrentMonth(index);
-              return (
-                <button
-                  key={month}
-                  type="button"
-                  onClick={() => handleSelectMonth(index)}
-                  className={`
-                    relative flex h-9 items-center justify-center
-                    rounded-lg text-sm font-medium
-                    transition-all duration-150 ease-out
-                    ${
-                      active
-                        ? "bg-neutral-900 text-white shadow-sm"
-                        : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
-                    }
-                  `}
-                >
-                  {month}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {typeof document !== "undefined" && createPortal(popover, document.body)}
       </div>
     </div>
   );

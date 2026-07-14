@@ -147,12 +147,19 @@ const resolveDateRangePreset = (
   return null;
 };
 
+const resolveMonthYearPreset = (preset: string): string | null => {
+  if (preset !== "currentMonthYear") return null;
+  const now = new Date();
+  return `${String(now.getMonth() + 1).padStart(2, "0")}-${now.getFullYear()}`;
+};
+
 const resolveDefaultPreset = (
   type: RuntimeValueType,
   preset: unknown,
 ): unknown => {
   if (typeof preset !== "string") return undefined;
   if (type === "date") return resolveDatePreset(preset) ?? undefined;
+  if (type === "monthYear") return resolveMonthYearPreset(preset) ?? undefined;
   if (type === "dateRange") return resolveDateRangePreset(preset) ?? undefined;
   return undefined;
 };
@@ -228,7 +235,7 @@ const validateOutput = (
     candidate.id.length === 0 ||
     typeof candidate.key !== "string" ||
     typeof candidate.type !== "string" ||
-    !["string", "number", "boolean", "date", "dateRange", "stringArray", "numberArray"].includes(
+    !["string", "number", "boolean", "date", "monthYear", "dateRange", "stringArray", "numberArray"].includes(
       candidate.type,
     ) ||
     !isRecord(candidate.source) ||
@@ -374,7 +381,7 @@ export const createPageRuntimeStore = (page: PageModel): PageRuntimeStore => {
       throw new Error("Page filters contain a malformed or duplicate ID.");
     }
     if (
-      !["string", "number", "boolean", "date", "dateRange", "stringArray", "numberArray"].includes(
+      !["string", "number", "boolean", "date", "monthYear", "dateRange", "stringArray", "numberArray"].includes(
         filter.type,
       )
     ) {

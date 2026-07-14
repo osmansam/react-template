@@ -553,6 +553,8 @@ export default function GenericPaginatedPage({
     hasImageField,
     [...tableSourceQueryKey],
   );
+  const bulkEditActionConfig = tableConfig?.bulkActions?.edit;
+  const bulkDeleteActionConfig = tableConfig?.bulkActions?.delete;
 
   const displayFields: Field[] = useMemo(() => {
     const containerFields = container?.fields || [];
@@ -2155,11 +2157,14 @@ export default function GenericPaginatedPage({
 
   const selectionActions = useMemo(
     () => [
-      {
-        name: t("Delete Selected"),
+      ...(bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false
+        ? [
+            {
+              name: t(bulkDeleteActionConfig.label || "Delete Selected"),
         isButton: true,
         buttonClassName:
-          "px-2 bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
+                bulkDeleteActionConfig.buttonClassName ||
+                "px-2 bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
         isModal: true,
         className: "cursor-pointer",
         isDisabled: !schemaActionsEnabled || !selectedRows?.length,
@@ -2169,19 +2174,31 @@ export default function GenericPaginatedPage({
               isOpen={isBulkDeleteOpen}
               close={() => setIsBulkDeleteOpen(false)}
               confirm={handleBulkDeleteConfirm}
-              title={t("Delete Selected")}
-              text={t("Are you sure you want to delete the selected items?")}
+                    title={t(
+                      bulkDeleteActionConfig.confirmTitle ||
+                        bulkDeleteActionConfig.label ||
+                        "Delete Selected",
+                    )}
+                    text={t(
+                      bulkDeleteActionConfig.confirmText ||
+                        "Are you sure you want to delete the selected items?",
+                    )}
             />
           ) : null,
         isModalOpen: isBulkDeleteOpen,
         setIsModal: setIsBulkDeleteOpen,
         isPath: false,
-      },
-      {
-        name: t("Edit Selected"),
+            },
+          ]
+        : []),
+      ...(bulkEditActionConfig && bulkEditActionConfig.enabled !== false
+        ? [
+            {
+              name: t(bulkEditActionConfig.label || "Edit Selected"),
         isButton: true,
         buttonClassName:
-          "px-2  bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
+                bulkEditActionConfig.buttonClassName ||
+                "px-2  bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
         isModal: true,
         className: "cursor-pointer",
         modal: isBulkEditOpen ? (
@@ -2195,7 +2212,11 @@ export default function GenericPaginatedPage({
             isEditMode={false}
             topClassName="flex flex-col gap-2"
             generalClassName="overflow-visible"
-            buttonName={t("Edit")}
+                  buttonName={t(
+                    bulkEditActionConfig.buttonName ||
+                      bulkEditActionConfig.label ||
+                      "Edit",
+                  )}
             isSubmitButtonActive={isBulkStepTwo}
             submitFunction={handleBulkEditSubmit}
             additionalButtons={[
@@ -2210,14 +2231,18 @@ export default function GenericPaginatedPage({
         setIsModal: setIsBulkEditOpen,
         isPath: false,
         isDisabled: !schemaActionsEnabled || !selectedRows?.length,
-      },
+            },
+          ]
+        : []),
     ],
     [
       t,
       schemaActionsEnabled,
       selectedRows,
+      bulkDeleteActionConfig,
       isBulkDeleteOpen,
       handleBulkDeleteConfirm,
+      bulkEditActionConfig,
       isBulkEditOpen,
       handleBulkEditClose,
       handleBulkFormChange,

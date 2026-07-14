@@ -50,13 +50,13 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
       <Header />
       <div className={`dynamic-page-renderer ${className}`}>
         {navbarFilters.length > 0 && (
-          <div className="mb-4 flex flex-wrap gap-3">
+          <div className="relative z-[1000] mb-4 flex flex-wrap gap-3">
             {navbarFilters.map((filter) => (
               <PageFilterRenderer key={filter.id} filter={filter} />
             ))}
           </div>
         )}
-        <div className="sections-container space-y-6">
+        <div className="sections-container relative z-0 space-y-6">
           {[...renderedSections]
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
             .map((section, index) => (

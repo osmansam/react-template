@@ -12,6 +12,7 @@ const RUNTIME_VALUE_TYPES = new Set<RuntimeValueType>([
   "number",
   "boolean",
   "date",
+  "monthYear",
   "dateRange",
   "stringArray",
   "numberArray",
@@ -361,7 +362,11 @@ export const compileComponentParameters = (
       const valueType = filterDefinition.type;
       const field = binding.field as string | undefined;
       const allowedFields =
-        valueType === "dateRange" ? [...DATE_RANGE_FIELDS, "value"] : ["value"];
+        valueType === "dateRange"
+          ? [...DATE_RANGE_FIELDS, "value"]
+          : valueType === "monthYear"
+            ? ["value", "month", "year"]
+            : ["value"];
       if (
         field !== undefined &&
         !allowedFields.includes(field as (typeof allowedFields)[number])
@@ -385,7 +390,7 @@ export const compileComponentParameters = (
         ...(field === undefined
           ? {}
           : {
-              field: field as "value" | "start" | "end" | "preset" | "timezone",
+              field: field as "value" | "month" | "year" | "start" | "end" | "preset" | "timezone",
             }),
       } satisfies CompiledParameterResolver;
       const dependencyKey = `pageFilter:${filterId}`;
