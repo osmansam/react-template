@@ -14,6 +14,7 @@ export type RuntimeValueType =
   | "number"
   | "boolean"
   | "date"
+  | "monthYear"
   | "dateRange"
   | "stringArray"
   | "numberArray";
@@ -40,6 +41,7 @@ export interface PageFilterDefinition {
     | "today"
     | "yesterday"
     | "tomorrow"
+  | "currentMonthYear"
     | "thisWeek"
     | "lastWeek"
     | "thisMonth"
@@ -77,7 +79,7 @@ export type ParameterBinding =
   | {
       source: "pageFilter";
       filterId: string;
-      field?: "value" | "start" | "end" | "preset" | "timezone";
+      field?: "value" | "month" | "year" | "start" | "end" | "preset" | "timezone";
     }
   | {
       source: "pageVariable";
@@ -272,9 +274,15 @@ export interface TableFilterPanelConfig {
   inputs?: TableFilterPanelInputConfig[];
 }
 
+export interface TableBulkActionsConfig {
+  edit?: TableActionConfig;
+  delete?: TableActionConfig;
+}
+
 export interface TableActionSubmitConfig {
   workflowName?: string;
   workflowSchema?: string;
+  functionName?: string;
 }
 
 export interface TableActionConfig {
@@ -314,6 +322,7 @@ export interface TableComponentConfig {
   cache?: TableCacheConfig;
   addButton?: TableActionConfig;
   actions?: TableActionConfig[];
+  bulkActions?: TableBulkActionsConfig;
   filterPanel?: TableFilterPanelConfig;
 }
 

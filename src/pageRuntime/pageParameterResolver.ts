@@ -105,6 +105,8 @@ export const matchesRuntimeValueType = (
       return typeof value === "boolean";
     case "date":
       return parseIsoInstant(value) !== null;
+    case "monthYear":
+      return typeof value === "string" && /^(0[1-9]|1[0-2])-\d{4}$/.test(value);
     case "dateRange":
       return isDateRangeValue(value);
     case "stringArray":
@@ -195,6 +197,15 @@ export const resolveComponentParameters = (
           return;
         }
         if (
+          resolver.valueType === "monthYear" &&
+          typeof runtimeValue.value === "string" &&
+          (resolver.field === "month" || resolver.field === "year")
+        ) {
+          const [month, year] = runtimeValue.value.split("-");
+          values[parameter] = resolver.field === "month" ? month : year;
+          return;
+        }
+        if (
           resolver.arraySerialization === "comma" &&
           Array.isArray(runtimeValue.value)
         ) {
@@ -203,10 +214,11 @@ export const resolveComponentParameters = (
         }
         if (
           resolver.field !== undefined &&
+          ["start", "end", "preset", "timezone"].includes(resolver.field) &&
           runtimeValue.value !== null &&
           isDateRangeValue(runtimeValue.value)
         ) {
-          values[parameter] = runtimeValue.value[resolver.field];
+          values[parameter] = runtimeValue.value[resolver.field as keyof DateRangeValue];
           return;
         }
         values[parameter] = runtimeValue.value;

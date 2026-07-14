@@ -4,6 +4,7 @@ import {
   usePageRuntimeSelector,
   usePageRuntimeStore,
 } from "./PageRuntimeProvider";
+import MonthYearInput from "../components/panelComponents/FormElements/MonthYearInput";
 
 type PageFilterRendererProps = {
   filter: PageFilterDefinition;
@@ -44,6 +45,10 @@ const endOfDayUtc = (date: string): string =>
 const singleDateValue = (date: string): string | null =>
   date ? startOfDayUtc(date) : null;
 
+const visibleFilterLabel = (filter: PageFilterDefinition): string => {
+  return filter.label.trim();
+};
+
 const buildDateRangeValue = (
   startDate: string,
   endDate: string,
@@ -73,6 +78,7 @@ export const PageFilterRenderer: React.FC<PageFilterRendererProps> = ({
   filter,
 }) => {
   const store = usePageRuntimeStore();
+  const label = visibleFilterLabel(filter);
   const runtimeValue = usePageRuntimeSelector(
     (snapshot) => snapshot.pageFilters[filter.id],
   );
@@ -95,9 +101,9 @@ export const PageFilterRenderer: React.FC<PageFilterRendererProps> = ({
   if (filter.type === "date") {
     return (
       <label className="flex min-w-44 flex-col gap-1 text-sm">
-        <span className="font-medium text-neutral-700">
-          {filter.label || filter.key}
-        </span>
+        {label && (
+          <span className="font-medium text-neutral-700">{label}</span>
+        )}
         <input
           className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
           type="date"
@@ -105,6 +111,18 @@ export const PageFilterRenderer: React.FC<PageFilterRendererProps> = ({
           onChange={(event) => setValue(singleDateValue(event.target.value))}
         />
       </label>
+    );
+  }
+
+  if (filter.type === "monthYear") {
+    return (
+      <div className="min-w-44">
+        <MonthYearInput
+          label={label || undefined}
+          value={typeof value === "string" ? value : ""}
+          onChange={setValue}
+        />
+      </div>
     );
   }
 
@@ -116,16 +134,16 @@ export const PageFilterRenderer: React.FC<PageFilterRendererProps> = ({
           checked={Boolean(value)}
           onChange={(event) => setValue(event.target.checked)}
         />
-        <span>{filter.label || filter.key}</span>
+        {label && <span>{label}</span>}
       </label>
     );
   }
 
   return (
     <label className="flex min-w-44 flex-col gap-1 text-sm">
-      <span className="font-medium text-neutral-700">
-        {filter.label || filter.key}
-      </span>
+      {label && (
+        <span className="font-medium text-neutral-700">{label}</span>
+      )}
       <input
         className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
         type={filter.type === "number" ? "number" : "text"}
@@ -142,6 +160,7 @@ const DateRangeFilter: React.FC<{
   onChange: (value: DateRangeValue | null) => void;
 }> = ({ filter, value, onChange }) => {
   const [draft, setDraft] = useState({ start: "", end: "" });
+  const label = visibleFilterLabel(filter);
 
   useEffect(() => {
     if (!isDateRangeValue(value)) {
@@ -166,9 +185,9 @@ const DateRangeFilter: React.FC<{
 
   return (
     <div className="flex min-w-72 flex-col gap-1 text-sm">
-      <span className="font-medium text-neutral-700">
-        {filter.label || filter.key}
-      </span>
+      {label && (
+        <span className="font-medium text-neutral-700">{label}</span>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1 text-xs text-neutral-500">
           Start date

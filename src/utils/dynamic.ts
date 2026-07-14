@@ -764,6 +764,12 @@ export function useGetWorkflowData<T>(
   const workflowName = binding.workflowName || "";
   const mergedParams = { ...(binding.params || {}), ...(resolvedParams || {}) };
   const normalizedRecord = normalizeJsonRequestValue(mergedParams);
+  const normalizedQueryParams =
+    normalizedRecord &&
+    typeof normalizedRecord === "object" &&
+    !Array.isArray(normalizedRecord)
+      ? (normalizedRecord as Record<string, unknown>)
+      : {};
   const queryKey = [
     "dynamic",
     schemaName,
@@ -777,9 +783,9 @@ export function useGetWorkflowData<T>(
     queryKey,
     queryFn: async () => {
       const response = await axiosClient.post<DynamicExecutionResponse<T>>(
-        `${BASE}/workflow/${encodeURIComponent(workflowName)}?${qs({
-          schemaName,
-        })}`,
+        `${BASE}/workflow/${encodeURIComponent(workflowName)}?${serializeQueryEntries(
+          normalizeQueryEntries({ schemaName, ...normalizedQueryParams }),
+        )}`,
         { record: normalizedRecord },
         {
           headers: {

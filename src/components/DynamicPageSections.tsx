@@ -207,7 +207,9 @@ const RenderReadyComponent: React.FC<{
           customTitle={title}
           tableConfig={tableConfig}
           dataBinding={resolvedDataBinding}
-          actionsEnabled={resolvedDataBinding.kind === "schema"}
+          actionsEnabled={["schema", "pipeline", "workflow"].includes(
+            resolvedDataBinding.kind,
+          )}
           componentId={component.id}
           outputs={component.outputs}
           resolvedParams={resolvedParams}

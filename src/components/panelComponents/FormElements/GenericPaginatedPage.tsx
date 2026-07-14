@@ -445,6 +445,17 @@ export default function GenericPaginatedPage({
     [container?.fields, dataBinding, schemaName, tableConfig],
   );
   const schemaActionsEnabled = actionsEnabled && tableBinding.kind === "schema";
+  const hasConfiguredRowActions = useMemo(
+    () =>
+      Array.isArray(tableConfig?.actions) &&
+      tableConfig.actions.some(
+        (action) => action.kind !== "create" && action.enabled !== false,
+      ),
+    [tableConfig?.actions],
+  );
+  const isActionsActive = Boolean(
+    actionsEnabled && (schemaActionsEnabled || hasConfiguredRowActions),
+  );
   const effectiveSourceRevision = container?.updatedAt || sourceRevision;
   const configuredFilterInputs = tableConfig?.filterPanel?.inputs;
   const filtersById = useMemo(() => {
@@ -542,6 +553,8 @@ export default function GenericPaginatedPage({
     hasImageField,
     [...tableSourceQueryKey],
   );
+  const bulkEditActionConfig = tableConfig?.bulkActions?.edit;
+  const bulkDeleteActionConfig = tableConfig?.bulkActions?.delete;
 
   const displayFields: Field[] = useMemo(() => {
     const containerFields = container?.fields || [];
@@ -980,10 +993,10 @@ export default function GenericPaginatedPage({
             ?.type !== "computedLabel",
         correspondingKey: f.name,
       }));
-    return schemaActionsEnabled
+    return isActionsActive
       ? [...baseCols, { key: t("Actions"), isSortable: false }]
       : baseCols;
-  }, [displayFields, t, schemaActionsEnabled, constantFilter, tableConfig]);
+  }, [displayFields, t, isActionsActive, constantFilter, tableConfig]);
 
   const { inputs, formKeys, constantFilterKeys } = useMemo(() => {
     const constantFilterKeys = constantFilter
@@ -1201,8 +1214,10 @@ export default function GenericPaginatedPage({
   const [rowToAction, setRowToAction] = useState<GenericItem | null>(null);
 
   const configuredAddButtonAction =
-    tableConfig?.addButton?.enabled !== false
-      ? tableConfig?.addButton
+    tableConfig?.addButton !== undefined
+      ? tableConfig.addButton.enabled !== false
+        ? tableConfig.addButton
+        : undefined
       : tableConfig?.actions?.find(
           (action) => action.kind === "create" && action.enabled !== false,
         );
@@ -1222,6 +1237,11 @@ export default function GenericPaginatedPage({
   const addButtonConstants = configuredAddButtonAction
     ? parseActionConstantValues(configuredAddButtonAction)
     : {};
+  const addButtonWorkflowSubmit = configuredAddButtonAction?.submit;
+  const isAddButtonWorkflowAction = Boolean(
+    addButtonWorkflowSubmit?.workflowName &&
+      addButtonWorkflowSubmit?.workflowSchema,
+  );
   const addButtonInputs = configuredAddButtonAction
     ? buildActionInputs(
         configuredAddButtonAction,
@@ -1265,6 +1285,14 @@ export default function GenericPaginatedPage({
         const mergedItem = constantFilter
           ? { ...configuredCreateValues, ...constantFilter }
           : configuredCreateValues;
+        if (isAddButtonWorkflowAction) {
+          executeWorkflow({
+            workflowName: addButtonWorkflowSubmit?.workflowName || "",
+            workflowSchema: addButtonWorkflowSubmit?.workflowSchema,
+            record: mergedItem,
+          });
+          return;
+        }
         createDynamicItem(mergedItem as GenericItem);
       }
     },
@@ -1275,55 +1303,75 @@ export default function GenericPaginatedPage({
       constantFilterKeys,
       addButtonDefaults,
       addButtonConstants,
+      addButtonWorkflowSubmit,
+      isAddButtonWorkflowAction,
+      executeWorkflow,
     ],
   );
 
   const addButton = useMemo(
-    () => ({
-      name: configuredAddButtonAction?.label || t("Add"),
-      isModal: true,
-      modal: (
-        <GenericAddEditPanel
-          isOpen={isAddOpen}
-          close={() => setIsAddOpen(false)}
-          inputs={addButtonInputs}
-          formKeys={addButtonFormKeys}
-          submitItem={handleSubmitItem}
-          buttonName={
-            configuredAddButtonAction?.buttonName ||
-            configuredAddButtonAction?.label ||
-            undefined
-          }
-          topClassName="flex flex-col gap-2"
-          itemToEdit={
-            constantFilter ||
-            Object.keys(addButtonDefaults).length > 0 ||
-            Object.keys(addButtonConstants).length > 0
-              ? {
-                  id: "",
-                  updates: {
-                    ...addButtonDefaults,
-                    ...addButtonConstants,
-                    ...(constantFilter || {}),
-                    _id: "",
-                  } as GenericItem,
-                }
-              : undefined
-          }
-        />
-      ),
-      isModalOpen: isAddOpen,
-      setIsModal: setIsAddOpen,
-      isPath: false,
-      icon: null,
-      className:
-        configuredAddButtonAction?.buttonClassName ||
-        configuredAddButtonAction?.className ||
-        "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
-    }),
+    () => {
+      if (!actionsEnabled) return undefined;
+      if (!configuredAddButtonAction) {
+        if (
+          !schemaActionsEnabled ||
+          tableConfig?.addButton?.enabled === false
+        ) {
+          return undefined;
+        }
+      }
+
+      const actionConfig = configuredAddButtonAction || { kind: "create" as const };
+
+      return {
+        name: actionConfig.label || t("Add"),
+        isModal: true,
+        modal: (
+          <GenericAddEditPanel
+            isOpen={isAddOpen}
+            close={() => setIsAddOpen(false)}
+            inputs={addButtonInputs}
+            formKeys={addButtonFormKeys}
+            submitItem={handleSubmitItem}
+            buttonName={
+              actionConfig.buttonName ||
+              actionConfig.label ||
+              undefined
+            }
+            topClassName="flex flex-col gap-2"
+            itemToEdit={
+              constantFilter ||
+              Object.keys(addButtonDefaults).length > 0 ||
+              Object.keys(addButtonConstants).length > 0
+                ? {
+                    id: "",
+                    updates: {
+                      ...addButtonDefaults,
+                      ...addButtonConstants,
+                      ...(constantFilter || {}),
+                      _id: "",
+                    } as GenericItem,
+                  }
+                : undefined
+            }
+          />
+        ),
+        isModalOpen: isAddOpen,
+        setIsModal: setIsAddOpen,
+        isPath: false,
+        icon: null,
+        className:
+          actionConfig.buttonClassName ||
+          actionConfig.className ||
+          "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
+      };
+    },
     [
       t,
+      actionsEnabled,
+      schemaActionsEnabled,
       configuredAddButtonAction,
+      tableConfig?.addButton?.enabled,
       isAddOpen,
       addButtonInputs,
       addButtonFormKeys,
@@ -1335,7 +1383,7 @@ export default function GenericPaginatedPage({
   );
 
   const actions = useMemo(() => {
-    if (!schemaActionsEnabled) return [];
+    if (!isActionsActive) return [];
 
     const configuredActions = (tableConfig?.actions || [])
       .filter((action) => action.kind !== "create")
@@ -1384,9 +1432,16 @@ export default function GenericPaginatedPage({
       const editActionId = editActionConfig
         ? getActionId(editActionConfig, 0)
         : "edit-0";
+      const editConstantValues = editActionConfig
+        ? parseActionConstantValues(editActionConfig)
+        : {};
       const editDefaultValues = editActionConfig
         ? getActionDefaultValues(editActionConfig)
         : {};
+      const editWorkflowSubmit = editActionConfig?.submit;
+      const isEditWorkflowAction = Boolean(
+        editWorkflowSubmit?.workflowName && editWorkflowSubmit?.workflowSchema,
+      );
       const editInputs = buildActionInputs(
         editActionConfig || { kind: "edit" },
         inputs,
@@ -1444,7 +1499,29 @@ export default function GenericPaginatedPage({
                   close={() => setIsEditOpen(false)}
                   inputs={editInputs}
                   formKeys={editFormKeys}
-                  submitItem={handleSubmitItem}
+                  submitItem={(item) => {
+                    if ("id" in item && "updates" in item) {
+                      const record = {
+                        ...rowToAction,
+                        ...(item.updates as Record<string, unknown>),
+                        ...editConstantValues,
+                      };
+                      if (isEditWorkflowAction) {
+                        executeWorkflow({
+                          workflowName: editWorkflowSubmit?.workflowName || "",
+                          workflowSchema: editWorkflowSubmit?.workflowSchema,
+                          record,
+                          oldRecord: rowToAction,
+                        });
+                      } else {
+                        handleSubmitItem({
+                          id: item.id as string | number,
+                          updates: record as Partial<GenericItem>,
+                        });
+                      }
+                    }
+                    setIsEditOpen(false);
+                  }}
                   isEditMode
                   buttonName={editActionConfig?.buttonName || t("Edit")}
                   topClassName="flex flex-col gap-2"
@@ -1453,6 +1530,7 @@ export default function GenericPaginatedPage({
                     updates: {
                       ...normalizedUpdates,
                       ...editDefaultValues,
+                      ...editConstantValues,
                     },
                   }}
                 />
@@ -1570,7 +1648,8 @@ export default function GenericPaginatedPage({
       };
     };
 
-    if (!hasConfiguredActions) {
+    if (!hasConfiguredActions || configuredActions.length === 0) {
+      if (!schemaActionsEnabled) return [];
       return [buildDeleteAction(), buildEditAction()];
     }
 
@@ -1602,6 +1681,7 @@ export default function GenericPaginatedPage({
     handleSubmitItem,
     formKeys,
     schemaActionsEnabled,
+    isActionsActive,
     displayFields,
     inputs,
     tableConfig?.actions,
@@ -2077,11 +2157,14 @@ export default function GenericPaginatedPage({
 
   const selectionActions = useMemo(
     () => [
-      {
-        name: t("Delete Selected"),
+      ...(bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false
+        ? [
+            {
+              name: t(bulkDeleteActionConfig.label || "Delete Selected"),
         isButton: true,
         buttonClassName:
-          "px-2 bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
+                bulkDeleteActionConfig.buttonClassName ||
+                "px-2 bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
         isModal: true,
         className: "cursor-pointer",
         isDisabled: !schemaActionsEnabled || !selectedRows?.length,
@@ -2091,19 +2174,31 @@ export default function GenericPaginatedPage({
               isOpen={isBulkDeleteOpen}
               close={() => setIsBulkDeleteOpen(false)}
               confirm={handleBulkDeleteConfirm}
-              title={t("Delete Selected")}
-              text={t("Are you sure you want to delete the selected items?")}
+                    title={t(
+                      bulkDeleteActionConfig.confirmTitle ||
+                        bulkDeleteActionConfig.label ||
+                        "Delete Selected",
+                    )}
+                    text={t(
+                      bulkDeleteActionConfig.confirmText ||
+                        "Are you sure you want to delete the selected items?",
+                    )}
             />
           ) : null,
         isModalOpen: isBulkDeleteOpen,
         setIsModal: setIsBulkDeleteOpen,
         isPath: false,
-      },
-      {
-        name: t("Edit Selected"),
+            },
+          ]
+        : []),
+      ...(bulkEditActionConfig && bulkEditActionConfig.enabled !== false
+        ? [
+            {
+              name: t(bulkEditActionConfig.label || "Edit Selected"),
         isButton: true,
         buttonClassName:
-          "px-2  bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
+                bulkEditActionConfig.buttonClassName ||
+                "px-2  bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
         isModal: true,
         className: "cursor-pointer",
         modal: isBulkEditOpen ? (
@@ -2117,7 +2212,11 @@ export default function GenericPaginatedPage({
             isEditMode={false}
             topClassName="flex flex-col gap-2"
             generalClassName="overflow-visible"
-            buttonName={t("Edit")}
+                  buttonName={t(
+                    bulkEditActionConfig.buttonName ||
+                      bulkEditActionConfig.label ||
+                      "Edit",
+                  )}
             isSubmitButtonActive={isBulkStepTwo}
             submitFunction={handleBulkEditSubmit}
             additionalButtons={[
@@ -2132,14 +2231,18 @@ export default function GenericPaginatedPage({
         setIsModal: setIsBulkEditOpen,
         isPath: false,
         isDisabled: !schemaActionsEnabled || !selectedRows?.length,
-      },
+            },
+          ]
+        : []),
     ],
     [
       t,
       schemaActionsEnabled,
       selectedRows,
+      bulkDeleteActionConfig,
       isBulkDeleteOpen,
       handleBulkDeleteConfirm,
+      bulkEditActionConfig,
       isBulkEditOpen,
       handleBulkEditClose,
       handleBulkFormChange,
@@ -2209,7 +2312,7 @@ export default function GenericPaginatedPage({
           title={customTitle || t(humanize(schemaName))}
           addButton={addButton}
           isCollapsible={false}
-          isActionsActive={schemaActionsEnabled}
+          isActionsActive={isActionsActive}
           isSearch={false}
           outsideSortProps={outsideSort}
           {...(pagination && { pagination })}
