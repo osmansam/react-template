@@ -51,6 +51,7 @@ import {
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
 import {
+  applyTableNestedRows,
   getComputedLabelValue,
   getProgressBarValue,
   getTableCellClassName,
@@ -1133,7 +1134,11 @@ export default function GenericPaginatedPage({
     effectiveSourceRevision,
   );
 
-  const rows = useMemo(() => itemsPayload?.items || [], [itemsPayload?.items]);
+  const rows = useMemo(
+    () =>
+      applyTableNestedRows((itemsPayload?.items || []) as GenericItem[], tableConfig, t),
+    [itemsPayload?.items, tableConfig, t],
+  );
 
   const outsideSort = useMemo(
     () => ({ filterPanelFormElements, setFilterPanelFormElements }),
@@ -2311,7 +2316,7 @@ export default function GenericPaginatedPage({
           rowStyleFunction={rowStyleFunction}
           title={customTitle || t(humanize(schemaName))}
           addButton={addButton}
-          isCollapsible={false}
+          isCollapsible={tableConfig?.nestedRows?.enabled === true}
           isActionsActive={isActionsActive}
           isSearch={false}
           outsideSortProps={outsideSort}

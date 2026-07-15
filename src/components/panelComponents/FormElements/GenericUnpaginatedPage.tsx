@@ -35,6 +35,7 @@ import {
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
 import {
+  applyTableNestedRows,
   getComputedLabelValue,
   getProgressBarValue,
   getTableCellClassName,
@@ -1906,7 +1907,10 @@ export default function GenericUnpaginatedPage({
     ],
   );
 
-  const rows = useMemo(() => items || [], [items]);
+  const rows = useMemo(
+    () => applyTableNestedRows(items || [], tableConfig, t),
+    [items, tableConfig, t],
+  );
 
   return (
     <>
@@ -1920,7 +1924,7 @@ export default function GenericUnpaginatedPage({
           rowStyleFunction={rowStyleFunction}
           title={customTitle || t(humanize(schemaName))}
           addButton={addButton}
-          isCollapsible={false}
+          isCollapsible={tableConfig?.nestedRows?.enabled === true}
           isActionsActive={actionsEnabled}
           selectionActions={selectionActions}
           isExcel={!hasImageField}
