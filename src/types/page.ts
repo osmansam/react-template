@@ -140,6 +140,7 @@ export interface TableLinkConfig {
 
 export type TableColumnType =
   | "field"
+  | "lookupLabel"
   | "computedLabel"
   | "progressBar"
   | "number"
@@ -174,10 +175,17 @@ export interface TableProgressBarConfig {
   colorRules?: TableProgressBarColorRule[];
 }
 
+export interface TableLookupLabelConfig {
+  schemaName?: string;
+  matchField?: string;
+  labelField?: string;
+}
+
 export interface TableColumnConfig {
   field: string;
   type?: TableColumnType;
   displayName?: string;
+  lookup?: TableLookupLabelConfig;
   computedLabelRules?: TableComputedLabelRule[];
   fallbackValue?: string;
   progressBar?: TableProgressBarConfig;
@@ -193,6 +201,8 @@ export interface TableNestedRowColumnConfig {
   field: string;
   displayName?: string;
   type?: TableColumnType;
+  lookup?: TableLookupLabelConfig;
+  fallbackValue?: string;
 }
 
 export interface TableNestedRowsConfig {
@@ -330,6 +340,7 @@ export interface TableActionConfig {
 
 export interface TableComponentConfig {
   title?: string;
+  enableSearch?: boolean;
   columns?: TableColumnConfig[];
   rows?: TableRowsConfig;
   nestedRows?: TableNestedRowsConfig;

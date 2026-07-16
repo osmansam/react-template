@@ -34,14 +34,18 @@ import {
   tailwindBgToStyle,
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
+import { getSelectionQueryConfig } from "../../../utils/selectionQuery";
 import {
   applyTableNestedRows,
   getComputedLabelValue,
+  getLookupLabelValue,
   getProgressBarValue,
   getTableCellClassName,
   getTableDisplayName,
   getTableLinkConfig,
+  isTableSearchEnabled,
 } from "../../../utils/tableConfig";
+import { useTableLookupSelectionData } from "../../../utils/tableLookupSelection";
 import {
   buildConfiguredFilterInputs,
   getFilterDefaultValues,
@@ -67,15 +71,6 @@ type ActionSelectDataMap = Map<string, GenericItem[]>;
 const getSelectionFieldName = (field: TableActionFormFieldConfig) =>
   field.sourceLabelField || field.sourceValueField || "_id";
 
-const actionQs = (params: Record<string, unknown>) =>
-  new URLSearchParams(
-    Object.entries(params)
-      .filter(
-        ([, value]) => value !== undefined && value !== null && value !== "",
-      )
-      .map(([key, value]) => [key, String(value)]),
-  ).toString();
-
 const useActionFormSelectionData = (
   actions: TableActionConfig[] = [],
 ): ActionSelectDataMap => {
@@ -96,20 +91,15 @@ const useActionFormSelectionData = (
   const queryResults = useQueries({
     queries: schemaSelectFields.map(({ field }) => {
       const fieldName = getSelectionFieldName(field);
+      const { path, queryKey } = getSelectionQueryConfig({
+        schemaName: field.sourceSchemaName || "",
+        fieldName,
+      });
       return {
-        queryKey: [
-          "dynamic",
-          field.sourceSchemaName,
-          "selection",
-          fieldName,
-          "action-options",
-        ],
+        queryKey,
         queryFn: () =>
           get<GenericItem[]>({
-            path: `/dynamic/selection?${actionQs({
-              schemaName: field.sourceSchemaName,
-              fieldName,
-            })}`,
+            path,
           }),
         enabled: Boolean(field.sourceSchemaName && fieldName),
         staleTime: Infinity,
@@ -480,6 +470,7 @@ export default function GenericUnpaginatedPage({
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
+  const lookupSelectionDataMap = useTableLookupSelectionData(tableConfig);
 
   const rowKeys = useMemo(
     () =>
@@ -549,6 +540,24 @@ export default function GenericUnpaginatedPage({
           }
 
           rowKey.node = (row: GenericItem) => <span>{getComputedValue(row)}</span>;
+          return rowKey;
+        }
+
+        if (columnConfig?.type === "lookupLabel") {
+          const getLookupValue = (row: GenericItem) =>
+            getLookupLabelValue(columnConfig, row, lookupSelectionDataMap);
+
+          if (rowKeyClassName) {
+            rowKey.className = (row: GenericItem) =>
+              getMatchingRowClassNames(
+                { ...row, [f.name]: getLookupValue(row) },
+                rowKeyClassName,
+              );
+          }
+
+          rowKey.node = (row: GenericItem) => (
+            <span>{getLookupValue(row)}</span>
+          );
           return rowKey;
         }
 
@@ -832,7 +841,14 @@ export default function GenericUnpaginatedPage({
 
         return rowKey;
       }),
-    [displayFields, updateDynamicItem, selectionDataMap, t, tableConfig],
+    [
+      displayFields,
+      updateDynamicItem,
+      selectionDataMap,
+      lookupSelectionDataMap,
+      t,
+      tableConfig,
+    ],
   );
 
   const columns = useMemo(() => {
@@ -1908,8 +1924,8 @@ export default function GenericUnpaginatedPage({
   );
 
   const rows = useMemo(
-    () => applyTableNestedRows(items || [], tableConfig, t),
-    [items, tableConfig, t],
+    () => applyTableNestedRows(items || [], tableConfig, t, lookupSelectionDataMap),
+    [items, tableConfig, t, lookupSelectionDataMap],
   );
 
   return (
@@ -1926,6 +1942,7 @@ export default function GenericUnpaginatedPage({
           addButton={addButton}
           isCollapsible={tableConfig?.nestedRows?.enabled === true}
           isActionsActive={actionsEnabled}
+          isSearch={isTableSearchEnabled(tableConfig)}
           selectionActions={selectionActions}
           isExcel={!hasImageField}
           onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}

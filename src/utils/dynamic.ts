@@ -15,6 +15,7 @@ import {
   serializeQueryEntries,
 } from "./dynamicQueryKeys";
 import { canonicalizeRuntimeValue } from "../pageRuntime/pageParameterResolver";
+import { getSelectionQueryConfig } from "./selectionQuery";
 
 export interface DynamicPayload<T> {
   items: T[];
@@ -813,23 +814,14 @@ export function useGetSelection<T>(
   // Only enable the request if both schemaName and fieldName are provided
   const enabled = requestEnabled && Boolean(schemaName && fieldName);
 
-  const queryEntries = normalizeQueryEntries({
-    ...(resolvedParams || {}),
+  const queryEntries = normalizeQueryEntries(resolvedParams || {});
+  const { path, queryKey } = getSelectionQueryConfig({
     schemaName,
     fieldName,
     valueField,
-  });
-  const path = `${BASE}/selection?${serializeQueryEntries(queryEntries)}`;
-
-  const queryKey = [
-    "dynamic",
-    schemaName || "",
-    "selection",
-    fieldName || "",
-    valueField || "",
+    extraParams: queryEntries,
     sourceRevision,
-    canonicalizeRuntimeValue(queryEntries),
-  ] as const;
+  });
 
   const data = useGet<T>(path, queryKey, enabled);
 

@@ -102,7 +102,7 @@ const TabPanel: React.FC<Props> = ({
     if (activeTab > adjustedTabs.length - 1) {
       setActiveTab(
         adjustedTabs.find((tab) => tab.number === activeTab)?.adjustedNumber ||
-          0
+          0,
       );
     }
   }, [activeTab, adjustedTabs, i18n.language, setActiveTab]);
@@ -203,10 +203,10 @@ const TabPanel: React.FC<Props> = ({
         )}
       </div>
       {activeAdjustedTab?.content && !activeAdjustedTab?.isDisabled && (
-          <div className={`${topClassName ? "pt-3" : "py-6"}`}>
-            {activeAdjustedTab.content}
-          </div>
-        )}
+        <div className={`${topClassName ? "pt-3" : "py-6"} px-2`}>
+          {activeAdjustedTab.content}
+        </div>
+      )}
     </div>
   );
 };
