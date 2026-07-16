@@ -7,16 +7,10 @@ import {
 import { TableFilterPanelInputConfig } from "../types/page";
 import { get } from "./api";
 import { evaluateRowCondition } from "./genericPageHelpers";
+import { getSelectionQueryConfig } from "./selectionQuery";
 
 type GenericItem = Record<string, unknown> & { _id: string };
 type FilterSelectDataMap = Map<string, Array<Record<string, unknown>>>;
-
-const qs = (params: Record<string, unknown>) =>
-  new URLSearchParams(
-    Object.entries(params)
-      .filter(([, v]) => v !== undefined && v !== null && v !== "")
-      .map(([k, v]) => [k, String(v)]),
-  ).toString();
 
 const getSelectionFieldName = (field: TableFilterPanelInputConfig) =>
   field.sourceLabelField || field.sourceValueField || "_id";
@@ -52,20 +46,15 @@ export const useFilterPanelSelectionData = (
   const queryResults = useQueries({
     queries: schemaSelectFields.map((field) => {
       const fieldName = getSelectionFieldName(field);
+      const { path, queryKey } = getSelectionQueryConfig({
+        schemaName: field.sourceSchemaName || "",
+        fieldName,
+      });
       return {
-        queryKey: [
-          "dynamic",
-          field.sourceSchemaName,
-          "selection",
-          fieldName,
-          "filter-options",
-        ],
+        queryKey,
         queryFn: () =>
           get<Array<Record<string, unknown>>>({
-            path: `/dynamic/selection?${qs({
-              schemaName: field.sourceSchemaName,
-              fieldName,
-            })}`,
+            path,
           }),
         enabled: Boolean(field.sourceSchemaName && fieldName),
         staleTime: Infinity,

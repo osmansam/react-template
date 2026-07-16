@@ -50,14 +50,19 @@ import {
   tailwindBgToStyle,
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
+import { getSelectionQueryConfig } from "../../../utils/selectionQuery";
 import {
+  applyTableNestedRows,
   getComputedLabelValue,
+  getLookupLabelValue,
   getProgressBarValue,
   getTableCellClassName,
   getTableDataFieldNames,
   getTableDisplayName,
   getTableLinkConfig,
+  isTableSearchEnabled,
 } from "../../../utils/tableConfig";
+import { useTableLookupSelectionData } from "../../../utils/tableLookupSelection";
 import {
   buildConfiguredFilterInputs,
   getFilterDefaultValues,
@@ -83,15 +88,6 @@ type ActionSelectDataMap = Map<string, GenericItem[]>;
 const getSelectionFieldName = (field: TableActionFormFieldConfig) =>
   field.sourceLabelField || field.sourceValueField || "_id";
 
-const actionQs = (params: Record<string, unknown>) =>
-  new URLSearchParams(
-    Object.entries(params)
-      .filter(
-        ([, value]) => value !== undefined && value !== null && value !== "",
-      )
-      .map(([key, value]) => [key, String(value)]),
-  ).toString();
-
 const useActionFormSelectionData = (
   actions: TableActionConfig[] = [],
 ): ActionSelectDataMap => {
@@ -112,20 +108,15 @@ const useActionFormSelectionData = (
   const queryResults = useQueries({
     queries: schemaSelectFields.map(({ field }) => {
       const fieldName = getSelectionFieldName(field);
+      const { path, queryKey } = getSelectionQueryConfig({
+        schemaName: field.sourceSchemaName || "",
+        fieldName,
+      });
       return {
-        queryKey: [
-          "dynamic",
-          field.sourceSchemaName,
-          "selection",
-          fieldName,
-          "action-options",
-        ],
+        queryKey,
         queryFn: () =>
           get<GenericItem[]>({
-            path: `/dynamic/selection?${actionQs({
-              schemaName: field.sourceSchemaName,
-              fieldName,
-            })}`,
+            path,
           }),
         enabled: Boolean(field.sourceSchemaName && fieldName),
         staleTime: Infinity,
@@ -615,6 +606,7 @@ export default function GenericPaginatedPage({
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
+  const lookupSelectionDataMap = useTableLookupSelectionData(tableConfig);
 
   const rowKeys = useMemo(() => {
     const constantFilterKeys = constantFilter
@@ -689,6 +681,24 @@ export default function GenericPaginatedPage({
 
           rowKey.node = (row: GenericItem) => (
             <span>{getComputedValue(row)}</span>
+          );
+          return rowKey;
+        }
+
+        if (columnConfig?.type === "lookupLabel") {
+          const getLookupValue = (row: GenericItem) =>
+            getLookupLabelValue(columnConfig, row, lookupSelectionDataMap);
+
+          if (rowKeyClassName) {
+            rowKey.className = (row: GenericItem) =>
+              getMatchingRowClassNames(
+                { ...row, [f.name]: getLookupValue(row) },
+                rowKeyClassName,
+              );
+          }
+
+          rowKey.node = (row: GenericItem) => (
+            <span>{getLookupValue(row)}</span>
           );
           return rowKey;
         }
@@ -976,6 +986,7 @@ export default function GenericPaginatedPage({
     displayFields,
     updateDynamicItem,
     selectionDataMap,
+    lookupSelectionDataMap,
     constantFilter,
     tableConfig,
   ]);
@@ -1133,7 +1144,16 @@ export default function GenericPaginatedPage({
     effectiveSourceRevision,
   );
 
-  const rows = useMemo(() => itemsPayload?.items || [], [itemsPayload?.items]);
+  const rows = useMemo(
+    () =>
+      applyTableNestedRows(
+        (itemsPayload?.items || []) as GenericItem[],
+        tableConfig,
+        t,
+        lookupSelectionDataMap,
+      ),
+    [itemsPayload?.items, tableConfig, t, lookupSelectionDataMap],
+  );
 
   const outsideSort = useMemo(
     () => ({ filterPanelFormElements, setFilterPanelFormElements }),
@@ -1155,6 +1175,7 @@ export default function GenericPaginatedPage({
     () => ({ t, filterPanelFormElements, setFilterPanelFormElements }),
     [t, filterPanelFormElements],
   );
+  const searchEnabled = isTableSearchEnabled(tableConfig);
 
   const rowStyleFunction = useCallback(
     (row: GenericItem): React.CSSProperties => {
@@ -2311,12 +2332,12 @@ export default function GenericPaginatedPage({
           rowStyleFunction={rowStyleFunction}
           title={customTitle || t(humanize(schemaName))}
           addButton={addButton}
-          isCollapsible={false}
+          isCollapsible={tableConfig?.nestedRows?.enabled === true}
           isActionsActive={isActionsActive}
           isSearch={false}
           outsideSortProps={outsideSort}
           {...(pagination && { pagination })}
-          outsideSearchProps={outsideSearchProps}
+          outsideSearchProps={searchEnabled ? outsideSearchProps : undefined}
           selectionActions={selectionActions}
           isExcel={true}
           onExcelUpload={
