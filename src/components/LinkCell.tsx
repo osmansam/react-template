@@ -7,13 +7,14 @@ interface LinkCellProps {
   field: Field;
   row: Record<string, unknown>;
   linkConfig?: Frontend;
+  labelOverride?: React.ReactNode;
 }
 
 /**
  * Renders a table cell that can be a clickable link based on field configuration
  * Supports multiple link types: external, internal, email, phone, file
  */
-export function LinkCell({ field, row, linkConfig }: LinkCellProps) {
+export function LinkCell({ field, row, linkConfig, labelOverride }: LinkCellProps) {
   const navigate = useNavigate();
   const { buildPath } = useTenantProject();
   const fieldValue = row?.[field.name];
@@ -25,7 +26,7 @@ export function LinkCell({ field, row, linkConfig }: LinkCellProps) {
   }
 
   const url = buildLinkUrl(frontend, fieldValue, row);
-  const label = getLinkLabel(frontend, fieldValue, row);
+  const label = labelOverride ?? getLinkLabel(frontend, fieldValue, row);
 
   // If URL building failed, render plain value
   if (!url) {
@@ -87,6 +88,24 @@ export function LinkCell({ field, row, linkConfig }: LinkCellProps) {
     >
       {label}
     </a>
+  );
+}
+
+export function renderLinkedCellContent(
+  field: Field,
+  row: Record<string, unknown>,
+  linkConfig: Frontend | undefined,
+  fallback: React.ReactNode,
+): React.ReactNode {
+  if (!linkConfig?.linkTemplate) return fallback;
+
+  return (
+    <LinkCell
+      field={field}
+      row={row}
+      linkConfig={linkConfig}
+      labelOverride={fallback}
+    />
   );
 }
 

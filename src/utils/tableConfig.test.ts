@@ -3,6 +3,7 @@ import {
   applyTableNestedRows,
   getLookupLabelValue,
   getTableDataFieldNames,
+  getTableLinkConfig,
   getTableLookupKey,
   isTableSearchEnabled,
 } from "./tableConfig";
@@ -152,5 +153,28 @@ describe("applyTableNestedRows", () => {
 
     expect(row.collapsible?.collapsibleRowKeys[0].node?.({ productId: "p1" }))
       .toBe("Espresso");
+  });
+});
+
+
+describe("getTableLinkConfig", () => {
+  it("maps saved table column email links to LinkCell frontend config", () => {
+    expect(
+      getTableLinkConfig(
+        {
+          columns: [
+            {
+              field: "customerEmail",
+              link: { template: "mailto:{{value}}", type: "email" },
+            },
+          ],
+        },
+        { name: "customerEmail", type: "string" } as any,
+      ),
+    ).toEqual({
+      linkTemplate: "mailto:{{value}}",
+      linkLabelField: undefined,
+      linkType: "email",
+    });
   });
 });
