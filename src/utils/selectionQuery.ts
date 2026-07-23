@@ -10,6 +10,7 @@ export interface SelectionQueryConfigParams {
   projectSlug?: string;
   basePath?: string;
   extraParams?: ExtraSelectionParams;
+  filterParams?: Record<string, unknown>;
   sourceRevision?: string;
 }
 
@@ -73,6 +74,7 @@ export const getSelectionQueryConfig = ({
   projectSlug,
   basePath = "/dynamic",
   extraParams = {},
+  filterParams = {},
   sourceRevision = "",
 }: SelectionQueryConfigParams) => {
   const routeScope = getSelectionScopeFromLocation();
@@ -86,11 +88,15 @@ export const getSelectionQueryConfig = ({
   const extraEntries = isEntryArray(extraParams)
     ? extraParams
     : cleanEntries(extraParams);
+  const filterEntries = cleanEntries(filterParams).map(
+    ([key, value]) => [`filter.${key}`, value] as const,
+  );
 
   return {
     path: `${basePath}/selection?${serializeEntries([
       ...cleanEntries(queryParams),
       ...extraEntries,
+      ...filterEntries,
     ])}`,
     queryKey: [
       "dynamic",
@@ -102,6 +108,7 @@ export const getSelectionQueryConfig = ({
       valueField,
       sourceRevision,
       stableValue(extraParams),
+      stableValue(filterParams),
     ] as const,
   };
 };

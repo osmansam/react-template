@@ -149,6 +149,7 @@ export interface GenericInputType {
   onChangeTrigger?: (value: FormElementValue) => void;
   disabledCondition?: string;
   requiredCondition?: string;
+  sourceRequestFilters?: Record<string, unknown>;
   sourceFilterCondition?: string;
   isReadOnly?: boolean;
   invalidateKeys?: {
