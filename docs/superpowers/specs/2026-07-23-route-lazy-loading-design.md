@@ -36,17 +36,19 @@ The project currently has no bundle analyzer. Its Vite build only configures the
 
 ### Bundle analysis
 
-Add `rollup-plugin-visualizer` as a development dependency. Register it in `vite.config.ts` only when analysis is explicitly requested, so ordinary production builds do not generate or open a report.
+Add `rollup-plugin-visualizer` and `cross-env` as development dependencies. Register the visualizer in `vite.config.ts` only when `ANALYZE=true`, so ordinary production builds do not generate or open a report. `cross-env` keeps the analysis script portable across Unix-like systems and Windows.
 
-Add an `analyze` package script that runs the existing TypeScript check and a Vite production build with analysis enabled. The visualizer will write `bundle-report.html` at the project root and include gzip and Brotli size estimates. It will not automatically open a browser.
+Add an `analyze` package script that runs the existing build as `cross-env ANALYZE=true yarn build`. The visualizer will use `fileURLToPath(new URL("./bundle-report.html", import.meta.url))` so its ESM Vite configuration writes `bundle-report.html` at the project root rather than relying on plugin-relative path behavior. The report will include gzip and Brotli size estimates and will not automatically open a browser.
 
 The generated report is a local build artifact and will be ignored by Git.
 
 ### Route splitting
 
-Replace eager imports of `Login`, `GoogleCallback`, and `AuditLogs` with `React.lazy` dynamic imports. Keep the existing default exports and route configuration shape so consumers do not need a new registry API.
+Replace eager imports of `Login`, `GoogleCallback`, and `AuditLogs` with `React.lazy` dynamic imports. All three modules have default exports, so no named-export adapters are needed.
 
-`RouterContainer` will render its `Routes` tree inside a single `Suspense` boundary. The fallback will use the project's existing full-screen loading presentation. This boundary covers:
+Widen the route configuration's `element` field from `() => JSX.Element` to `React.ComponentType`. This accepts both ordinary function components and `LazyExoticComponent` values while preserving the field name, configuration structure, and current `<route.element />` rendering contract.
+
+`RouterContainer` will render its `Routes` tree inside a single `Suspense` boundary located immediately around the route tree. The sidebar, global providers, toast container, and other application shell elements remain mounted during route chunk loading. The boundary covers:
 
 - legacy public routes;
 - tenant/project public routes;
@@ -57,7 +59,7 @@ Dynamic pages created by `useDynamicPages` will continue to work as they do now.
 
 ### Loading and error behavior
 
-While a route chunk downloads, the user sees a centered, full-screen "Loading page..." state. Existing dynamic-page metadata loading and error states remain unchanged.
+While a route chunk downloads, the user sees a reusable centered, full-screen "Loading page..." fallback. Its status text will use `role="status"` and `aria-live="polite"`. Existing dynamic-page metadata loading and error states remain unchanged.
 
 This phase does not add a new chunk error boundary. A failed dynamic import will continue to propagate to the application's existing error handling. Retry or recovery UI can be designed separately if production telemetry shows it is needed.
 
@@ -65,11 +67,13 @@ This phase does not add a new chunk error boundary. A failed dynamic import will
 
 Automated verification will cover:
 
-1. Existing unit tests continue to pass.
-2. TypeScript accepts lazy component types in the current route configuration.
-3. A normal production build succeeds and emits separate route chunks.
-4. The analysis build succeeds and creates `bundle-report.html`.
-5. The report is not tracked by Git.
+1. Before implementation, record the initial entry chunk's raw, gzip, and Brotli sizes from an analysis build.
+2. Existing unit tests continue to pass.
+3. TypeScript accepts lazy component types in the widened route configuration.
+4. A normal production build succeeds and emits separate route chunks.
+5. The analysis build succeeds and creates `bundle-report.html`.
+6. Record the post-change initial entry chunk size and the generated chunk names and sizes for Login, Google Callback, and Audit Logs.
+7. The report is not tracked by Git.
 
 No route URL, redirect rule, authentication guard, sidebar rule, or page output should change.
 
@@ -79,6 +83,7 @@ No route URL, redirect rule, authentication guard, sidebar rule, or page output 
 - Visiting any of those routes loads and renders the same page through a lazy chunk.
 - Normal builds do not create or open a bundle report.
 - `yarn analyze` creates a readable bundle report with raw, gzip, and Brotli size information.
+- The implementation handoff reports the measured before-and-after initial entry size and the sizes of the three new route chunks.
 - Existing tests and the production build pass.
 
 ## Follow-up
