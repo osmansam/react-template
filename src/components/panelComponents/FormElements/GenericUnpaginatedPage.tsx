@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
-import { LinkCell } from "../../../components/LinkCell";
+import { LinkCell, renderLinkedCellContent } from "../../../components/LinkCell";
 import { useGeneralContext } from "../../../context/General.context";
 import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
@@ -544,7 +544,13 @@ export default function GenericUnpaginatedPage({
               );
           }
 
-          rowKey.node = (row: GenericItem) => <span>{getComputedValue(row)}</span>;
+          rowKey.node = (row: GenericItem) =>
+            renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
+              <span>{getComputedValue(row)}</span>,
+            );
           return rowKey;
         }
 
@@ -560,9 +566,13 @@ export default function GenericUnpaginatedPage({
               );
           }
 
-          rowKey.node = (row: GenericItem) => (
-            <span>{getLookupValue(row)}</span>
-          );
+          rowKey.node = (row: GenericItem) =>
+            renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
+              <span>{getLookupValue(row)}</span>,
+            );
           return rowKey;
         }
 
@@ -611,7 +621,12 @@ export default function GenericUnpaginatedPage({
             const v = row[f.name];
             if (v === undefined || v === null || v === "") return <span>-</span>;
             const n = Number(v);
-            return <span>{isNaN(n) ? String(v) : n.toLocaleString()}</span>;
+            return renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
+              <span>{isNaN(n) ? String(v) : n.toLocaleString()}</span>,
+            );
           };
           return rowKey;
         }
@@ -621,10 +636,13 @@ export default function GenericUnpaginatedPage({
             const v = row[f.name];
             if (v === undefined || v === null || v === "") return <span>-</span>;
             const n = Number(v);
-            return (
+            return renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
               <span>
                 {isNaN(n) ? String(v) : n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-              </span>
+              </span>,
             );
           };
           return rowKey;
@@ -635,7 +653,12 @@ export default function GenericUnpaginatedPage({
             const v = row[f.name];
             if (v === undefined || v === null || v === "") return <span>-</span>;
             const n = Number(v);
-            return <span>{isNaN(n) ? String(v) : `${n.toLocaleString()}%`}</span>;
+            return renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
+              <span>{isNaN(n) ? String(v) : `${n.toLocaleString()}%`}</span>,
+            );
           };
           return rowKey;
         }
@@ -645,7 +668,9 @@ export default function GenericUnpaginatedPage({
             const v = row[f.name];
             if (v === undefined || v === null || v === "") return <span>-</span>;
             const n = Number(v);
-            if (isNaN(n)) return <span>{String(v)}</span>;
+            if (isNaN(n)) {
+              return renderLinkedCellContent(f, row, linkConfig, <span>{String(v)}</span>);
+            }
             const isPositive = n > 0;
             const isNegative = n < 0;
             const sign = isPositive ? "+" : "";
@@ -655,11 +680,14 @@ export default function GenericUnpaginatedPage({
               : isNegative
                 ? "#c62828"
                 : "#827717";
-            return (
+            return renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
               <span style={{ color, display: "inline-flex", alignItems: "center", gap: "4px" }}>
                 <span>{arrow}</span>
                 <span>{sign}{n.toLocaleString()}%</span>
-              </span>
+              </span>,
             );
           };
           return rowKey;
@@ -671,16 +699,21 @@ export default function GenericUnpaginatedPage({
             if (!v) return <span>-</span>;
             try {
               const d = new Date(v as string | number);
-              if (isNaN(d.getTime())) return <span>{String(v)}</span>;
-              return (
+              if (isNaN(d.getTime())) {
+                return renderLinkedCellContent(f, row, linkConfig, <span>{String(v)}</span>);
+              }
+              return renderLinkedCellContent(
+                f,
+                row,
+                linkConfig,
                 <span>
                   {String(d.getDate()).padStart(2, "0")}/
                   {String(d.getMonth() + 1).padStart(2, "0")}/
                   {d.getFullYear()}
-                </span>
+                </span>,
               );
             } catch {
-              return <span>{String(v)}</span>;
+              return renderLinkedCellContent(f, row, linkConfig, <span>{String(v)}</span>);
             }
           };
           return rowKey;
@@ -731,10 +764,13 @@ export default function GenericUnpaginatedPage({
           rowKey.node = (row: GenericItem) => {
             const v = row[f.name];
             if (v === undefined || v === null || v === "") return <span>-</span>;
-            return (
+            return renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
               <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
                 {String(v)}
-              </span>
+              </span>,
             );
           };
           return rowKey;
@@ -745,7 +781,7 @@ export default function GenericUnpaginatedPage({
             const v = row[f.name];
             if (v === undefined || v === null) return <span>-</span>;
             const content = Array.isArray(v) ? v.join(", ") : String(v);
-            return <span>{content || "-"}</span>;
+            return renderLinkedCellContent(f, row, linkConfig, <span>{content || "-"}</span>);
           };
           return rowKey;
         }
@@ -1049,6 +1085,10 @@ export default function GenericUnpaginatedPage({
   );
   const bulkEditActionConfig = tableConfig?.bulkActions?.edit;
   const bulkDeleteActionConfig = tableConfig?.bulkActions?.delete;
+  const isBulkSelectionEnabled = Boolean(
+    (bulkEditActionConfig && bulkEditActionConfig.enabled !== false) ||
+      (bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false),
+  );
   const configuredBulkEditFields = bulkEditActionConfig?.formFields || [];
   const bulkActionSelectionDataMap = useActionFormSelectionData(
     bulkEditActionConfig ? [bulkEditActionConfig] : [],
@@ -1966,6 +2006,7 @@ export default function GenericUnpaginatedPage({
           isActionsActive={actionsEnabled}
           isSearch={isTableSearchEnabled(tableConfig)}
           selectionActions={selectionActions}
+          isSelectionEnabled={isBulkSelectionEnabled}
           isExcel={!hasImageField}
           onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
           filters={filters}

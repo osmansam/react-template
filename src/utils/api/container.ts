@@ -49,6 +49,7 @@ export interface Field {
   unique?: boolean;
   isHashed?: boolean;
   isLoginCredential?: boolean;
+  isAuditIdentity?: boolean;
   isSearchable?: boolean;
   children?: Field[];
   frontend?: Frontend;
@@ -512,6 +513,7 @@ export function useContainer(id: string, enabled: boolean = true) {
       isHashed: field.IsHashed ?? field.isHashed ?? false,
       isLoginCredential:
         field.IsLoginCredential ?? field.isLoginCredential ?? false,
+      isAuditIdentity: field.IsAuditIdentity ?? field.isAuditIdentity ?? false,
       isSearchable: field.IsSearchable ?? field.isSearchable ?? false,
       frontend: field.Frontend || field.frontend,
       populationSettings: field.PopulationSettings || field.populationSettings,
@@ -863,9 +865,9 @@ export function useResetRedis() {
 }
 
 // Legacy hook for backward compatibility - now uses project-scoped containers
-export function useGetContainers() {
+export function useGetContainers(enabled: boolean = true) {
   try {
-    return useContainers();
+    return useContainers(enabled);
   } catch (error) {
     // If no tenant/project context, return empty array
     console.warn("useGetContainers: No tenant/project context available");

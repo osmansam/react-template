@@ -1,4 +1,5 @@
 import { FormElementsState } from "../../types";
+import { AuditLogsAuthorizationConfig } from "../auditLogsAccess";
 import { useGet } from "./factory";
 
 export interface AuditLog {
@@ -6,6 +7,7 @@ export interface AuditLog {
   timestamp: string | Date;
   userId?: string;
   userEmail?: string;
+  userDisplayName?: string;
   roles?: string[];
   schemaName?: string;
   documentIds?: string[];
@@ -23,6 +25,12 @@ export interface PaginatedAuditLogsResponse {
   totalPages: number;
   page: number;
   limit: number;
+}
+
+interface GeneralResponse<T> {
+  status: number;
+  message: string;
+  data: T;
 }
 
 const AUDIT_BASE = "/audit-logs";
@@ -79,7 +87,8 @@ export function useGetAuditLogs(filters?: FormElementsState) {
 export function useGetPaginatedAuditLogs(
   page: number,
   limit: number,
-  filters?: FormElementsState
+  filters?: FormElementsState,
+  enabled = true
 ) {
   const queryKey = ["auditLogs", "page", { page, limit, filters }] as const;
 
@@ -129,5 +138,14 @@ export function useGetPaginatedAuditLogs(
   const queryString = parts.filter(Boolean).join("&");
   const url = `${AUDIT_BASE}?${queryString}`;
 
-  return useGet<PaginatedAuditLogsResponse>(url, queryKey, true);
+  return useGet<PaginatedAuditLogsResponse>(url, queryKey, enabled);
 }
+
+export function useAuditLogsAuthorizationConfig(enabled = true) {
+  return useGet<GeneralResponse<AuditLogsAuthorizationConfig>>(
+    `${AUDIT_BASE}/config`,
+    ["auditLogsConfig"],
+    enabled,
+  );
+}
+

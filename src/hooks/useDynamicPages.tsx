@@ -84,9 +84,9 @@ const extractPageTabs = (sections: PageSection[] = []): DynamicRouteTab[] => {
   return tabs;
 };
 
-export const useDynamicPages = () => {
+export const useDynamicPages = (enabled: boolean = true) => {
   // Fetch all pages from the page API
-  const pages = useGetAllPages();
+  const pages = useGetAllPages(enabled);
   const pageData = useMemo(
     () => (Array.isArray(pages.data) ? pages.data : []),
     [pages.data]

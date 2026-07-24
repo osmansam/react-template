@@ -89,6 +89,7 @@ type Props<T> = {
   outsideSortProps?: OutsideSortProps;
   outsideSearchProps?: OutsideSearchProps;
   selectionActions?: ActionType<T>[];
+  isSelectionEnabled?: boolean;
   isToolTipEnabled?: boolean;
   isEmtpyExcel?: boolean;
   showOrientationToggle?: boolean;
@@ -143,6 +144,7 @@ const GenericTable = <T,>({
   rowStyleFunction,
   pagination,
   selectionActions,
+  isSelectionEnabled = false,
   showOrientationToggle,
   onExcelUpload,
   dateFormat = DEFAULT_DATE_FORMAT,
@@ -344,7 +346,8 @@ const GenericTable = <T,>({
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
   const [isExcelMenuOpen, setIsExcelMenuOpen] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
-  const hasSelectionActions = Boolean(selectionActions?.length);
+  const hasSelectionActions =
+    Boolean(selectionActions?.length) || isSelectionEnabled;
 
   // Derive sortConfig from sortConfigKey instead of maintaining separate state
   const sortConfig = useMemo(

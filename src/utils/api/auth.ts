@@ -1,13 +1,14 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Cookies from "js-cookie";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useUserContext } from "../../context/User.context";
-import { useFilteredRoutes } from "../../hooks/useFilteredRoutes";
+import { baseQueryOptions } from "../../config/queryClient";
 import { useTenantProject } from "../../hooks/useTenantProject";
+import { User } from "../../types";
 // import { Routes } from "../../navigation/constants";
-import { post } from "./index";
+import { get, post } from "./index";
 import { redirectAfterAuth } from "./authRedirect";
 
 interface LoginError {
@@ -21,7 +22,37 @@ interface LoginError {
 
 export type LoginCredentials = Record<string, unknown>;
 
-import { User } from "../../types";
+export interface LoginConfigField {
+  name: string;
+  type: string;
+  isHashed?: boolean;
+  isLoginCredential?: boolean;
+  displayName?: string;
+}
+
+export interface LoginConfig {
+  schemaName: string;
+  isRegisterActive: boolean;
+  isGoogleLoginActive: boolean;
+  loginFields: LoginConfigField[];
+  registerFields: LoginConfigField[];
+}
+
+export function getLoginConfigFieldLabel(field: LoginConfigField) {
+  return field.displayName || field.name;
+}
+
+async function getLoginConfigMethod() {
+  return get<LoginConfig>({ path: "/auth/login-config" });
+}
+
+export function useLoginConfig() {
+  return useQuery({
+    queryKey: ["auth", "login-config"],
+    queryFn: getLoginConfigMethod,
+    ...baseQueryOptions,
+  });
+}
 
 export interface LoginResponse {
   status: number;
@@ -71,8 +102,7 @@ export function useLogin(
         setUser(user);
       }
 
-      // Clear all queries and refetch with new token
-      await queryClient.invalidateQueries();
+      queryClient.clear();
 
       toast.success(t("Logged in successfully"));
 
@@ -109,20 +139,6 @@ export function useRegister(
   const { setUser } = useUserContext();
   const queryClient = useQueryClient();
   const { buildPath } = useTenantProject();
-  const routes = useFilteredRoutes();
-
-  // Get first available page path
-  const getFirstPagePath = () => {
-    for (const route of routes) {
-      if (route.children) {
-        const firstChild = route.children.find((child) => child.path);
-        if (firstChild?.path) return firstChild.path;
-      } else if (route.path) {
-        return route.path;
-      }
-    }
-    return "/";
-  };
 
   const { mutate: register } = useMutation<
     LoginResponse,
@@ -144,15 +160,16 @@ export function useRegister(
         setUser(user);
       }
 
-      // Clear all queries and refetch with new token
-      await queryClient.invalidateQueries();
+      queryClient.clear();
 
       toast.success(t("Registered successfully"));
 
-      // Redirect to first page or provided redirect path
-      const firstPagePath = getFirstPagePath();
-      const target = redirectPath || buildPath(firstPagePath);
-      navigate(target);
+      if (redirectPath) {
+        navigate(redirectPath);
+        return;
+      }
+
+      redirectAfterAuth(buildPath);
     },
 
     onError,

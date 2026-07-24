@@ -7,7 +7,15 @@ import SwitchButton from "../components/panelComponents/common/SwitchButton";
 import { InputTypes } from "../components/panelComponents/shared/types";
 import { useGeneralContext } from "../context/General.context";
 import { FormElementsState } from "../types";
-import { AuditLog, useGetPaginatedAuditLogs } from "../utils/api/auditLogs";
+import { useUserContext } from "../context/User.context";
+import { canAccessAuditLogs } from "../utils/auditLogsAccess";
+import { ACCESS_TOKEN } from "../utils/api/axiosClient";
+import { decodeJWT } from "../utils/jwtUtils";
+import {
+  AuditLog,
+  useAuditLogsAuthorizationConfig,
+  useGetPaginatedAuditLogs,
+} from "../utils/api/auditLogs";
 import { useGetContainers } from "../utils/api/container";
 
 const AUDIT_LOGS_ROWS_PER_PAGE_OPTIONS: number[] = [10, 20, 50, 100, 200, 500];
@@ -37,6 +45,7 @@ type CollapsibleRow = {
 };
 
 type AuditLogRow = AuditLog & {
+  userLabel: string;
   formattedDate: string;
   createHour: string;
   collapsible: CollapsibleRow;
@@ -55,7 +64,16 @@ const initialFilterState: FormElementsState = {
 const AuditLogs = () => {
   const { t } = useTranslation();
   const { rowsPerPage } = useGeneralContext();
-  const rawContainers = useGetContainers();
+  const { user } = useUserContext();
+  const tokenRole = decodeJWT(localStorage.getItem(ACCESS_TOKEN) || "")?.role;
+  const auditUser = useMemo(
+    () => user || (tokenRole ? { role: tokenRole } : undefined),
+    [tokenRole, user],
+  );
+  const auditConfigResponse = useAuditLogsAuthorizationConfig(Boolean(auditUser));
+  const auditConfig = auditConfigResponse?.data;
+  const canViewAuditLogs = canAccessAuditLogs(auditConfig, auditUser);
+  const rawContainers = useGetContainers(canViewAuditLogs);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Filter state
@@ -75,6 +93,7 @@ const AuditLogs = () => {
     currentPage,
     rowsPerPage,
     filterFormElements,
+    canViewAuditLogs,
   );
 
   const schemaOptions = useMemo(() => {
@@ -92,6 +111,7 @@ const AuditLogs = () => {
 
       return {
         ...log,
+        userLabel: log.userDisplayName || log.userEmail || log.userId || "",
         formattedDate: timestamp ? format(timestamp, "yyyy-MM-dd") : "",
         createHour: timestamp ? format(timestamp, "HH:mm:ss") : "",
         collapsible: {
@@ -142,9 +162,9 @@ const AuditLogs = () => {
   const columns = useMemo(
     () => [
       {
-        key: t("User Email"),
+        key: t("User"),
         isSortable: true,
-        correspondingKey: "userEmail",
+        correspondingKey: "userLabel",
       },
       {
         key: t("Action"),
@@ -177,7 +197,7 @@ const AuditLogs = () => {
   const rowKeys = useMemo(
     () => [
       {
-        key: "userEmail",
+        key: "userLabel",
         className: "font-medium text-gray-700",
       },
       {
@@ -235,9 +255,9 @@ const AuditLogs = () => {
       },
       {
         type: InputTypes.TEXT,
-        formKey: "userEmail",
-        label: t("User Email"),
-        placeholder: t("User Email"),
+        formKey: "userDisplayName",
+        label: t("User"),
+        placeholder: t("User"),
         required: false,
       },
       {
@@ -323,6 +343,28 @@ const AuditLogs = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [filterFormElements, setCurrentPage]);
+
+  if (!auditConfig) {
+    return (
+      <>
+        <Header />
+        <div className="w-[95%] mx-auto my-10 text-sm text-gray-500">
+          {t("Loading...")}
+        </div>
+      </>
+    );
+  }
+
+  if (!canViewAuditLogs) {
+    return (
+      <>
+        <Header />
+        <div className="w-[95%] mx-auto my-10 rounded-lg border border-red-100 bg-red-50 p-6 text-sm text-red-700">
+          {t("You are not authorized to view audit logs.")}
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

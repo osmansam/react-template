@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import Cookies from "js-cookie";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FcGoogle } from "react-icons/fc";
 import { useLocation } from "react-router-dom";
@@ -10,9 +10,12 @@ import TextInput from "../components/panelComponents/FormElements/TextInput";
 import { H1, H5 } from "../components/panelComponents/Typography";
 import { useUserContext } from "../context/User.context";
 import { useTenantProject } from "../hooks/useTenantProject";
-import { useLogin, useRegister } from "../utils/api/auth";
-import { ContainerModel, useGetContainers } from "../utils/api/container";
-import { getFieldLabel } from "../utils/genericPageHelpers";
+import {
+  getLoginConfigFieldLabel,
+  useLogin,
+  useLoginConfig,
+  useRegister,
+} from "../utils/api/auth";
 import {
   redirectAfterGoogleLogin,
   refreshAfterGoogleLogin,
@@ -22,11 +25,8 @@ const Login = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const containers = useGetContainers();
+  const { data: loginConfig, isLoading, isError } = useLoginConfig();
   const { buildPath } = useTenantProject();
-  const [authContainer, setAuthContainer] = useState<ContainerModel | null>(
-    null,
-  );
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const { setUser } = useUserContext();
@@ -35,14 +35,6 @@ const Login = () => {
   const { login } = useLogin();
   const { register } = useRegister();
 
-  useEffect(() => {
-    if (containers) {
-      const auth = containers.find((c) => c.isAuthContainer);
-      if (auth) {
-        setAuthContainer(auth);
-      }
-    }
-  }, [containers]);
 
   const handleInputChange = (fieldName: string, value: string) => {
     setFormData((prev) => ({ ...prev, [fieldName]: value }));
@@ -51,7 +43,7 @@ const Login = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isRegisterMode) {
-      register({ ...formData, schemaName: authContainer?.schemaName || "" });
+      register({ ...formData, schemaName: loginConfig?.schemaName || "" });
     } else {
       login(formData);
     }
@@ -132,8 +124,8 @@ const Login = () => {
     }, 500);
   };
 
-  if (!authContainer) {
-    if (containers && containers.length > 0) {
+  if (isLoading || !loginConfig) {
+    if (isError) {
       return (
         <div className="flex items-center justify-center h-screen bg-gray-50">
           <div className="text-center p-8 bg-white rounded-lg shadow-md">
@@ -141,11 +133,7 @@ const Login = () => {
               Configuration Error
             </h2>
             <p className="text-gray-600">
-              No authentication container found. Please set{" "}
-              <code className="bg-gray-100 px-1 rounded">
-                IsAuthContainer: true
-              </code>{" "}
-              for one of your containers in the backend.
+              No authentication configuration found for this project.
             </p>
           </div>
         </div>
@@ -162,11 +150,9 @@ const Login = () => {
     );
   }
 
-  const loginFields = authContainer.fields.filter((f) => f.isLoginCredential);
-  const allFields = authContainer.fields.filter(
-    (f) => f.name !== "_id" && f.name !== "createdAt" && f.name !== "updatedAt",
-  );
-  const fieldsToShow = isRegisterMode ? allFields : loginFields;
+  const fieldsToShow = isRegisterMode
+    ? loginConfig.registerFields
+    : loginConfig.loginFields;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4">
@@ -187,7 +173,7 @@ const Login = () => {
             {fieldsToShow.map((field) => (
               <TextInput
                 key={field.name}
-                label={getFieldLabel(field)}
+                label={getLoginConfigFieldLabel(field)}
                 type={field.isHashed ? "password" : "text"}
                 value={formData[field.name] || ""}
                 onChange={(val) => handleInputChange(field.name, val)}
@@ -205,7 +191,7 @@ const Login = () => {
             </GenericButton>
           </form>
 
-          {authContainer.isGoogleLoginActive && (
+          {loginConfig.isGoogleLoginActive && (
           <div className="mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -231,7 +217,7 @@ const Login = () => {
           )}
         </div>
         <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
-          {authContainer.isRegisterActive ? (
+          {loginConfig.isRegisterActive ? (
             <p className="text-sm text-gray-600">
               {isRegisterMode
                 ? t("Already have an account?")
