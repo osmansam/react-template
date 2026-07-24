@@ -1,6 +1,8 @@
 // import { Tab } from "../components/panelComponents/shared/types";
 
-import AuditLogs from "../pages/AuditLogs";
+import { lazy, type ComponentType } from "react";
+
+const AuditLogs = lazy(() => import("../pages/AuditLogs"));
 
 // Removed all missing page imports - only keeping existing pages
 export enum PublicRoutes {
@@ -21,7 +23,7 @@ export const staticRoutes: {
   exceptionalRoles?: number[];
   link?: string;
   icon?: string;
-  element?: () => JSX.Element;
+  element?: ComponentType;
   children?: typeof staticRoutes;
 }[] = [
   {

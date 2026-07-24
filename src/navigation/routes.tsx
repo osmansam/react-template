@@ -1,12 +1,19 @@
-import { useMemo } from "react";
+import {
+  lazy,
+  Suspense,
+  useMemo,
+  type ComponentType,
+} from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useDynamicPages } from "../hooks/useDynamicPages";
-import GoogleCallback from "../pages/GoogleCallback";
-import Login from "../pages/Login";
 import { allRoutes, PublicRoutes } from "./constants";
+import { RouteLoadingFallback } from "./RouteLoadingFallback";
 import { getPreferredLandingPath } from "./landingRoute";
 import { PrivateRoutes } from "./PrivateRoutes";
 import { shouldLoadDynamicPages } from "./dynamicPagesLoading";
+
+const GoogleCallback = lazy(() => import("../pages/GoogleCallback"));
+const Login = lazy(() => import("../pages/Login"));
 
 interface RouteConfig {
   name: string;
@@ -14,7 +21,7 @@ interface RouteConfig {
   isOnSidebar: boolean;
   isMainPage?: boolean;
   icon?: string;
-  element?: () => JSX.Element;
+  element?: ComponentType;
   children?: RouteConfig[];
   link?: string;
   tabs?: {
@@ -77,57 +84,59 @@ const RouterContainer = () => {
   }
 
   return (
-    <Routes>
-      {/* Tenant/Project scoped routes - ALL routes including login */}
-      <Route path="/t/:tenant/p/:project">
-        <Route path="login" element={<Login />} />
-        <Route path="auth/google/callback" element={<GoogleCallback />} />
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Routes>
+        {/* Tenant/Project scoped routes - ALL routes including login */}
+        <Route path="/t/:tenant/p/:project">
+          <Route path="login" element={<Login />} />
+          <Route path="auth/google/callback" element={<GoogleCallback />} />
 
-        {/* Private routes */}
+          {/* Private routes */}
+          <Route element={<PrivateRoutes />}>
+            <Route
+              index
+              element={<Navigate to={tenantLandingPath} replace />}
+            />
+            {flattenedRoutes.map((route) => (
+              <Route
+                key={route.path}
+                path={
+                  route.path?.startsWith("/") ? route.path.slice(1) : route.path
+                }
+                element={route.element && <route.element />}
+              />
+            ))}
+            {/* Catch-all for 404 within tenant/project context */}
+            <Route
+              path="*"
+              element={
+                <div className="p-8 text-center">
+                  <h1 className="text-2xl font-bold mb-2">
+                    404 - Page Not Found
+                  </h1>
+                  <p className="text-gray-600">
+                    The page you're looking for doesn't exist.
+                  </p>
+                </div>
+              }
+            />
+          </Route>
+        </Route>
+
+        {/* Legacy routes without tenant/project (for backward compatibility) */}
+        <Route path={PublicRoutes.Login} element={<Login />} />
         <Route element={<PrivateRoutes />}>
-          <Route
-            index
-            element={<Navigate to={tenantLandingPath} replace />}
-          />
+          <Route index element={<Navigate to={landingPath} replace />} />
           {flattenedRoutes.map((route) => (
             <Route
-              key={route.path}
-              path={
-                route.path?.startsWith("/") ? route.path.slice(1) : route.path
-              }
+              key={`legacy-${route.path}`}
+              path={route.path}
               element={route.element && <route.element />}
             />
           ))}
-          {/* Catch-all for 404 within tenant/project context */}
-          <Route
-            path="*"
-            element={
-              <div className="p-8 text-center">
-                <h1 className="text-2xl font-bold mb-2">
-                  404 - Page Not Found
-                </h1>
-                <p className="text-gray-600">
-                  The page you're looking for doesn't exist.
-                </p>
-              </div>
-            }
-          />
         </Route>
-      </Route>
-
-      {/* Legacy routes without tenant/project (for backward compatibility) */}
-      <Route path={PublicRoutes.Login} element={<Login />} />
-      <Route element={<PrivateRoutes />}>
-        <Route index element={<Navigate to={landingPath} replace />} />
-        {flattenedRoutes.map((route) => (
-          <Route
-            key={`legacy-${route.path}`}
-            path={route.path}
-            element={route.element && <route.element />}
-          />
-        ))}
-      </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 };
 
