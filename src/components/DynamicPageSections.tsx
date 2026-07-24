@@ -8,7 +8,6 @@ import {
   PageFilterDefinition,
   PageSection,
   TabContent,
-  TableComponentConfig,
 } from "../types/page";
 import {
   ComponentRequestBoundary,
@@ -18,6 +17,7 @@ import {
 } from "../pageRuntime/ComponentRequestBoundary";
 import PageFilterRenderer from "../pageRuntime/PageFilterRenderer";
 import { useGetSelection } from "../utils/dynamic";
+import { getTableConfig } from "../utils/dynamicPageTableConfig";
 import { resolveRouteParamValue, RouteParams } from "../utils/routeParams";
 import type { ChartType } from "./charts/DynamicChart";
 import GenericPaginatedPage from "./panelComponents/FormElements/GenericPaginatedPage";
@@ -54,23 +54,6 @@ const getChartTypeFromComponentType = (
   };
   return mapping[componentType] || null;
 };
-
-const getTableConfig = (
-  table: TableComponentConfig | undefined,
-  props: Record<string, unknown> | undefined,
-): TableComponentConfig | undefined =>
-  table ||
-  (props?.table as TableComponentConfig | undefined) ||
-  ([
-    props?.columns,
-    props?.rows,
-    props?.cache,
-    props?.actions,
-    props?.filterPanel,
-    props?.title,
-  ].some(Boolean)
-    ? (props as TableComponentConfig)
-    : undefined);
 
 const MixedTabPanel: React.FC<{
   tabs: TabContent[];

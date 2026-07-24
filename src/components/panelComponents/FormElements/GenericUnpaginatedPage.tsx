@@ -1085,6 +1085,10 @@ export default function GenericUnpaginatedPage({
   );
   const bulkEditActionConfig = tableConfig?.bulkActions?.edit;
   const bulkDeleteActionConfig = tableConfig?.bulkActions?.delete;
+  const isBulkSelectionEnabled = Boolean(
+    (bulkEditActionConfig && bulkEditActionConfig.enabled !== false) ||
+      (bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false),
+  );
   const configuredBulkEditFields = bulkEditActionConfig?.formFields || [];
   const bulkActionSelectionDataMap = useActionFormSelectionData(
     bulkEditActionConfig ? [bulkEditActionConfig] : [],
@@ -2002,6 +2006,7 @@ export default function GenericUnpaginatedPage({
           isActionsActive={actionsEnabled}
           isSearch={isTableSearchEnabled(tableConfig)}
           selectionActions={selectionActions}
+          isSelectionEnabled={isBulkSelectionEnabled}
           isExcel={!hasImageField}
           onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
           filters={filters}

@@ -10,10 +10,11 @@ const BASE = "/page";
 const PAGE_QUERY_KEY = ["page", "all"] as const;
 
 // Get all pages
-export function useGetAllPages() {
+export function useGetAllPages(enabled: boolean = true) {
   return useQuery({
     queryKey: PAGE_QUERY_KEY,
-    queryFn: () => get<PageModel[]>({ path: `${BASE}/public` }),
+    queryFn: () => get<PageModel[]>({ path: BASE }),
+    enabled,
     ...pageQueryOptions,
   });
 }

@@ -576,6 +576,10 @@ export default function GenericPaginatedPage({
   );
   const bulkEditActionConfig = tableConfig?.bulkActions?.edit;
   const bulkDeleteActionConfig = tableConfig?.bulkActions?.delete;
+  const isBulkSelectionEnabled = Boolean(
+    (bulkEditActionConfig && bulkEditActionConfig.enabled !== false) ||
+      (bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false),
+  );
 
   const displayFields: Field[] = useMemo(() => {
     const containerFields = container?.fields || [];
@@ -2420,6 +2424,7 @@ export default function GenericPaginatedPage({
           {...(pagination && { pagination })}
           outsideSearchProps={searchEnabled ? outsideSearchProps : undefined}
           selectionActions={selectionActions}
+          isSelectionEnabled={isBulkSelectionEnabled}
           isExcel={true}
           onExcelUpload={
             schemaActionsEnabled && !hasImageField

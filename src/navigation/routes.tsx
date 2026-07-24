@@ -1,11 +1,12 @@
 import { useMemo } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useDynamicPages } from "../hooks/useDynamicPages";
 import GoogleCallback from "../pages/GoogleCallback";
 import Login from "../pages/Login";
 import { allRoutes, PublicRoutes } from "./constants";
 import { getPreferredLandingPath } from "./landingRoute";
 import { PrivateRoutes } from "./PrivateRoutes";
+import { shouldLoadDynamicPages } from "./dynamicPagesLoading";
 
 interface RouteConfig {
   name: string;
@@ -23,7 +24,10 @@ interface RouteConfig {
 }
 
 const RouterContainer = () => {
-  const { dynamicRoutes, isLoading, isError } = useDynamicPages();
+  const location = useLocation();
+  const token = localStorage.getItem("jwt");
+  const loadDynamicPages = shouldLoadDynamicPages(location.pathname, token);
+  const { dynamicRoutes, isLoading, isError } = useDynamicPages(loadDynamicPages);
 
   // Combine static routes with dynamic routes
   const combinedRoutes = useMemo(() => {
@@ -53,7 +57,7 @@ const RouterContainer = () => {
   const tenantLandingPath = landingPath.replace(/^\/+/, "") || ".";
 
   // Show loading screen while fetching dynamic pages to prevent 404 flash
-  if (isLoading) {
+  if (loadDynamicPages && isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white text-sm text-gray-500">
         Loading pages...
@@ -61,7 +65,7 @@ const RouterContainer = () => {
     );
   }
 
-  if (isError) {
+  if (loadDynamicPages && isError) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white p-8 text-center">
         <div>
