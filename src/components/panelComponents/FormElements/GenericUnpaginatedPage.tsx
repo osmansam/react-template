@@ -178,7 +178,6 @@ const getActionFieldOptions = (
   actionId: string,
   field: TableActionFormFieldConfig,
   selectDataMap: ActionSelectDataMap,
-  fallback?: GenericInputType,
 ) => {
   if (field.type !== "select") return [];
   if (field.optionsSource !== "schema") return getStaticActionOptions(field);
@@ -225,7 +224,6 @@ const buildActionInputs = (
           actionId,
           field,
           selectDataMap,
-          fallback,
         ),
         sourceRequestFilters: field.sourceRequestFilters,
         sourceFilterCondition: field.sourceFilterCondition,
