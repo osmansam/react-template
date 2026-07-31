@@ -5,10 +5,19 @@ import { useTranslation } from "react-i18next";
 import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { Header } from "../../../components/header/Header";
-import { LinkCell, renderLinkedCellContent } from "../../../components/LinkCell";
+import {
+  LinkCell,
+  renderLinkedCellContent,
+} from "../../../components/LinkCell";
 import { useGeneralContext } from "../../../context/General.context";
 import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
+import { usePageRuntimeStore } from "../../../pageRuntime/PageRuntimeProvider";
+import {
+  TableOutputState,
+  resolveSelectedRowIds,
+  resolveTableOutput,
+} from "../../../pageRuntime/tableOutputAdapter";
 import { FormElementsState } from "../../../types";
 import {
   ComponentOutputDefinition,
@@ -17,12 +26,6 @@ import {
   TableActionFormFieldConfig,
   TableComponentConfig,
 } from "../../../types/page";
-import { usePageRuntimeStore } from "../../../pageRuntime/PageRuntimeProvider";
-import {
-  resolveSelectedRowIds,
-  resolveTableOutput,
-  TableOutputState,
-} from "../../../pageRuntime/tableOutputAdapter";
 import { UpdatePayload, get } from "../../../utils/api";
 import {
   ContainerModel,
@@ -51,6 +54,7 @@ import {
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
 import { getSelectionQueryConfig } from "../../../utils/selectionQuery";
+import { canUseConfiguredBulkSchemaActions } from "../../../utils/tableActions";
 import {
   applyTableNestedRows,
   getComputedLabelValue,
@@ -62,12 +66,12 @@ import {
   getTableLinkConfig,
   isTableSearchEnabled,
 } from "../../../utils/tableConfig";
-import { useTableLookupSelectionData } from "../../../utils/tableLookupSelection";
 import {
   buildConfiguredFilterInputs,
   getFilterDefaultValues,
   useFilterPanelSelectionData,
 } from "../../../utils/tableFilters";
+import { useTableLookupSelectionData } from "../../../utils/tableLookupSelection";
 import {
   isFieldRequired,
   parseValidationRules,
@@ -569,16 +573,18 @@ export default function GenericPaginatedPage({
     deleteDynamicItem,
     deleteMultipleDynamicItem,
     updateMultipleDynamicItem,
-  } = useDynamicCrud<GenericItem>(
-    schemaName,
-    hasImageField,
-    [...tableSourceQueryKey],
-  );
+  } = useDynamicCrud<GenericItem>(schemaName, hasImageField, [
+    ...tableSourceQueryKey,
+  ]);
   const bulkEditActionConfig = tableConfig?.bulkActions?.edit;
   const bulkDeleteActionConfig = tableConfig?.bulkActions?.delete;
+  const bulkSchemaActionsEnabled = canUseConfiguredBulkSchemaActions(
+    actionsEnabled,
+    tableBinding,
+  );
   const isBulkSelectionEnabled = Boolean(
     (bulkEditActionConfig && bulkEditActionConfig.enabled !== false) ||
-      (bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false),
+    (bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false),
   );
 
   const displayFields: Field[] = useMemo(() => {
@@ -788,7 +794,8 @@ export default function GenericPaginatedPage({
         if (columnConfig?.type === "number") {
           rowKey.node = (row: GenericItem) => {
             const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
+            if (v === undefined || v === null || v === "")
+              return <span>-</span>;
             const n = Number(v);
             return renderLinkedCellContent(
               f,
@@ -803,14 +810,21 @@ export default function GenericPaginatedPage({
         if (columnConfig?.type === "currency") {
           rowKey.node = (row: GenericItem) => {
             const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
+            if (v === undefined || v === null || v === "")
+              return <span>-</span>;
             const n = Number(v);
             return renderLinkedCellContent(
               f,
               row,
               linkConfig,
               <span>
-                {isNaN(n) ? String(v) : n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                {isNaN(n)
+                  ? String(v)
+                  : n.toLocaleString("tr-TR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                ₺
               </span>,
             );
           };
@@ -820,7 +834,8 @@ export default function GenericPaginatedPage({
         if (columnConfig?.type === "percentage") {
           rowKey.node = (row: GenericItem) => {
             const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
+            if (v === undefined || v === null || v === "")
+              return <span>-</span>;
             const n = Number(v);
             return renderLinkedCellContent(
               f,
@@ -835,10 +850,16 @@ export default function GenericPaginatedPage({
         if (columnConfig?.type === "growthPercentage") {
           rowKey.node = (row: GenericItem) => {
             const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
+            if (v === undefined || v === null || v === "")
+              return <span>-</span>;
             const n = Number(v);
             if (isNaN(n)) {
-              return renderLinkedCellContent(f, row, linkConfig, <span>{String(v)}</span>);
+              return renderLinkedCellContent(
+                f,
+                row,
+                linkConfig,
+                <span>{String(v)}</span>,
+              );
             }
             const isPositive = n > 0;
             const isNegative = n < 0;
@@ -853,9 +874,19 @@ export default function GenericPaginatedPage({
               f,
               row,
               linkConfig,
-              <span style={{ color, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+              <span
+                style={{
+                  color,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
                 <span>{arrow}</span>
-                <span>{sign}{n.toLocaleString()}%</span>
+                <span>
+                  {sign}
+                  {n.toLocaleString()}%
+                </span>
               </span>,
             );
           };
@@ -869,7 +900,12 @@ export default function GenericPaginatedPage({
             try {
               const d = new Date(v as string | number);
               if (isNaN(d.getTime())) {
-                return renderLinkedCellContent(f, row, linkConfig, <span>{String(v)}</span>);
+                return renderLinkedCellContent(
+                  f,
+                  row,
+                  linkConfig,
+                  <span>{String(v)}</span>,
+                );
               }
               return renderLinkedCellContent(
                 f,
@@ -877,12 +913,16 @@ export default function GenericPaginatedPage({
                 linkConfig,
                 <span>
                   {String(d.getDate()).padStart(2, "0")}/
-                  {String(d.getMonth() + 1).padStart(2, "0")}/
-                  {d.getFullYear()}
+                  {String(d.getMonth() + 1).padStart(2, "0")}/{d.getFullYear()}
                 </span>,
               );
             } catch {
-              return renderLinkedCellContent(f, row, linkConfig, <span>{String(v)}</span>);
+              return renderLinkedCellContent(
+                f,
+                row,
+                linkConfig,
+                <span>{String(v)}</span>,
+              );
             }
           };
           return rowKey;
@@ -932,7 +972,8 @@ export default function GenericPaginatedPage({
         if (columnConfig?.type === "badge") {
           rowKey.node = (row: GenericItem) => {
             const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
+            if (v === undefined || v === null || v === "")
+              return <span>-</span>;
             return renderLinkedCellContent(
               f,
               row,
@@ -950,7 +991,12 @@ export default function GenericPaginatedPage({
             const v = row[f.name];
             if (v === undefined || v === null) return <span>-</span>;
             const content = Array.isArray(v) ? v.join(", ") : String(v);
-            return renderLinkedCellContent(f, row, linkConfig, <span>{content || "-"}</span>);
+            return renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
+              <span>{content || "-"}</span>,
+            );
           };
           return rowKey;
         }
@@ -1334,7 +1380,9 @@ export default function GenericPaginatedPage({
 
   const actionSelectionDataMap = useActionFormSelectionData([
     ...(configuredAddButtonAction ? [configuredAddButtonAction] : []),
-    ...(tableConfig?.actions || []).filter((action) => action.kind !== "create"),
+    ...(tableConfig?.actions || []).filter(
+      (action) => action.kind !== "create",
+    ),
   ]);
 
   const addButtonDefaults = configuredAddButtonAction
@@ -1346,7 +1394,7 @@ export default function GenericPaginatedPage({
   const addButtonWorkflowSubmit = configuredAddButtonAction?.submit;
   const isAddButtonWorkflowAction = Boolean(
     addButtonWorkflowSubmit?.workflowName &&
-      addButtonWorkflowSubmit?.workflowSchema,
+    addButtonWorkflowSubmit?.workflowSchema,
   );
   const addButtonInputs = configuredAddButtonAction
     ? buildActionInputs(
@@ -1415,78 +1463,72 @@ export default function GenericPaginatedPage({
     ],
   );
 
-  const addButton = useMemo(
-    () => {
-      if (!actionsEnabled) return undefined;
-      if (!configuredAddButtonAction) {
-        if (
-          !schemaActionsEnabled ||
-          tableConfig?.addButton?.enabled === false
-        ) {
-          return undefined;
-        }
+  const addButton = useMemo(() => {
+    if (!actionsEnabled) return undefined;
+    if (!configuredAddButtonAction) {
+      if (!schemaActionsEnabled || tableConfig?.addButton?.enabled === false) {
+        return undefined;
       }
+    }
 
-      const actionConfig = configuredAddButtonAction || { kind: "create" as const };
+    const actionConfig = configuredAddButtonAction || {
+      kind: "create" as const,
+    };
 
-      return {
-        name: actionConfig.label || t("Add"),
-        isModal: true,
-        modal: (
-          <GenericAddEditPanel
-            isOpen={isAddOpen}
-            close={() => setIsAddOpen(false)}
-            inputs={addButtonInputs}
-            formKeys={addButtonFormKeys}
-            submitItem={handleSubmitItem}
-            buttonName={
-              actionConfig.buttonName ||
-              actionConfig.label ||
-              undefined
-            }
-            topClassName="flex flex-col gap-2"
-            itemToEdit={
-              constantFilter ||
-              Object.keys(addButtonDefaults).length > 0 ||
-              Object.keys(addButtonConstants).length > 0
-                ? {
-                    id: "",
-                    updates: {
-                      ...addButtonDefaults,
-                      ...addButtonConstants,
-                      ...(constantFilter || {}),
-                      _id: "",
-                    } as GenericItem,
-                  }
-                : undefined
-            }
-          />
-        ),
-        isModalOpen: isAddOpen,
-        setIsModal: setIsAddOpen,
-        isPath: false,
-        icon: null,
-        className:
-          actionConfig.buttonClassName ||
-          actionConfig.className ||
-          "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
-      };
-    },
-    [
-      t,
-      actionsEnabled,
-      schemaActionsEnabled,
-      configuredAddButtonAction,
-      tableConfig?.addButton?.enabled,
-      isAddOpen,
-      addButtonInputs,
-      addButtonFormKeys,
-      handleSubmitItem,
-      constantFilter,
-      addButtonDefaults,
-      addButtonConstants,
-    ],
-  );
+    return {
+      name: actionConfig.label || t("Add"),
+      isModal: true,
+      modal: (
+        <GenericAddEditPanel
+          isOpen={isAddOpen}
+          close={() => setIsAddOpen(false)}
+          inputs={addButtonInputs}
+          formKeys={addButtonFormKeys}
+          submitItem={handleSubmitItem}
+          buttonName={
+            actionConfig.buttonName || actionConfig.label || undefined
+          }
+          topClassName="flex flex-col gap-2"
+          itemToEdit={
+            constantFilter ||
+            Object.keys(addButtonDefaults).length > 0 ||
+            Object.keys(addButtonConstants).length > 0
+              ? {
+                  id: "",
+                  updates: {
+                    ...addButtonDefaults,
+                    ...addButtonConstants,
+                    ...(constantFilter || {}),
+                    _id: "",
+                  } as GenericItem,
+                }
+              : undefined
+          }
+        />
+      ),
+      isModalOpen: isAddOpen,
+      setIsModal: setIsAddOpen,
+      isPath: false,
+      icon: null,
+      className:
+        actionConfig.buttonClassName ||
+        actionConfig.className ||
+        "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
+    };
+  }, [
+    t,
+    actionsEnabled,
+    schemaActionsEnabled,
+    configuredAddButtonAction,
+    tableConfig?.addButton?.enabled,
+    isAddOpen,
+    addButtonInputs,
+    addButtonFormKeys,
+    handleSubmitItem,
+    constantFilter,
+    addButtonDefaults,
+    addButtonConstants,
+  ]);
 
   const actions = useMemo(() => {
     if (!isActionsActive) return [];
@@ -2267,19 +2309,19 @@ export default function GenericPaginatedPage({
         ? [
             {
               name: t(bulkDeleteActionConfig.label || "Delete Selected"),
-        isButton: true,
-        buttonClassName:
+              isButton: true,
+              buttonClassName:
                 bulkDeleteActionConfig.buttonClassName ||
                 "px-2 bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
-        isModal: true,
-        className: "cursor-pointer",
-        isDisabled: !schemaActionsEnabled || !selectedRows?.length,
-        modal:
-          selectedRows?.length > 0 ? (
-            <ConfirmationDialog
-              isOpen={isBulkDeleteOpen}
-              close={() => setIsBulkDeleteOpen(false)}
-              confirm={handleBulkDeleteConfirm}
+              isModal: true,
+              className: "cursor-pointer",
+              isDisabled: !bulkSchemaActionsEnabled || !selectedRows?.length,
+              modal:
+                selectedRows?.length > 0 ? (
+                  <ConfirmationDialog
+                    isOpen={isBulkDeleteOpen}
+                    close={() => setIsBulkDeleteOpen(false)}
+                    confirm={handleBulkDeleteConfirm}
                     title={t(
                       bulkDeleteActionConfig.confirmTitle ||
                         bulkDeleteActionConfig.label ||
@@ -2289,11 +2331,11 @@ export default function GenericPaginatedPage({
                       bulkDeleteActionConfig.confirmText ||
                         "Are you sure you want to delete the selected items?",
                     )}
-            />
-          ) : null,
-        isModalOpen: isBulkDeleteOpen,
-        setIsModal: setIsBulkDeleteOpen,
-        isPath: false,
+                  />
+                ) : null,
+              isModalOpen: isBulkDeleteOpen,
+              setIsModal: setIsBulkDeleteOpen,
+              isPath: false,
             },
           ]
         : []),
@@ -2301,49 +2343,49 @@ export default function GenericPaginatedPage({
         ? [
             {
               name: t(bulkEditActionConfig.label || "Edit Selected"),
-        isButton: true,
-        buttonClassName:
+              isButton: true,
+              buttonClassName:
                 bulkEditActionConfig.buttonClassName ||
                 "px-2  bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
-        isModal: true,
-        className: "cursor-pointer",
-        modal: isBulkEditOpen ? (
-          <GenericAddEditPanel
-            isOpen={isBulkEditOpen}
-            close={handleBulkEditClose}
-            inputs={bulkEditInputs}
-            formKeys={bulkFormKeys}
-            setForm={handleBulkFormChange}
-            submitItem={() => {}}
-            isEditMode={false}
-            topClassName="flex flex-col gap-2"
-            generalClassName="overflow-visible"
+              isModal: true,
+              className: "cursor-pointer",
+              modal: isBulkEditOpen ? (
+                <GenericAddEditPanel
+                  isOpen={isBulkEditOpen}
+                  close={handleBulkEditClose}
+                  inputs={bulkEditInputs}
+                  formKeys={bulkFormKeys}
+                  setForm={handleBulkFormChange}
+                  submitItem={() => {}}
+                  isEditMode={false}
+                  topClassName="flex flex-col gap-2"
+                  generalClassName="overflow-visible"
                   buttonName={t(
                     bulkEditActionConfig.buttonName ||
                       bulkEditActionConfig.label ||
                       "Edit",
                   )}
-            isSubmitButtonActive={isBulkStepTwo}
-            submitFunction={handleBulkEditSubmit}
-            additionalButtons={[
-              {
-                label: isBulkStepTwo ? t("Back") : t("Forward"),
-                onClick: handleBulkEditBackOrForward,
-              },
-            ]}
-          />
-        ) : null,
-        isModalOpen: isBulkEditOpen,
-        setIsModal: setIsBulkEditOpen,
-        isPath: false,
-        isDisabled: !schemaActionsEnabled || !selectedRows?.length,
+                  isSubmitButtonActive={isBulkStepTwo}
+                  submitFunction={handleBulkEditSubmit}
+                  additionalButtons={[
+                    {
+                      label: isBulkStepTwo ? t("Back") : t("Forward"),
+                      onClick: handleBulkEditBackOrForward,
+                    },
+                  ]}
+                />
+              ) : null,
+              isModalOpen: isBulkEditOpen,
+              setIsModal: setIsBulkEditOpen,
+              isPath: false,
+              isDisabled: !bulkSchemaActionsEnabled || !selectedRows?.length,
             },
           ]
         : []),
     ],
     [
       t,
-      schemaActionsEnabled,
+      bulkSchemaActionsEnabled,
       selectedRows,
       bulkDeleteActionConfig,
       isBulkDeleteOpen,
