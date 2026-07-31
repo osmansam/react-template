@@ -667,6 +667,36 @@ const GenericTable = <T,>({
     </div>
   );
 
+  const getSelectionKey = (row: T): string | number | T => {
+    if (row && typeof row === "object") {
+      const record = row as Record<string, unknown>;
+      const id = record._id ?? record.id;
+      if (typeof id === "string" || typeof id === "number") {
+        return id;
+      }
+    }
+    return row;
+  };
+
+  const isSameSelectedRow = (left: T, right: T) =>
+    getSelectionKey(left) === getSelectionKey(right);
+
+  const isRowSelected = (row: T) =>
+    selectedRows.some((selectedRow) => isSameSelectedRow(selectedRow, row));
+
+  const toggleSelectedRow = (row: T) => {
+    if (isRowSelected(row)) {
+      setSelectedRows(
+        selectedRows.filter(
+          (selectedRow) => !isSameSelectedRow(selectedRow, row),
+        ),
+      );
+      return;
+    }
+
+    setSelectedRows([...selectedRows, row]);
+  };
+
   const currentRowsContent = currentRows.map((row, rowIndex) => {
     const rowId = `row-${rowIndex}`;
     const isRowExpanded = expandedRows[rowId];
@@ -688,18 +718,8 @@ const GenericTable = <T,>({
             <td className="w-6 h-6 mx-auto p-1">
               <div className="flex items-center justify-center">
                 <EnterpriseCheckbox
-                  checked={selectedRows.includes(row)}
-                  onChange={() => {
-                    if (selectedRows.includes(row)) {
-                      setSelectedRows(
-                        selectedRows.filter(
-                          (selectedRow) => selectedRow !== row,
-                        ),
-                      );
-                    } else {
-                      setSelectedRows([...selectedRows, row]);
-                    }
-                  }}
+                  checked={isRowSelected(row)}
+                  onChange={() => toggleSelectedRow(row)}
                 />
               </div>
             </td>
@@ -1030,7 +1050,7 @@ const GenericTable = <T,>({
   const allVisibleSelected =
     selectedRows.length > 0 &&
     selectedRows.length === currentRows.length &&
-    currentRows.every((r) => selectedRows.includes(r));
+    currentRows.every((row) => isRowSelected(row));
 
   return (
     <div
