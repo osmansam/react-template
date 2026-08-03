@@ -10,6 +10,7 @@ import { User } from "../../types";
 // import { Routes } from "../../navigation/constants";
 import { get, post } from "./index";
 import { redirectAfterAuth } from "./authRedirect";
+import { notifyApiError } from "./errorMessage";
 
 interface LoginError {
   response: {
@@ -116,7 +117,10 @@ export function useLogin(
       redirectAfterAuth(buildPath);
     },
 
-    onError,
+    onError: (error) => {
+      notifyApiError(error, t, toast.error, "Login failed");
+      onError?.(error);
+    },
   });
   return { login };
 }
@@ -172,7 +176,10 @@ export function useRegister(
       redirectAfterAuth(buildPath);
     },
 
-    onError,
+    onError: (error) => {
+      notifyApiError(error, t, toast.error, "Registration failed");
+      onError?.(error);
+    },
   });
   return { register };
 }

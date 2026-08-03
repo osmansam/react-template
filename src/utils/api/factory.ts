@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import { baseQueryOptions } from "../../config/queryClient";
 import { UpdatePayload, get, patch, post, remove } from ".";
+import { getApiErrorMessage } from "./errorMessage";
 
 interface Props<T> {
   baseQuery: string;
@@ -99,9 +100,7 @@ export function useMutationApi<T extends { _id: number | string }>({
           const { previousItems } = previousItemContext;
           queryClient.setQueryData<T[]>(queryKey, previousItems);
         }
-        const errorMessage =
-          (_err as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message || "An unexpected error occurred";
+        const errorMessage = getApiErrorMessage(_err);
         setTimeout(() => toast.error(t(errorMessage)), 200);
       },
       // Always refetch after error or success:
@@ -150,9 +149,7 @@ export function useMutationApi<T extends { _id: number | string }>({
           const { previousItems } = previousItemContext;
           queryClient.setQueryData<T[]>(queryKey, previousItems);
         }
-        const errorMessage =
-          (_err as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message || "An unexpected error occurred";
+        const errorMessage = getApiErrorMessage(_err);
         setTimeout(() => toast.error(t(errorMessage)), 200);
       },
       // Always refetch after error or success:
@@ -206,9 +203,7 @@ export function useMutationApi<T extends { _id: number | string }>({
           const { previousItems } = previousItemContext;
           queryClient.setQueryData<T[]>(queryKey, previousItems);
         }
-        const errorMessage =
-          (_err as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message || "An unexpected error occurred";
+        const errorMessage = getApiErrorMessage(_err);
         setTimeout(() => toast.error(t(errorMessage)), 200);
       },
       // Always refetch after error or success:
