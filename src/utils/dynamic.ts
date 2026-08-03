@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { FormElementsState } from "../types";
 import { useGet } from "../utils/api/factory";
 import { axiosClient } from "./api/axiosClient";
+import { getApiErrorMessage } from "./api/errorMessage";
 import {
   DynamicTableSourceBinding,
   getDynamicItemsQueryEntries,
@@ -262,9 +263,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       if (context?.previousData) {
         qc.setQueryData(queryKey, context.previousData);
       }
-      const errorMessage =
-        (_err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "An unexpected error occurred";
+      const errorMessage = getApiErrorMessage(_err);
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
@@ -310,9 +309,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       if (context?.previousData) {
         qc.setQueryData(queryKey, context.previousData);
       }
-      const errorMessage =
-        (_err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "An unexpected error occurred";
+      const errorMessage = getApiErrorMessage(_err);
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
@@ -370,9 +367,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       if (context?.previousData) {
         qc.setQueryData(queryKey, context.previousData);
       }
-      const errorMessage =
-        (_err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "An unexpected error occurred";
+      const errorMessage = getApiErrorMessage(_err);
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
@@ -410,8 +405,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     mutationFn: createManyRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (err: any) => {
-      const errorMessage =
-        err?.response?.data?.message || "An unexpected error occurred";
+      const errorMessage = getApiErrorMessage(err);
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
@@ -443,8 +437,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     mutationFn: deleteManyRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (err: any) => {
-      const errorMessage =
-        err?.response?.data?.message || "An unexpected error occurred";
+      const errorMessage = getApiErrorMessage(err);
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
@@ -488,8 +481,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     mutationFn: updateManyRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (err: any) => {
-      const errorMessage =
-        err?.response?.data?.message || "An unexpected error occurred";
+      const errorMessage = getApiErrorMessage(err);
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
@@ -539,8 +531,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     mutationFn: executeWorkflowRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (err: any) => {
-      const errorMessage =
-        err?.response?.data?.message || "An unexpected error occurred";
+      const errorMessage = getApiErrorMessage(err);
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: () => {
