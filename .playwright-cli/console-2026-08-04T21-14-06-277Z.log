@@ -1,0 +1,78 @@
+[     358ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://localhost:3005/node_modules/.vite/deps/chunk-276SZO74.js?v=d0b0c0fe:21550
+[     404ms] [LOG] i18next: languageChanged en-US @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     404ms] [LOG] i18next: initialized {debug: true, initImmediate: true, ns: Array(1), defaultNS: Array(1), fallbackLng: Array(1)} @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     420ms] [WARNING] WebSocket connection to 'ws://localhost:3002/api/v1/acme/deneme/ws?tenantSlug=acme&projectSlug=deneme' failed: WebSocket is closed before the connection is established. @ http://localhost:3005/src/hooks/useWebSocket.ts:104
+[     426ms] [LOG] WS disconnected. Reconnecting... @ http://localhost:3005/src/hooks/useWebSocket.ts:93
+[     455ms] [ERROR] WebSocket connection to 'ws://localhost:3002/api/v1/acme/deneme/ws?tenantSlug=acme&projectSlug=deneme' failed: HTTP Authentication failed; no valid credentials available @ http://localhost:3005/src/hooks/useWebSocket.ts:47
+[     456ms] [LOG] WS disconnected. Reconnecting... @ http://localhost:3005/src/hooks/useWebSocket.ts:93
+[     495ms] [LOG] i18next::translator: missingKey en-US translation Welcome Back Welcome Back @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     495ms] [LOG] i18next::translator: missingKey en-US translation Please sign in to continue Please sign in to continue @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     495ms] [LOG] i18next::translator: missingKey en-US translation Enter your email Enter your email @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     495ms] [LOG] i18next::translator: missingKey en-US translation Sign In Sign In @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Or continue with Or continue with @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Sign in with Google Sign in with Google @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Don't have an account? Don't have an account? @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Contact support Contact support @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Welcome Back Welcome Back @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Please sign in to continue Please sign in to continue @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Enter your email Enter your email @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Sign In Sign In @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Or continue with Or continue with @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Sign in with Google Sign in with Google @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Don't have an account? Don't have an account? @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     496ms] [LOG] i18next::translator: missingKey en-US translation Contact support Contact support @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Welcome Back Welcome Back @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Please sign in to continue Please sign in to continue @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Enter your email Enter your email @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Sign In Sign In @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Or continue with Or continue with @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Sign in with Google Sign in with Google @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Don't have an account? Don't have an account? @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Contact support Contact support @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Welcome Back Welcome Back @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Please sign in to continue Please sign in to continue @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Enter your email Enter your email @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     505ms] [LOG] i18next::translator: missingKey en-US translation Sign In Sign In @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     506ms] [LOG] i18next::translator: missingKey en-US translation Or continue with Or continue with @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     506ms] [LOG] i18next::translator: missingKey en-US translation Sign in with Google Sign in with Google @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     506ms] [LOG] i18next::translator: missingKey en-US translation Don't have an account? Don't have an account? @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[     506ms] [LOG] i18next::translator: missingKey en-US translation Contact support Contact support @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43822ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://localhost:3005/node_modules/.vite/deps/chunk-276SZO74.js?v=d0b0c0fe:21550
+[   43843ms] [LOG] i18next: languageChanged en-US @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43843ms] [LOG] i18next: initialized {debug: true, initImmediate: true, ns: Array(1), defaultNS: Array(1), fallbackLng: Array(1)} @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43847ms] [WARNING] WebSocket connection to 'ws://localhost:3002/api/v1/acme/deneme/ws?tenantSlug=acme&projectSlug=deneme' failed: WebSocket is closed before the connection is established. @ http://localhost:3005/src/hooks/useWebSocket.ts:104
+[   43890ms] [LOG] WS disconnected. Reconnecting... @ http://localhost:3005/src/hooks/useWebSocket.ts:93
+[   43894ms] [ERROR] WebSocket connection to 'ws://localhost:3002/api/v1/acme/deneme/ws?tenantSlug=acme&projectSlug=deneme' failed: HTTP Authentication failed; no valid credentials available @ http://localhost:3005/src/hooks/useWebSocket.ts:47
+[   43895ms] [LOG] WS disconnected. Reconnecting... @ http://localhost:3005/src/hooks/useWebSocket.ts:93
+[   43937ms] [LOG] i18next::translator: missingKey en-US translation Welcome Back Welcome Back @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43937ms] [LOG] i18next::translator: missingKey en-US translation Please sign in to continue Please sign in to continue @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43937ms] [LOG] i18next::translator: missingKey en-US translation Enter your email Enter your email @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43937ms] [LOG] i18next::translator: missingKey en-US translation Sign In Sign In @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43937ms] [LOG] i18next::translator: missingKey en-US translation Or continue with Or continue with @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43937ms] [LOG] i18next::translator: missingKey en-US translation Sign in with Google Sign in with Google @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43937ms] [LOG] i18next::translator: missingKey en-US translation Don't have an account? Don't have an account? @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43937ms] [LOG] i18next::translator: missingKey en-US translation Contact support Contact support @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43938ms] [LOG] i18next::translator: missingKey en-US translation Welcome Back Welcome Back @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43938ms] [LOG] i18next::translator: missingKey en-US translation Please sign in to continue Please sign in to continue @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43938ms] [LOG] i18next::translator: missingKey en-US translation Enter your email Enter your email @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43938ms] [LOG] i18next::translator: missingKey en-US translation Sign In Sign In @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43938ms] [LOG] i18next::translator: missingKey en-US translation Or continue with Or continue with @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43938ms] [LOG] i18next::translator: missingKey en-US translation Sign in with Google Sign in with Google @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43938ms] [LOG] i18next::translator: missingKey en-US translation Don't have an account? Don't have an account? @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43938ms] [LOG] i18next::translator: missingKey en-US translation Contact support Contact support @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Welcome Back Welcome Back @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Please sign in to continue Please sign in to continue @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Enter your email Enter your email @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Sign In Sign In @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Or continue with Or continue with @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Sign in with Google Sign in with Google @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Don't have an account? Don't have an account? @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Contact support Contact support @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Welcome Back Welcome Back @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Please sign in to continue Please sign in to continue @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Enter your email Enter your email @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43939ms] [LOG] i18next::translator: missingKey en-US translation Sign In Sign In @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43940ms] [LOG] i18next::translator: missingKey en-US translation Or continue with Or continue with @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43940ms] [LOG] i18next::translator: missingKey en-US translation Sign in with Google Sign in with Google @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43940ms] [LOG] i18next::translator: missingKey en-US translation Don't have an account? Don't have an account? @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203
+[   43940ms] [LOG] i18next::translator: missingKey en-US translation Contact support Contact support @ http://localhost:3005/node_modules/.vite/deps/i18next.js?v=d0b0c0fe:203

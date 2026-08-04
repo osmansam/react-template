@@ -1,0 +1,7 @@
+[     346ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://localhost:3001/node_modules/.vite/deps/chunk-276SZO74.js?v=48b1ae7e:21550
+[     475ms] [LOG] i18next: languageChanged en-US @ http://localhost:3001/node_modules/.vite/deps/i18next.js?v=48b1ae7e:203
+[     475ms] [LOG] i18next: initialized {debug: true, initImmediate: true, ns: Array(1), defaultNS: Array(1), fallbackLng: Array(1)} @ http://localhost:3001/node_modules/.vite/deps/i18next.js?v=48b1ae7e:203
+[     488ms] [WARNING] WebSocket connection to 'ws://localhost:3002/ws' failed: WebSocket is closed before the connection is established. @ http://localhost:3001/src/hooks/useWebSocket.ts?t=1785861470188:84
+[     492ms] [LOG] WS disconnected. Reconnecting... @ http://localhost:3001/src/hooks/useWebSocket.ts?t=1785861470188:73
+[     529ms] [ERROR] WebSocket connection to 'ws://localhost:3002/ws' failed: Error during WebSocket handshake: Unexpected response code: 404 @ http://localhost:3001/src/hooks/useWebSocket.ts?t=1785861470188:26
+[     529ms] [LOG] WS disconnected. Reconnecting... @ http://localhost:3001/src/hooks/useWebSocket.ts?t=1785861470188:73

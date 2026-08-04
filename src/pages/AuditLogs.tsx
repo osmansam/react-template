@@ -9,8 +9,6 @@ import { useGeneralContext } from "../context/General.context";
 import { FormElementsState } from "../types";
 import { useUserContext } from "../context/User.context";
 import { canAccessAuditLogs } from "../utils/auditLogsAccess";
-import { ACCESS_TOKEN } from "../utils/api/axiosClient";
-import { decodeJWT } from "../utils/jwtUtils";
 import {
   AuditLog,
   useAuditLogsAuthorizationConfig,
@@ -65,11 +63,7 @@ const AuditLogs = () => {
   const { t } = useTranslation();
   const { rowsPerPage } = useGeneralContext();
   const { user } = useUserContext();
-  const tokenRole = decodeJWT(localStorage.getItem(ACCESS_TOKEN) || "")?.role;
-  const auditUser = useMemo(
-    () => user || (tokenRole ? { role: tokenRole } : undefined),
-    [tokenRole, user],
-  );
+  const auditUser = useMemo(() => user, [user]);
   const auditConfigResponse = useAuditLogsAuthorizationConfig(Boolean(auditUser));
   const auditConfig = auditConfigResponse?.data;
   const canViewAuditLogs = canAccessAuditLogs(auditConfig, auditUser);

@@ -23,6 +23,7 @@ import {
   OutsideSearchProps,
 } from "../../../utils/outsideSearch";
 import { outsideSort } from "../../../utils/outsideSort";
+import { syncTranslatedTableColumns } from "../../../utils/tableColumns";
 import { GenericButton } from "../FormElements/GenericButton";
 import ImageModal from "../Modals/ImageModal";
 import { OrientationToggle } from "../TabPanel/OrientationToggle";
@@ -448,14 +449,11 @@ const GenericTable = <T,>({
 
   useEffect(() => {
     if (!title) return;
-    const existing = tableColumns[title];
-    if (!existing || existing.length !== columns.length) {
-      setTableColumns((prev) => ({
-        ...prev,
-        [title]: columns.map((column) => ({ ...column, isActive: true })),
-      }));
-    }
-  }, [title, columns, setTableColumns, tableColumns]);
+    setTableColumns((prev) => {
+      const synchronized = syncTranslatedTableColumns(prev[title], columns);
+      return synchronized === prev[title] ? prev : { ...prev, [title]: synchronized };
+    });
+  }, [title, columns, setTableColumns]);
 
   const checkHeaderScrollButtons = () => {
     if (headerScrollRef.current) {

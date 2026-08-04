@@ -39,11 +39,14 @@ function toWsUrl(
 ) {
   const u = new URL(httpUrl);
   u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
-  u.pathname = wsPath.startsWith("/") ? wsPath : `/${wsPath}`;
+  const apiPath = u.pathname.replace(/\/$/, "");
+  u.pathname = tenantId && projectId
+    ? `${apiPath}/${encodeURIComponent(tenantId)}/${encodeURIComponent(projectId)}/ws`
+    : wsPath.startsWith("/") ? wsPath : `/${wsPath}`;
 
   // Add tenant and project as query parameters if available
   if (tenantId && projectId) {
-    u.search = `?tenantId=${tenantId}&projectId=${projectId}`;
+    u.search = `?tenantSlug=${encodeURIComponent(tenantId)}&projectSlug=${encodeURIComponent(projectId)}`;
   } else {
     u.search = "";
   }

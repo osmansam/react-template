@@ -1,11 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
-import Cookies from "js-cookie";
 import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGeneralContext } from "../context/General.context";
 import { useUserContext } from "../context/User.context";
 import { useFilteredRoutes } from "./useFilteredRoutes";
 import { useTenantProject } from "./useTenantProject";
+import { removeProjectSessionItem, setProjectSessionItem } from "../utils/projectSessionStorage";
 import { getTabSlug } from "../utils/slug";
 
 export type SidebarTabItem = {
@@ -162,10 +162,10 @@ export const useSidebarNavigation = (onNavigateComplete?: () => void) => {
   );
 
   const handleLogoutClick = useCallback(() => {
-    localStorage.clear();
-    localStorage.setItem("loggedOut", "true");
-    setTimeout(() => localStorage.removeItem("loggedOut"), 500);
-    Cookies.remove("jwt");
+    setProjectSessionItem("loggedOut", "true");
+    removeProjectSessionItem("loggedIn");
+    removeProjectSessionItem("user");
+    setTimeout(() => removeProjectSessionItem("loggedOut"), 500);
     setUser(undefined);
     queryClient.clear();
     navigate(buildPath("/login"));

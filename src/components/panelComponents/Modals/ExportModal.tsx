@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { IoIosClose } from "react-icons/io";
 import { CheckSwitch } from "../../../common/CheckSwitch";
@@ -100,9 +101,9 @@ export default function ExportModal({
 
   if (!isOpen) return null;
 
-  return (
+  const modal = (
     <div
-      className="__className_a182b8 fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50"
+      className="__className_a182b8 fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-[60]"
       onClick={close}
     >
       <div
@@ -264,4 +265,8 @@ export default function ExportModal({
       </div>
     </div>
   );
+
+  return typeof document === "undefined"
+    ? modal
+    : createPortal(modal, document.body);
 }
