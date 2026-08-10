@@ -1,6 +1,7 @@
 import { useQueries } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { IoCheckmark, IoCloseOutline } from "react-icons/io5";
 import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { LinkCell, renderLinkedCellContent } from "../../../components/LinkCell";
@@ -26,6 +27,7 @@ import {
   evaluateRowCondition,
   fieldToInput,
   getFieldLabel,
+  getMatchingRowClassPresentation,
   getMatchingRowClassNames,
   humanize,
   isDisplayablePrimitive,
@@ -46,6 +48,21 @@ import {
   isTableSearchEnabled,
 } from "../../../utils/tableConfig";
 import { useTableLookupSelectionData } from "../../../utils/tableLookupSelection";
+import { useGeneratedRelationTableColumns } from "../../../utils/useGeneratedRelationTableColumns";
+import { resolveTableActionFormLayout } from "../../../utils/tableActionFormLayout";
+import {
+  reorderCurrentPageRows,
+  resolveTableDragState,
+} from "../../../utils/tableRowReorder";
+import {
+  appendShowFiltersControl,
+  createTableToggleState,
+  isBooleanColumnEditable,
+  isBooleanColumnSwitchPresentation,
+  isTableColumnVisible,
+  isTableToggleUpperSide,
+  resolveToggleRequestEffects,
+} from "../../../utils/tableToggles";
 import {
   buildConfiguredFilterInputs,
   getFilterDefaultValues,
@@ -309,6 +326,16 @@ export default function GenericUnpaginatedPage({
   const { selectedRows, setSelectedRows, setIsSelectionActive } =
     useGeneralContext();
   const { user } = useUserContext();
+  const configuredTableToggles = useMemo(
+    () => tableConfig?.toggles || [],
+    [tableConfig?.toggles],
+  );
+  const [tableToggleState, setTableToggleState] = useState(() =>
+    createTableToggleState(configuredTableToggles),
+  );
+  useEffect(() => {
+    setTableToggleState(createTableToggleState(configuredTableToggles));
+  }, [configuredTableToggles]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -347,7 +374,50 @@ export default function GenericUnpaginatedPage({
     });
   }, [configuredFilterDefaults]);
 
-  const items = useGetDynamicItems<GenericItem>(schemaName, filterFormElements);
+  const tableDragState = useMemo(
+    () =>
+      resolveTableDragState(
+        tableConfig?.drag,
+        filterFormElements.sort,
+        tableConfig?.constantSort?.sort,
+      ),
+    [
+      filterFormElements.sort,
+      tableConfig?.constantSort?.sort,
+      tableConfig?.drag,
+    ],
+  );
+
+  const requestFilters = useMemo(
+    () => ({
+      ...filterFormElements,
+      ...(!filterFormElements.sort && tableConfig?.constantSort?.sort
+        ? {
+            sort: tableConfig.constantSort.sort,
+            asc: tableConfig.constantSort.asc ?? 1,
+          }
+        : !filterFormElements.sort && tableDragState.defaultSort
+          ? { sort: tableDragState.defaultSort, asc: 1 }
+          : {}),
+      ...resolveToggleRequestEffects(
+        configuredTableToggles,
+        tableToggleState,
+      ),
+      ...(tableConfig?.constantFilters || {}),
+    }),
+    [
+      filterFormElements,
+      configuredTableToggles,
+      tableToggleState,
+      tableConfig?.constantFilters,
+      tableConfig?.constantSort,
+      tableDragState.defaultSort,
+    ],
+  );
+  const items = useGetDynamicItems<GenericItem>(
+    schemaName,
+    requestFilters as FormElementsState,
+  );
   const rawContainers = useGetContainers();
 
   const container: ContainerModel | undefined = useMemo(() => {
@@ -429,6 +499,13 @@ export default function GenericUnpaginatedPage({
 
     if (tableConfig?.columns?.length) {
       fields = tableConfig.columns
+        .filter((column) =>
+          isTableColumnVisible(
+            column.visibilityToggle,
+            tableToggleState,
+            configuredTableToggles,
+          ),
+        )
         .map((column) => {
           const field = fields.find((item) => item.name === column.field);
           return (
@@ -469,13 +546,28 @@ export default function GenericUnpaginatedPage({
     });
 
     return fields;
-  }, [container, includeFields, excludeFields, user, tableConfig]);
+  }, [
+    container,
+    includeFields,
+    excludeFields,
+    user,
+    tableConfig,
+    tableToggleState,
+    configuredTableToggles,
+  ]);
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
   const lookupSelectionDataMap = useTableLookupSelectionData(tableConfig);
 
-  const rowKeys = useMemo(
+  const generatedRelationTableColumns = useGeneratedRelationTableColumns({
+    tableConfig,
+    toggleState: tableToggleState,
+    toggles: configuredTableToggles,
+    updateRow: updateDynamicItem,
+  });
+
+  const baseRowKeys = useMemo(
     () =>
       displayFields.map((f) => {
         const fieldType = (f.type || "").toLowerCase();
@@ -503,6 +595,7 @@ export default function GenericUnpaginatedPage({
           isDate?: boolean;
           isBoolean?: boolean;
           className?: string | ((row: GenericItem) => string);
+          style?: React.CSSProperties | ((row: GenericItem) => React.CSSProperties);
           node?: (row: GenericItem) => React.ReactNode;
         } = {
           key: f.name,
@@ -519,7 +612,9 @@ export default function GenericUnpaginatedPage({
         // Compute className based on table column cellClassName conditions
         if (rowKeyClassName) {
           rowKey.className = (row: GenericItem) =>
-            getMatchingRowClassNames(row, rowKeyClassName);
+            getMatchingRowClassPresentation(row, rowKeyClassName).className;
+          rowKey.style = (row: GenericItem) =>
+            getMatchingRowClassPresentation(row, rowKeyClassName).style;
         }
 
         const columnConfig = tableConfig?.columns?.find(
@@ -536,10 +631,15 @@ export default function GenericUnpaginatedPage({
 
           if (rowKeyClassName) {
             rowKey.className = (row: GenericItem) =>
-              getMatchingRowClassNames(
+              getMatchingRowClassPresentation(
                 { ...row, [f.name]: getComputedValue(row) },
                 rowKeyClassName,
-              );
+              ).className;
+            rowKey.style = (row: GenericItem) =>
+              getMatchingRowClassPresentation(
+                { ...row, [f.name]: getComputedValue(row) },
+                rowKeyClassName,
+              ).style;
           }
 
           rowKey.node = (row: GenericItem) =>
@@ -558,10 +658,15 @@ export default function GenericUnpaginatedPage({
 
           if (rowKeyClassName) {
             rowKey.className = (row: GenericItem) =>
-              getMatchingRowClassNames(
+              getMatchingRowClassPresentation(
                 { ...row, [f.name]: getLookupValue(row) },
                 rowKeyClassName,
-              );
+              ).className;
+            rowKey.style = (row: GenericItem) =>
+              getMatchingRowClassPresentation(
+                { ...row, [f.name]: getLookupValue(row) },
+                rowKeyClassName,
+              ).style;
           }
 
           rowKey.node = (row: GenericItem) =>
@@ -739,6 +844,31 @@ export default function GenericUnpaginatedPage({
         if (columnConfig?.type === "booleanSwitch") {
           rowKey.node = (row: GenericItem) => {
             const isChecked = isTruthyBooleanValue(row[f.name]);
+            if (
+              !isBooleanColumnSwitchPresentation(
+                columnConfig.booleanDisplayToggle,
+                tableToggleState,
+                configuredTableToggles,
+              ) ||
+              !isBooleanColumnEditable(
+                columnConfig.booleanEditToggle,
+                tableToggleState,
+                configuredTableToggles,
+              )
+            ) {
+              const label = getTableDisplayName(tableConfig, f);
+              return (
+                <span
+                  aria-label={`${label}: ${isChecked ? "Yes" : "No"}`}
+                >
+                  {isChecked ? (
+                    <IoCheckmark className="text-blue-500 text-2xl" />
+                  ) : (
+                    <IoCloseOutline className="text-red-800 text-2xl" />
+                  )}
+                </span>
+              );
+            }
             return (
               <CheckSwitch
                 checked={isChecked}
@@ -904,22 +1034,32 @@ export default function GenericUnpaginatedPage({
       lookupSelectionDataMap,
       t,
       tableConfig,
+      tableToggleState,
+      configuredTableToggles,
     ],
   );
 
+  const rowKeys = useMemo(
+    () => [...baseRowKeys, ...generatedRelationTableColumns.rowKeys],
+    [baseRowKeys, generatedRelationTableColumns.rowKeys],
+  );
+
   const columns = useMemo(() => {
-    const baseCols = displayFields.map((f) => ({
+    const baseCols = [
+      ...displayFields.map((f) => ({
       key: t(getTableDisplayName(tableConfig, f) || getFieldLabel(f)),
       isSortable:
         tableConfig?.columns?.find((column) => column.field === f.name)
           ?.type !== "computedLabel",
       correspondingKey: f.name,
-    }));
+      })),
+      ...generatedRelationTableColumns.columns,
+    ];
     if (actionsEnabled) {
       return [...baseCols, { key: t("Actions"), isSortable: false }];
     }
     return baseCols;
-  }, [displayFields, t, actionsEnabled, tableConfig]);
+  }, [displayFields, t, actionsEnabled, tableConfig, generatedRelationTableColumns.columns]);
 
   const { inputs, formKeys } = useMemo(() => {
     const ins = displayFields
@@ -1067,7 +1207,9 @@ export default function GenericUnpaginatedPage({
           inputs={inputs}
           formKeys={formKeys}
           submitItem={handleSubmitItem}
-          topClassName="flex flex-col gap-2"
+          {...resolveTableActionFormLayout(tableConfig?.addButton, {
+            topClassName: "flex flex-col gap-2",
+          })}
         />
       ),
       isModalOpen: isAddOpen,
@@ -1076,7 +1218,7 @@ export default function GenericUnpaginatedPage({
       icon: null,
       className: "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
     };
-  }, [t, isAddOpen, inputs, formKeys, handleSubmitItem]);
+  }, [t, isAddOpen, inputs, formKeys, handleSubmitItem, tableConfig?.addButton]);
 
   const actionSelectionDataMap = useActionFormSelectionData(
     tableConfig?.actions || [],
@@ -1308,7 +1450,9 @@ export default function GenericUnpaginatedPage({
               }}
               isEditMode
               buttonName={action.buttonName || action.label || t("Update")}
-              topClassName="flex flex-col gap-2"
+              {...resolveTableActionFormLayout(action, {
+                topClassName: "flex flex-col gap-2",
+              })}
               itemToEdit={{
                 id: rowToAction._id,
                 updates: {
@@ -1853,23 +1997,45 @@ export default function GenericUnpaginatedPage({
   ]);
   const hasFilterPanelInputs = filterPanelInputs.length > 0;
 
-  const filters = useMemo(
-    () =>
+  const filters = useMemo(() => {
+    const displayToggleControls = configuredTableToggles.map((toggle) => ({
+        label: toggle.label || toggle.id,
+        isUpperSide: isTableToggleUpperSide(toggle),
+        node: (
+          <SwitchButton
+            checked={tableToggleState[toggle.id] ?? toggle.defaultValue}
+            onChange={() =>
+              setTableToggleState((current) => ({
+                ...current,
+                [toggle.id]: !(current[toggle.id] ?? toggle.defaultValue),
+              }))
+            }
+          />
+        ),
+      }));
+    return appendShowFiltersControl(
+      displayToggleControls,
       hasFilterPanelInputs
-        ? [
-            {
-              label: t("Show Filters"),
-              isUpperSide: true,
-              node: (
-                <SwitchButton
-                  checked={showFilters}
-                  onChange={() => setShowFilters(!showFilters)}
-                />
-              ),
-            },
-          ]
-        : [],
-    [t, showFilters, hasFilterPanelInputs],
+        ? {
+            label: t("Show Filters"),
+            isUpperSide: true,
+            node: (
+              <SwitchButton
+                checked={showFilters}
+                onChange={() => setShowFilters(!showFilters)}
+              />
+            ),
+          }
+        : undefined,
+    );
+  },
+    [
+      t,
+      showFilters,
+      hasFilterPanelInputs,
+      configuredTableToggles,
+      tableToggleState,
+    ],
   );
 
   const filterPanel = useMemo(
@@ -1939,8 +2105,10 @@ export default function GenericUnpaginatedPage({
             setForm={handleBulkFormChange}
             submitItem={() => {}}
             isEditMode={false}
-            topClassName="flex flex-col gap-2"
-            generalClassName="overflow-visible"
+            {...resolveTableActionFormLayout(bulkEditActionConfig, {
+              topClassName: "flex flex-col gap-2",
+              generalClassName: "overflow-visible",
+            })}
                   buttonName={t(
                     bulkEditActionConfig?.buttonName ||
                       bulkEditActionConfig?.label ||
@@ -1987,6 +2155,21 @@ export default function GenericUnpaginatedPage({
     () => applyTableNestedRows(items || [], tableConfig, t, lookupSelectionDataMap),
     [items, tableConfig, t, lookupSelectionDataMap],
   );
+  const handleRowDrag = useCallback(
+    (draggedRow: GenericItem, targetRow: GenericItem) => {
+      const result = reorderCurrentPageRows(
+        rows,
+        draggedRow,
+        targetRow,
+        tableDragState.orderField,
+        1,
+      );
+      if (result.updates.length) {
+        updateMultipleDynamicItem(result.updates);
+      }
+    },
+    [rows, tableDragState.orderField, updateMultipleDynamicItem],
+  );
 
   return (
     <>
@@ -1997,6 +2180,8 @@ export default function GenericUnpaginatedPage({
           actions={actions}
           columns={columns}
           rows={rows || []}
+          isDraggable={tableDragState.enabled}
+          onDragEnter={tableDragState.enabled ? handleRowDrag : undefined}
           rowStyleFunction={rowStyleFunction}
           title={customTitle || t(humanize(schemaName))}
           addButton={addButton}

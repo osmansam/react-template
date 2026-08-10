@@ -265,24 +265,42 @@ const extractConditionFieldCandidates = (condition: string): string[] => {
   return Array.from(fields);
 };
 
+const extractClassTemplateFieldCandidates = (className: string): string[] =>
+  Array.from(
+    className.matchAll(/\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}/g),
+    (match) => match[1],
+  );
+
 export const getTableDataFieldNames = (
   tableConfig: TableComponentConfig | undefined,
   availableFieldNames?: string[],
 ): string[] | undefined => {
-  if (!tableConfig?.columns?.length) return undefined;
+  if (
+    !tableConfig?.columns?.length &&
+    !tableConfig?.generatedRelationColumns?.length &&
+    !tableConfig?.drag?.orderField?.trim()
+  )
+    return undefined;
 
   const available = availableFieldNames?.length
     ? new Set(availableFieldNames)
     : undefined;
   const fields = new Set<string>();
 
-  tableConfig.columns.forEach((column) => {
+  (tableConfig.columns || []).forEach((column) => {
     if (column.type !== "computedLabel" && column.field) {
       fields.add(column.field);
     }
 
     column.cellClassName?.forEach((rule) => {
       extractConditionFieldCandidates(rule.condition || "").forEach(
+        (candidate) => {
+          if (!available || available.has(candidate)) {
+            fields.add(candidate);
+          }
+        },
+      );
+      extractClassTemplateFieldCandidates(rule.className || "").forEach(
         (candidate) => {
           if (!available || available.has(candidate)) {
             fields.add(candidate);
@@ -324,6 +342,18 @@ export const getTableDataFieldNames = (
 
   if (tableConfig.nestedRows?.enabled && tableConfig.nestedRows.field?.trim()) {
     fields.add(tableConfig.nestedRows.field.trim());
+  }
+
+  tableConfig.generatedRelationColumns?.forEach((group) => {
+    const arrayField = group.arrayField?.trim();
+    if (arrayField && (!available || available.has(arrayField))) {
+      fields.add(arrayField);
+    }
+  });
+
+  const dragOrderField = tableConfig.drag?.orderField?.trim();
+  if (dragOrderField && (!available || available.has(dragOrderField))) {
+    fields.add(dragOrderField);
   }
 
   return Array.from(fields);

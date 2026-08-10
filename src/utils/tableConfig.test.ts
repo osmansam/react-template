@@ -9,6 +9,25 @@ import {
 } from "./tableConfig";
 
 describe("applyTableNestedRows", () => {
+  it("requests row fields referenced by cell class templates", () => {
+    expect(
+      getTableDataFieldNames({
+        columns: [
+          {
+            field: "name",
+            type: "field",
+            cellClassName: [
+              {
+                condition: "status = 'active'",
+                className: "text-white bg-[{{backgroundColor}}] {{fontClass}}",
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual(["name", "status", "backgroundColor", "fontClass"]);
+  });
+
   it("builds GenericTable collapsible data from a configured array field", () => {
     const rows = [
       {
@@ -84,6 +103,30 @@ describe("applyTableNestedRows", () => {
         },
       }),
     ).toEqual(["date", "status", "items"]);
+  });
+
+  it("requests generated relation array fields without visible static columns", () => {
+    expect(
+      getTableDataFieldNames({
+        generatedRelationColumns: [
+          {
+            id: "locations",
+            arrayField: "locations",
+            sourceSchemaName: "location",
+            sourceLabelField: "name",
+          },
+        ],
+      }),
+    ).toEqual(["locations"]);
+  });
+
+  it("requests the drag order field even when it is not a visible column", () => {
+    expect(
+      getTableDataFieldNames(
+        { drag: { enabled: true, orderField: "position" } },
+        ["name", "position"],
+      ),
+    ).toEqual(["position"]);
   });
 
   it("keeps table search enabled by default and allows disabling it", () => {
