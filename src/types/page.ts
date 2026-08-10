@@ -391,6 +391,7 @@ export interface TableActionConfig {
 }
 
 export interface TableComponentConfig {
+  dataMode?: "paginated" | "all";
   title?: string;
   enableSearch?: boolean;
   columns?: TableColumnConfig[];
