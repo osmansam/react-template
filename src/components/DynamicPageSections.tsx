@@ -18,9 +18,11 @@ import {
 import PageFilterRenderer from "../pageRuntime/PageFilterRenderer";
 import { useGetSelection } from "../utils/dynamic";
 import { getTableConfig } from "../utils/dynamicPageTableConfig";
+import { resolveTableComponentMode } from "../utils/tableDataMode";
 import { resolveRouteParamValue, RouteParams } from "../utils/routeParams";
 import type { ChartType } from "./charts/DynamicChart";
 import GenericPaginatedPage from "./panelComponents/FormElements/GenericPaginatedPage";
+import GenericUnpaginatedPage from "./panelComponents/FormElements/GenericUnpaginatedPage";
 import GenericTabPage from "./panelComponents/FormElements/GenericTabPage";
 import { canonicalizeTabKeyValue } from "./panelComponents/FormElements/tabInstanceKey";
 import DistributionBlocks from "./panelComponents/FormElements/DistributionBlocks";
@@ -184,20 +186,33 @@ const RenderReadyComponent: React.FC<{
         ["schema", "pipeline", "workflow"].includes(
           resolvedDataBinding.kind,
         ) ? (
-        <GenericPaginatedPage
-          schemaName={resolvedDataBinding.schemaName}
-          isHeader={false}
-          customTitle={title}
-          tableConfig={tableConfig}
-          dataBinding={resolvedDataBinding}
-          actionsEnabled={["schema", "pipeline", "workflow"].includes(
-            resolvedDataBinding.kind,
-          )}
-          componentId={component.id}
-          outputs={component.outputs}
-          resolvedParams={resolvedParams}
-          sourceRevision={requestSourceRevision}
-        />
+        resolveTableComponentMode(
+          resolvedDataBinding.kind,
+          tableConfig?.dataMode,
+        ) === "unpaginated" ? (
+          <GenericUnpaginatedPage
+            schemaName={resolvedDataBinding.schemaName}
+            isHeader={false}
+            customTitle={title}
+            tableConfig={tableConfig}
+            actionsEnabled
+          />
+        ) : (
+          <GenericPaginatedPage
+            schemaName={resolvedDataBinding.schemaName}
+            isHeader={false}
+            customTitle={title}
+            tableConfig={tableConfig}
+            dataBinding={resolvedDataBinding}
+            actionsEnabled={["schema", "pipeline", "workflow"].includes(
+              resolvedDataBinding.kind,
+            )}
+            componentId={component.id}
+            outputs={component.outputs}
+            resolvedParams={resolvedParams}
+            sourceRevision={requestSourceRevision}
+          />
+        )
       ) : (
         <NoticePanel>
           Table component requires schema, pipeline, or workflow binding.
