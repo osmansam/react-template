@@ -32,6 +32,7 @@ type Props = {
   schemaName: string;
   currentPage: number;
   totalPages: number;
+  showPaginationScopes?: boolean;
 };
 
 export default function ExportModal({
@@ -42,6 +43,7 @@ export default function ExportModal({
   schemaName,
   currentPage,
   totalPages,
+  showPaginationScopes = true,
 }: Props) {
   const { t } = useTranslation();
 
@@ -87,8 +89,8 @@ export default function ExportModal({
       selectedFields,
       includeSearch,
       includeFilters,
-      exportScope,
-      exportScope === "numberOfPages" ? pageCount : undefined
+      showPaginationScopes ? exportScope : "all",
+      showPaginationScopes && exportScope === "numberOfPages" ? pageCount : undefined
     );
     // Reset state when closing
     setSelectedFields(fields.map((f) => f.name));
@@ -169,33 +171,37 @@ export default function ExportModal({
                 <span className="text-sm">{t("All Data")}</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                <input
-                  type="radio"
-                  name="exportScope"
-                  value="currentPage"
-                  checked={exportScope === "currentPage"}
-                  onChange={() => setExportScope("currentPage")}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <span className="text-sm">
-                  {t("This Page")} ({t("Page")} {currentPage})
-                </span>
-              </label>
+              {showPaginationScopes && (
+                <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                  <input
+                    type="radio"
+                    name="exportScope"
+                    value="currentPage"
+                    checked={exportScope === "currentPage"}
+                    onChange={() => setExportScope("currentPage")}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-sm">
+                    {t("This Page")} ({t("Page")} {currentPage})
+                  </span>
+                </label>
+              )}
 
-              <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                <input
-                  type="radio"
-                  name="exportScope"
-                  value="numberOfPages"
-                  checked={exportScope === "numberOfPages"}
-                  onChange={() => setExportScope("numberOfPages")}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <span className="text-sm">{t("Number of Pages")}</span>
-              </label>
+              {showPaginationScopes && (
+                <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                  <input
+                    type="radio"
+                    name="exportScope"
+                    value="numberOfPages"
+                    checked={exportScope === "numberOfPages"}
+                    onChange={() => setExportScope("numberOfPages")}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-sm">{t("Number of Pages")}</span>
+                </label>
+              )}
 
-              {exportScope === "numberOfPages" && (
+              {showPaginationScopes && exportScope === "numberOfPages" && (
                 <div className="ml-6 flex items-center gap-2">
                   <input
                     type="number"

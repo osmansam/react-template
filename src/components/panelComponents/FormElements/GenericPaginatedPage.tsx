@@ -13,11 +13,10 @@ import {
 import { useGeneralContext } from "../../../context/General.context";
 import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
-import { usePageRuntimeStore } from "../../../pageRuntime/PageRuntimeProvider";
+import TableOutputPublisher from "../../../pageRuntime/TableOutputPublisher";
 import {
   TableOutputState,
   resolveSelectedRowIds,
-  resolveTableOutput,
 } from "../../../pageRuntime/tableOutputAdapter";
 import { FormElementsState } from "../../../types";
 import {
@@ -368,45 +367,6 @@ const mergeTableRequestFilters = (
     ...(tableConfig?.constantFilters || {}),
     ...(constantFilter || {}),
   } as FormElementsState;
-};
-
-const TableOutputPublisher = ({
-  componentId,
-  outputs,
-  state,
-}: {
-  componentId: string;
-  outputs: ComponentOutputDefinition[];
-  state: TableOutputState;
-}) => {
-  const store = usePageRuntimeStore();
-
-  useEffect(() => {
-    outputs.forEach((output) => {
-      const runtimeValue = resolveTableOutput(output, state);
-      if (runtimeValue.status === "available") {
-        store.publishOutput(
-          componentId,
-          componentId,
-          output.id,
-          runtimeValue.value,
-        );
-      } else {
-        store.markOutputUnavailable(componentId, componentId, output.id);
-      }
-    });
-  }, [componentId, outputs, state, store]);
-
-  useEffect(
-    () => () => {
-      outputs.forEach((output) => {
-        store.markOutputUnavailable(componentId, componentId, output.id);
-      });
-    },
-    [componentId, outputs, store],
-  );
-
-  return null;
 };
 
 export default function GenericPaginatedPage({

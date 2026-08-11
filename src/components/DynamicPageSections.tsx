@@ -196,6 +196,11 @@ const RenderReadyComponent: React.FC<{
             customTitle={title}
             tableConfig={tableConfig}
             actionsEnabled
+            dataBinding={resolvedDataBinding}
+            componentId={component.id}
+            outputs={component.outputs}
+            resolvedParams={resolvedParams}
+            sourceRevision={requestSourceRevision}
           />
         ) : (
           <GenericPaginatedPage

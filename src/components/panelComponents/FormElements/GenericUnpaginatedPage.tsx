@@ -5,11 +5,14 @@ import { IoCheckmark, IoCloseOutline } from "react-icons/io5";
 import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { LinkCell, renderLinkedCellContent } from "../../../components/LinkCell";
-import { useGeneralContext } from "../../../context/General.context";
 import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
+import TableOutputPublisher from "../../../pageRuntime/TableOutputPublisher";
+import { resolveSelectedRowIds, type TableOutputState } from "../../../pageRuntime/tableOutputAdapter";
 import { FormElementsState } from "../../../types";
 import {
+  ComponentOutputDefinition,
+  DataBinding,
   TableActionConfig,
   TableActionFormFieldConfig,
   TableComponentConfig,
@@ -21,7 +24,12 @@ import {
   Types,
   useGetContainers,
 } from "../../../utils/api/container";
-import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
+import {
+  useDynamicCrud,
+  useExportDynamicItems,
+  useGetDynamicItems,
+} from "../../../utils/dynamic";
+import { mergeTableConstantValues, omitTableConstantKeys } from "../../../utils/tableConstantValues";
 import {
   RawContainer,
   evaluateRowCondition,
@@ -77,6 +85,7 @@ import { Header } from "../../header/Header";
 import SwitchButton from "../common/SwitchButton";
 import { FormKeyTypeEnum, GenericInputType, InputTypes } from "../shared/types";
 import GenericTable from "../Tables/GenericTable";
+import ExportModal from "../Modals/ExportModal";
 import GenericAddEditPanel from "./GenericAddEditPanel";
 
 type GenericItem = Record<string, unknown> & { _id: string };
@@ -310,8 +319,14 @@ type Props = {
   excludeFields?: string[];
   actionsEnabled?: boolean;
   isHeader?: boolean;
+  constantFilter?: Record<string, unknown>;
   customTitle?: string;
   tableConfig?: TableComponentConfig;
+  dataBinding?: DataBinding;
+  componentId?: string;
+  outputs?: ComponentOutputDefinition[];
+  resolvedParams?: Record<string, unknown>;
+  sourceRevision?: string;
 };
 
 export default function GenericUnpaginatedPage({
@@ -320,12 +335,15 @@ export default function GenericUnpaginatedPage({
   excludeFields,
   actionsEnabled = true,
   isHeader = false,
+  constantFilter,
   customTitle,
   tableConfig,
+  componentId,
+  outputs,
+  resolvedParams,
+  sourceRevision = "",
 }: Props) {
   const { t } = useTranslation();
-  const { selectedRows, setSelectedRows, setIsSelectionActive } =
-    useGeneralContext();
   const { user } = useUserContext();
   const configuredTableToggles = useMemo(
     () => tableConfig?.toggles || [],
@@ -338,6 +356,17 @@ export default function GenericUnpaginatedPage({
     setTableToggleState(createTableToggleState(configuredTableToggles));
   }, [configuredTableToggles]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedRows, setSelectedRows] = useState<GenericItem[]>([]);
+  const [isSelectionActive, setIsSelectionActive] = useState(false);
+  const [isSelectionInitialized, setIsSelectionInitialized] = useState(false);
+  const handleSelectedRowsChange = useCallback((nextRows: GenericItem[]) => {
+    setIsSelectionInitialized(true);
+    setSelectedRows(nextRows);
+  }, []);
+  const handleSelectionActiveChange = useCallback((nextActive: boolean) => {
+    setIsSelectionInitialized(true);
+    setIsSelectionActive(nextActive);
+  }, []);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -405,6 +434,8 @@ export default function GenericUnpaginatedPage({
         tableToggleState,
       ),
       ...(tableConfig?.constantFilters || {}),
+      ...(constantFilter || {}),
+      ...(resolvedParams || {}),
     }),
     [
       filterFormElements,
@@ -413,11 +444,14 @@ export default function GenericUnpaginatedPage({
       tableConfig?.constantFilters,
       tableConfig?.constantSort,
       tableDragState.defaultSort,
+      constantFilter,
+      resolvedParams,
     ],
   );
   const items = useGetDynamicItems<GenericItem>(
     schemaName,
     requestFilters as FormElementsState,
+    sourceRevision,
   );
   const rawContainers = useGetContainers();
 
@@ -1188,13 +1222,24 @@ export default function GenericUnpaginatedPage({
       if ("id" in item && "updates" in item) {
         updateDynamicItem(
           item.id as string | number,
-          item.updates as Partial<GenericItem>,
+          omitTableConstantKeys(
+            item.updates as GenericItem,
+            tableConfig?.constantFilters,
+            constantFilter,
+          ) as Partial<GenericItem>,
         );
       } else {
-        createDynamicItem(item as GenericItem);
+        createDynamicItem(
+          mergeTableConstantValues(
+            item as GenericItem,
+            tableConfig?.addButton?.constantValues,
+            tableConfig?.constantFilters,
+            constantFilter,
+          ),
+        );
       }
     },
-    [updateDynamicItem, createDynamicItem],
+    [updateDynamicItem, createDynamicItem, tableConfig, constantFilter],
   );
 
   const addButton = useMemo(() => {
@@ -2163,6 +2208,27 @@ export default function GenericUnpaginatedPage({
       ? sortRowsByOrderField(nestedRows, tableDragState.orderField)
       : nestedRows;
   }, [items, tableConfig, t, lookupSelectionDataMap, tableDragState]);
+  const filtersById = useMemo(() => {
+    const normalized: Record<string, unknown> = {};
+    (configuredFilterInputs || []).forEach((filter) => {
+      if (filter.id && filter.formKey && Object.hasOwn(filterFormElements, filter.formKey)) {
+        normalized[filter.id] = filterFormElements[filter.formKey];
+      }
+    });
+    return normalized;
+  }, [configuredFilterInputs, filterFormElements]);
+  const selectedIds = useMemo(
+    () => resolveSelectedRowIds(selectedRows, isSelectionInitialized),
+    [isSelectionInitialized, selectedRows],
+  );
+  const tableOutputState = useMemo<TableOutputState>(
+    () => ({
+      filters: filtersById,
+      search: String(filterFormElements.search ?? ""),
+      selectedIds,
+    }),
+    [filterFormElements.search, filtersById, selectedIds],
+  );
   const handleRowDrag = useCallback(
     (draggedRow: GenericItem, targetRow: GenericItem) => {
       const result = reorderCurrentPageRows(
@@ -2178,9 +2244,35 @@ export default function GenericUnpaginatedPage({
     },
     [rows, tableDragState.orderField, updateMultipleDynamicItem],
   );
+  const { exportDynamicItems } = useExportDynamicItems();
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const handleExport = useCallback(
+    (
+      selectedFields: string[],
+      includeSearch: boolean,
+      includeFilters: boolean,
+    ) => {
+      exportDynamicItems({
+        schemaName,
+        fields: selectedFields,
+        filters: includeFilters ? requestFilters : {},
+        search: includeSearch ? String(filterFormElements.search || "") : "",
+        limit: 0,
+        page: 1,
+      });
+    },
+    [exportDynamicItems, filterFormElements.search, requestFilters, schemaName],
+  );
 
   return (
     <>
+      {componentId && outputs && outputs.length > 0 && (
+        <TableOutputPublisher
+          componentId={componentId}
+          outputs={outputs}
+          state={tableOutputState}
+        />
+      )}
       {isHeader && <Header />}
       <div className="w-full mx-auto">
         <GenericTable
@@ -2200,11 +2292,28 @@ export default function GenericUnpaginatedPage({
           isSelectionEnabled={isBulkSelectionEnabled}
           isExcel={!hasImageField}
           onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
+          onExcelExport={
+            actionsEnabled ? () => setIsExportModalOpen(true) : undefined
+          }
           filters={filters}
           filterPanel={filterPanel}
           containerFields={container?.fields}
+          localSelectedRows={selectedRows}
+          localSetSelectedRows={handleSelectedRowsChange}
+          localIsSelectionActive={isSelectionActive}
+          localSetIsSelectionActive={handleSelectionActiveChange}
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
+        />
+        <ExportModal
+          isOpen={isExportModalOpen}
+          close={() => setIsExportModalOpen(false)}
+          fields={displayFields}
+          onExport={handleExport}
+          schemaName={humanize(schemaName)}
+          currentPage={1}
+          totalPages={1}
+          showPaginationScopes={false}
         />
       </div>
     </>
