@@ -23,6 +23,7 @@ import {
   OutsideSearchProps,
 } from "../../../utils/outsideSearch";
 import { outsideSort } from "../../../utils/outsideSort";
+import { formatPopulatedArrayValue } from "../../../utils/populatedArrayDisplay";
 import { syncTranslatedTableColumns } from "../../../utils/tableColumns";
 import { GenericButton } from "../FormElements/GenericButton";
 import ImageModal from "../Modals/ImageModal";
@@ -640,7 +641,11 @@ const GenericTable = <T,>({
   const renderActionButtons = (row: T, actions: ActionType<T>[]) => (
     <div className="flex flex-row my-auto h-full gap-3 justify-center items-center">
       {actions?.map((action, index) => {
-        if (action?.isDisabled || action?.node === null) return null;
+        if (action?.isHidden?.(row) || action?.node === null) return null;
+        const isDisabled =
+          typeof action?.isDisabled === "function"
+            ? action.isDisabled(row)
+            : action?.isDisabled;
         if (action.node) return <div key={index}>{action.node(row)}</div>;
         return (
           <div
@@ -649,7 +654,10 @@ const GenericTable = <T,>({
               action.icon &&
               "rounded-full  h-6 w-6 flex my-auto items-center justify-center"
             } ${action?.className}`}
-            onClick={() => actionOnClick(action, row)}
+            onClick={() => {
+              if (!isDisabled) actionOnClick(action, row);
+            }}
+            aria-disabled={isDisabled || undefined}
           >
             {action.icon && (
               <ButtonTooltip content={action.name}>{action.icon}</ButtonTooltip>
@@ -805,7 +813,9 @@ const GenericTable = <T,>({
             const rawValue = row[rowKey.key as keyof T];
             const cellValue = rowKey.isDate
               ? formatDate(rawValue) || `${rawValue}`
-              : `${rawValue}`;
+              : Array.isArray(rawValue)
+                ? formatPopulatedArrayValue(rawValue)
+                : `${rawValue}`;
 
             const displayValue =
               cellValue.length > tooltipLimit && isToolTipEnabled

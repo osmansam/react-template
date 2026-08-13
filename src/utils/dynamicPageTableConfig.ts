@@ -7,6 +7,7 @@ const hasTableConfigFields = (props: Record<string, unknown> | undefined) =>
         props.columns,
         props.rows,
         props.nestedRows,
+        props.arraySource,
         props.cache,
         props.constantFilters,
         props.constantSort,
@@ -16,6 +17,9 @@ const hasTableConfigFields = (props: Record<string, unknown> | undefined) =>
         props.filterPanel,
         props.title,
         props.enableSearch,
+        props.generatedRelationColumns,
+        props.toggles,
+        props.drag,
       ].some((value) => value !== undefined),
   );
 

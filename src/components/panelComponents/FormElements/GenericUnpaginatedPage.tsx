@@ -19,6 +19,11 @@ import {
 } from "../../../types/page";
 import { UpdatePayload, get } from "../../../utils/api";
 import {
+  applyHiddenActionValues,
+  buildActionInitialValues,
+  partitionActionConstantValues,
+} from "../../../utils/actionConstantValues";
+import {
   ContainerModel,
   Field,
   Types,
@@ -44,9 +49,14 @@ import {
   tailwindBgToStyle,
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
+import { formatPopulatedArrayValue } from "../../../utils/populatedArrayDisplay";
 import { getSelectionQueryConfig } from "../../../utils/selectionQuery";
+import { renderTableColumnTemplate } from "../../../utils/tableColumnTemplate";
+import { getTableActionRowState } from "../../../utils/tableActions";
 import {
+  applyTableArraySource,
   applyTableNestedRows,
+  buildArraySourceParentUpdate,
   getComputedLabelValue,
   getLookupLabelValue,
   getProgressBarValue,
@@ -599,7 +609,14 @@ export default function GenericUnpaginatedPage({
     tableConfig,
     toggleState: tableToggleState,
     toggles: configuredTableToggles,
-    updateRow: updateDynamicItem,
+    updateRow: (id, updates, row) => {
+      const parentUpdate = buildArraySourceParentUpdate(row, updates);
+      if (parentUpdate) {
+        updateDynamicItem(parentUpdate.parentId, parentUpdate.updates);
+        return;
+      }
+      updateDynamicItem(id, updates);
+    },
   });
 
   const baseRowKeys = useMemo(
@@ -655,6 +672,19 @@ export default function GenericUnpaginatedPage({
         const columnConfig = tableConfig?.columns?.find(
           (column) => column.field === f.name,
         );
+        if (columnConfig?.type === "template") {
+          rowKey.node = (row: GenericItem) =>
+            renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
+              <span>
+                {renderTableColumnTemplate(columnConfig.template, row)}
+              </span>,
+            );
+          return rowKey;
+        }
+
         if (columnConfig?.type === "computedLabel") {
           const getComputedValue = (row: GenericItem) =>
             getComputedLabelValue(
@@ -943,7 +973,9 @@ export default function GenericUnpaginatedPage({
           rowKey.node = (row: GenericItem) => {
             const v = row[f.name];
             if (v === undefined || v === null) return <span>-</span>;
-            const content = Array.isArray(v) ? v.join(", ") : String(v);
+            const content = Array.isArray(v)
+              ? formatPopulatedArrayValue(v)
+              : String(v);
             return renderLinkedCellContent(f, row, linkConfig, <span>{content || "-"}</span>);
           };
           return rowKey;
@@ -967,7 +999,7 @@ export default function GenericUnpaginatedPage({
           rowKey.node = (row: GenericItem) => {
             const value = row[f.name];
             const content = Array.isArray(value)
-              ? value.join(", ")
+              ? formatPopulatedArrayValue(value)
               : String(value || "");
             return linkConfig?.linkTemplate ? (
               <LinkCell field={f} row={row} linkConfig={linkConfig} />
@@ -1229,20 +1261,37 @@ export default function GenericUnpaginatedPage({
           ) as Partial<GenericItem>,
         );
       } else {
+        const addConstants = partitionActionConstantValues(
+          tableConfig?.addButton?.constantValues,
+          formKeys.map((formKey) => formKey.key),
+        );
         createDynamicItem(
           mergeTableConstantValues(
-            item as GenericItem,
-            tableConfig?.addButton?.constantValues,
+            applyHiddenActionValues(
+              item as GenericItem,
+              addConstants.hiddenValues,
+            ) as GenericItem,
+            undefined,
             tableConfig?.constantFilters,
             constantFilter,
           ),
         );
       }
     },
-    [updateDynamicItem, createDynamicItem, tableConfig, constantFilter],
+    [
+      updateDynamicItem,
+      createDynamicItem,
+      tableConfig,
+      constantFilter,
+      formKeys,
+    ],
   );
 
   const addButton = useMemo(() => {
+    const addConstants = partitionActionConstantValues(
+      tableConfig?.addButton?.constantValues,
+      formKeys.map((formKey) => formKey.key),
+    );
     return {
       name: t("Add"),
       isModal: true,
@@ -1253,6 +1302,17 @@ export default function GenericUnpaginatedPage({
           inputs={inputs}
           formKeys={formKeys}
           submitItem={handleSubmitItem}
+          itemToEdit={
+            Object.keys(addConstants.visibleDefaults).length
+              ? {
+                  id: "",
+                  updates: {
+                    ...addConstants.visibleDefaults,
+                    _id: "",
+                  } as GenericItem,
+                }
+              : undefined
+          }
           {...resolveTableActionFormLayout(tableConfig?.addButton, {
             topClassName: "flex flex-col gap-2",
           })}
@@ -1300,6 +1360,14 @@ export default function GenericUnpaginatedPage({
       );
       return {
         name: deleteActionConfig?.label || t("Delete"),
+        isHidden: (row: GenericItem) =>
+          deleteActionConfig
+            ? getTableActionRowState(deleteActionConfig, row).hidden
+            : false,
+        isDisabled: (row: GenericItem) =>
+          deleteActionConfig
+            ? getTableActionRowState(deleteActionConfig, row).disabled
+            : false,
         icon: <DeleteIcon />,
         setRow: setRowToAction as (value: GenericItem) => void,
         modal: rowToAction ? (
@@ -1343,8 +1411,20 @@ export default function GenericUnpaginatedPage({
         editActionConfig?.formFields !== undefined
           ? buildActionFormKeys(editActionConfig, editInputs)
           : formKeys.filter((formKey) => editInputKeys.has(formKey.key));
+      const editConstantValues = partitionActionConstantValues(
+        editActionConfig ? parseActionConstantValues(editActionConfig) : {},
+        editFormKeys.map((formKey) => formKey.key),
+      );
       return {
         name: editActionConfig?.label || t("Edit"),
+        isHidden: (row: GenericItem) =>
+          editActionConfig
+            ? getTableActionRowState(editActionConfig, row).hidden
+            : false,
+        isDisabled: (row: GenericItem) =>
+          editActionConfig
+            ? getTableActionRowState(editActionConfig, row).disabled
+            : false,
         icon: <EditIcon />,
         className:
           editActionConfig?.className || "text-blue-500 cursor-pointer text-xl",
@@ -1388,16 +1468,27 @@ export default function GenericUnpaginatedPage({
                   close={() => setIsEditOpen(false)}
                   inputs={editInputs}
                   formKeys={editFormKeys}
-                  submitItem={handleSubmitItem}
+                  submitItem={(item) => {
+                    if ("id" in item && "updates" in item) {
+                      handleSubmitItem({
+                        id: item.id as string | number,
+                        updates: applyHiddenActionValues(
+                          item.updates as Record<string, unknown>,
+                          editConstantValues.hiddenValues,
+                        ) as Partial<GenericItem>,
+                      });
+                    }
+                  }}
                   isEditMode
                   buttonName={editActionConfig?.buttonName || t("Edit")}
                   topClassName="flex flex-col gap-2"
                   itemToEdit={{
                     id: rowToAction._id,
-                    updates: {
-                      ...normalizedUpdates,
-                      ...editDefaultValues,
-                    },
+                    updates: buildActionInitialValues(
+                      editDefaultValues,
+                      editConstantValues.visibleDefaults,
+                      normalizedUpdates,
+                    ) as GenericItem,
                   }}
                 />
               );
@@ -1412,7 +1503,6 @@ export default function GenericUnpaginatedPage({
     const buildCustomAction = (action: TableActionConfig, index: number) => {
       const actionId = getActionId(action, index);
       const ActionIcon = getIconByName(action.icon || "FiCheck");
-      const constantValues = parseActionConstantValues(action);
       const defaultValues = getActionDefaultValues(action);
       const actionInputs = buildActionInputs(
         action,
@@ -1421,6 +1511,10 @@ export default function GenericUnpaginatedPage({
         actionSelectionDataMap,
       );
       const actionFormKeys = buildActionFormKeys(action, actionInputs);
+      const constantValues = partitionActionConstantValues(
+        parseActionConstantValues(action),
+        actionFormKeys.map((formKey) => formKey.key),
+      );
       const workflowSubmit = action.submit;
       const isWorkflowAction = Boolean(
         workflowSubmit?.workflowName && workflowSubmit?.workflowSchema,
@@ -1432,6 +1526,10 @@ export default function GenericUnpaginatedPage({
 
       return {
         name: action.label || t("Action"),
+        isHidden: (row: GenericItem) =>
+          getTableActionRowState(action, row).hidden,
+        isDisabled: (row: GenericItem) =>
+          getTableActionRowState(action, row).disabled,
         icon: <ActionIcon />,
         className:
           action.className || "text-emerald-600 cursor-pointer text-xl ",
@@ -1456,12 +1554,18 @@ export default function GenericUnpaginatedPage({
               executeWorkflow({
                 workflowName: workflowSubmit?.workflowName || "",
                 workflowSchema: workflowSubmit?.workflowSchema,
-                record: { ...row, ...constantValues },
+                record: applyHiddenActionValues(
+                  row,
+                  constantValues.hiddenValues,
+                ),
                 oldRecord: row,
               });
               return;
             }
-            updateDynamicItem(row._id, constantValues as Partial<GenericItem>);
+            updateDynamicItem(
+              row._id,
+              constantValues.hiddenValues as Partial<GenericItem>,
+            );
           }
         },
         modal:
@@ -1473,11 +1577,10 @@ export default function GenericUnpaginatedPage({
               formKeys={actionFormKeys}
               submitItem={(item) => {
                 if ("id" in item && "updates" in item) {
-                  const record = {
+                  const record = applyHiddenActionValues({
                     ...rowToAction,
                     ...(item.updates as Record<string, unknown>),
-                    ...constantValues,
-                  };
+                  }, constantValues.hiddenValues);
                   if (isWorkflowAction) {
                     executeWorkflow({
                       workflowName: workflowSubmit?.workflowName || "",
@@ -1501,11 +1604,11 @@ export default function GenericUnpaginatedPage({
               })}
               itemToEdit={{
                 id: rowToAction._id,
-                updates: {
-                  ...rowToAction,
-                  ...defaultValues,
-                  ...constantValues,
-                },
+                updates: buildActionInitialValues(
+                  defaultValues,
+                  constantValues.visibleDefaults,
+                  rowToAction,
+                ) as GenericItem,
               }}
             />
           ) : null,
@@ -1834,9 +1937,19 @@ export default function GenericUnpaginatedPage({
       }
     }
 
+    const bulkConstants = partitionActionConstantValues(
+      bulkEditActionConfig
+        ? parseActionConstantValues(bulkEditActionConfig)
+        : {},
+      bulkSelectedKeys,
+    );
+    const submittedUpdates = applyHiddenActionValues(
+      updates,
+      bulkConstants.hiddenValues,
+    );
     const items = (selectedRows as GenericItem[]).map((r) => ({
       _id: r._id,
-      updates,
+      updates: submittedUpdates,
     }));
     if (bulkEditActionConfig?.submit?.workflowName) {
       executeWorkflow({
@@ -1844,7 +1957,7 @@ export default function GenericUnpaginatedPage({
         workflowSchema: bulkEditActionConfig.submit.workflowSchema || schemaName,
         record: {
           selectedIds: (selectedRows as GenericItem[]).map((r) => r._id),
-          updates,
+          updates: submittedUpdates,
           items,
           functionName: bulkEditActionConfig.submit.functionName,
         },
@@ -1920,7 +2033,17 @@ export default function GenericUnpaginatedPage({
             });
         }
 
-        setBulkForm((prev) => ({ ...prev, ...initialBulkValues }));
+        const bulkConstants = partitionActionConstantValues(
+          bulkEditActionConfig
+            ? parseActionConstantValues(bulkEditActionConfig)
+            : {},
+          selectedKeys,
+        );
+        setBulkForm((prev) => ({
+          ...prev,
+          ...initialBulkValues,
+          ...bulkConstants.visibleDefaults,
+        }));
         setIsBulkStepTwo(true);
       }
     }
@@ -2198,8 +2321,9 @@ export default function GenericUnpaginatedPage({
   );
 
   const rows = useMemo(() => {
+    const sourceRows = applyTableArraySource(items || [], tableConfig);
     const nestedRows = applyTableNestedRows(
-      items || [],
+      sourceRows,
       tableConfig,
       t,
       lookupSelectionDataMap,

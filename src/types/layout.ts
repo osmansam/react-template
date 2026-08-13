@@ -114,6 +114,12 @@ export interface TableNestedRowsConfig {
   columns?: TableNestedRowColumnConfig[];
 }
 
+export interface TableArraySourceConfig {
+  enabled?: boolean;
+  field?: string;
+  rowIdentityField?: string;
+}
+
 export interface TableCacheConfig {
   invalidateKeys?: string[];
 }
@@ -123,6 +129,7 @@ export interface TableComponentConfig {
   columns?: TableColumnConfig[];
   rows?: TableRowsConfig;
   nestedRows?: TableNestedRowsConfig;
+  arraySource?: TableArraySourceConfig;
   cache?: TableCacheConfig;
   constantFilters?: Record<string, unknown>;
   constantSort?: {

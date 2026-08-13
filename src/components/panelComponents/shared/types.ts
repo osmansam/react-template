@@ -23,7 +23,8 @@ export interface ActionType<T> {
   icon?: React.ReactNode;
   isButton?: boolean;
   buttonClassName?: string;
-  isDisabled?: boolean;
+  isDisabled?: boolean | ((row: T) => boolean);
+  isHidden?: (row: T) => boolean;
   node?: (row: T) => React.ReactNode;
   modal?: React.ReactNode;
   onClick?: (row: T) => void;
