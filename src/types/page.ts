@@ -425,6 +425,14 @@ export interface TableArraySourceConfig {
   enabled?: boolean;
   field?: string;
   rowIdentityField?: string;
+  parentId?: ParameterBinding;
+  autoGenerate?: {
+    columns: boolean;
+    add: boolean;
+    edit: boolean;
+    delete: boolean;
+    reorder: boolean;
+  };
 }
 
 export type FormAreaKey = "top" | "main" | "bottom" | "left" | "right";

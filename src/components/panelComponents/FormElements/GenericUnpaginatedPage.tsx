@@ -56,7 +56,7 @@ import { getTableActionRowState } from "../../../utils/tableActions";
 import {
   applyTableArraySource,
   applyTableNestedRows,
-  buildArraySourceParentUpdate,
+  getArraySourceMutationTarget,
   getComputedLabelValue,
   getLookupLabelValue,
   getProgressBarValue,
@@ -65,6 +65,7 @@ import {
   getTableLinkConfig,
   isTableSearchEnabled,
 } from "../../../utils/tableConfig";
+import { addDynamicArrayRow, deleteDynamicArrayRow, reorderDynamicArrayRows, updateDynamicArrayRow } from "../../../utils/api/dynamicArray";
 import { useTableLookupSelectionData } from "../../../utils/tableLookupSelection";
 import { useGeneratedRelationTableColumns } from "../../../utils/useGeneratedRelationTableColumns";
 import { resolveTableActionFormLayout } from "../../../utils/tableActionFormLayout";
@@ -609,10 +610,10 @@ export default function GenericUnpaginatedPage({
     tableConfig,
     toggleState: tableToggleState,
     toggles: configuredTableToggles,
-    updateRow: (id, updates, row) => {
-      const parentUpdate = buildArraySourceParentUpdate(row, updates);
-      if (parentUpdate) {
-        updateDynamicItem(parentUpdate.parentId, parentUpdate.updates);
+    updateRow: async (id, updates, row) => {
+      const target = getArraySourceMutationTarget(row);
+      if (target) {
+        await updateDynamicArrayRow({ schemaName, parentId: target.parentId, arrayField: target.arrayField, rowIdentityField: target.rowIdentityField, rowIdentity: target.rowIdentity, updates });
         return;
       }
       updateDynamicItem(id, updates);
@@ -1250,8 +1251,13 @@ export default function GenericUnpaginatedPage({
   }, [displayFields, t, selectionDataMap]);
 
   const handleSubmitItem = useCallback(
-    (item: GenericItem | UpdatePayload<GenericItem>) => {
+    async (item: GenericItem | UpdatePayload<GenericItem>) => {
       if ("id" in item && "updates" in item) {
+        const target = getArraySourceMutationTarget(rowToAction || undefined);
+        if (target) {
+          await updateDynamicArrayRow({ schemaName, parentId: target.parentId, arrayField: target.arrayField, rowIdentityField: target.rowIdentityField, rowIdentity: target.rowIdentity, updates: item.updates as Record<string, unknown> });
+          return;
+        }
         updateDynamicItem(
           item.id as string | number,
           omitTableConstantKeys(
@@ -1265,8 +1271,7 @@ export default function GenericUnpaginatedPage({
           tableConfig?.addButton?.constantValues,
           formKeys.map((formKey) => formKey.key),
         );
-        createDynamicItem(
-          mergeTableConstantValues(
+        const nextItem = mergeTableConstantValues(
             applyHiddenActionValues(
               item as GenericItem,
               addConstants.hiddenValues,
@@ -1274,8 +1279,14 @@ export default function GenericUnpaginatedPage({
             undefined,
             tableConfig?.constantFilters,
             constantFilter,
-          ),
-        );
+          );
+        const source = tableConfig?.arraySource;
+        const parentId = items?.[0]?._id;
+        if (source?.enabled && source.field && source.rowIdentityField && parentId != null) {
+          await addDynamicArrayRow({ schemaName, parentId, arrayField: source.field, rowIdentityField: source.rowIdentityField, item: nextItem as Record<string, unknown> });
+          return;
+        }
+        createDynamicItem(nextItem);
       }
     },
     [
@@ -1284,8 +1295,20 @@ export default function GenericUnpaginatedPage({
       tableConfig,
       constantFilter,
       formKeys,
+      rowToAction,
+      schemaName,
+      items,
     ],
   );
+
+  const deleteTableRow = useCallback(async (row: GenericItem) => {
+    const target = getArraySourceMutationTarget(row);
+    if (target) {
+      await deleteDynamicArrayRow({ schemaName, parentId: target.parentId, arrayField: target.arrayField, rowIdentityField: target.rowIdentityField, rowIdentity: target.rowIdentity });
+      return;
+    }
+    deleteDynamicItem(row._id);
+  }, [deleteDynamicItem, schemaName]);
 
   const addButton = useMemo(() => {
     const addConstants = partitionActionConstantValues(
@@ -1375,7 +1398,7 @@ export default function GenericUnpaginatedPage({
             isOpen={isDeleteOpen}
             close={() => setIsDeleteOpen(false)}
             confirm={() => {
-              deleteDynamicItem(rowToAction._id);
+              void deleteTableRow(rowToAction);
               setIsDeleteOpen(false);
             }}
             title={deleteActionConfig?.confirmTitle || t("Delete")}
@@ -1481,7 +1504,9 @@ export default function GenericUnpaginatedPage({
                   }}
                   isEditMode
                   buttonName={editActionConfig?.buttonName || t("Edit")}
-                  topClassName="flex flex-col gap-2"
+                  {...resolveTableActionFormLayout(editActionConfig, {
+                    topClassName: "flex flex-col gap-2",
+                  })}
                   itemToEdit={{
                     id: rowToAction._id,
                     updates: buildActionInitialValues(
@@ -2363,10 +2388,15 @@ export default function GenericUnpaginatedPage({
         1,
       );
       if (result.updates.length) {
+        const firstTarget = getArraySourceMutationTarget(result.rows[0]);
+        if (firstTarget) {
+          void reorderDynamicArrayRows({ schemaName, parentId: firstTarget.parentId, arrayField: firstTarget.arrayField, rowIdentityField: firstTarget.rowIdentityField, orderField: tableDragState.orderField, rowIdentities: result.rows.map((row) => getArraySourceMutationTarget(row)?.rowIdentity) });
+          return;
+        }
         updateMultipleDynamicItem(result.updates);
       }
     },
-    [rows, tableDragState.orderField, updateMultipleDynamicItem],
+    [rows, tableDragState.orderField, updateMultipleDynamicItem, schemaName],
   );
   const { exportDynamicItems } = useExportDynamicItems();
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
