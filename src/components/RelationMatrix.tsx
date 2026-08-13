@@ -1,7 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { CheckSwitch } from "../common/CheckSwitch";
+import GenericTable from "./panelComponents/Tables/GenericTable";
+import SwitchButton from "./panelComponents/common/SwitchButton";
+import type {
+  ColumnType,
+  FilterType,
+  RowKeyType,
+} from "./panelComponents/shared/types";
 import type { RelationMatrixConfig } from "../types/page";
 import { useGetPaginatedItems } from "../utils/dynamic";
 import {
@@ -10,6 +17,7 @@ import {
 } from "../utils/api/dynamicArray";
 import {
   buildRelationArrayTarget,
+  buildRelationMatrixTableDescriptors,
   isRelationMatrixMember,
   normalizeRelationId,
 } from "../utils/relationMatrix";
@@ -67,6 +75,10 @@ export default function RelationMatrix({
     toggleState,
     toggles,
   );
+  const descriptors = useMemo(
+    () => buildRelationMatrixTableDescriptors(columns, config),
+    [columns, config],
+  );
 
   const changeMembership = async (
     row: RecordItem,
@@ -113,79 +125,76 @@ export default function RelationMatrix({
     }
   };
 
+  const tableColumns = descriptors.columns as ColumnType[];
+  const rowKeys = useMemo<RowKeyType<RecordItem>[]>(
+    () => [
+      {
+        key: config.rowLabelField,
+        node: (row) => valueLabel(row[config.rowLabelField]),
+        className: "font-medium text-gray-900",
+      },
+      ...columns.map((column) => {
+        const columnId = normalizeRelationId(column[config.columnIdField]);
+        return {
+          key: `relation:${columnId}`,
+          className: "flex justify-center",
+          node: (row: RecordItem) => {
+            const rowId = normalizeRelationId(row[config.rowIdField]);
+            const key = `${columnId}:${rowId}`;
+            const serverChecked = isRelationMatrixMember(
+              column[config.targetArrayField],
+              config.targetItemMatchField,
+              rowId,
+            );
+            const checked = overrides[key] ?? serverChecked;
+            return (
+              <span className={pending[key] ? "inline-flex opacity-50" : "inline-flex"}>
+                <CheckSwitch
+                  checked={checked}
+                  onChange={() => editable && changeMembership(row, column, !checked)}
+                  uncheckedBg="bg-gray-300"
+                />
+              </span>
+            );
+          },
+        };
+      }),
+    ],
+    [columns, config, editable, overrides, pending],
+  );
+  const filters = useMemo<FilterType[]>(
+    () =>
+      toggles.map((toggle) => ({
+        label: toggle.label,
+        isUpperSide: toggle.isUpperSide !== false,
+        node: (
+          <SwitchButton
+            checked={toggleState[toggle.id] ?? toggle.defaultValue}
+            onChange={() =>
+              setToggleState((current) => ({
+                ...current,
+                [toggle.id]: !(current[toggle.id] ?? toggle.defaultValue),
+              }))
+            }
+          />
+        ),
+      })),
+    [toggleState, toggles],
+  );
+
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-gray-900">{title || "Relations"}</h2>
-        <div className="flex flex-wrap items-center gap-4">
-          {toggles.map((toggle) => (
-            <label key={toggle.id} className="flex items-center gap-2 text-sm text-gray-700">
-              <span>{toggle.label}</span>
-              <CheckSwitch
-                checked={toggleState[toggle.id] ?? toggle.defaultValue}
-                onChange={() =>
-                  setToggleState((current) => ({
-                    ...current,
-                    [toggle.id]: !(current[toggle.id] ?? toggle.defaultValue),
-                  }))
-                }
-              />
-            </label>
-          ))}
-        </div>
-      </div>
-      {visible && (
-        <div className="max-w-full overflow-auto rounded-lg border border-gray-200">
-          <table className="min-w-max w-full border-collapse text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="sticky left-0 z-10 min-w-48 border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-left font-semibold text-gray-700">
-                  {config.rowLabelField}
-                </th>
-                {columns.map((column) => (
-                  <th key={normalizeRelationId(column[config.columnIdField])} className="min-w-36 border-b border-gray-200 px-4 py-3 text-center font-semibold text-gray-700">
-                    {valueLabel(column[config.columnLabelField])}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const rowId = normalizeRelationId(row[config.rowIdField]);
-                return (
-                  <tr key={rowId} className="border-b border-gray-100 last:border-0">
-                    <td className="sticky left-0 z-10 border-r border-gray-200 bg-white px-4 py-3 font-medium text-gray-900">
-                      {valueLabel(row[config.rowLabelField])}
-                    </td>
-                    {columns.map((column) => {
-                      const columnId = normalizeRelationId(column[config.columnIdField]);
-                      const key = `${columnId}:${rowId}`;
-                      const serverChecked = isRelationMatrixMember(
-                        column[config.targetArrayField],
-                        config.targetItemMatchField,
-                        rowId,
-                      );
-                      const checked = overrides[key] ?? serverChecked;
-                      return (
-                        <td key={columnId} className="px-4 py-3 text-center">
-                          <span className={pending[key] ? "inline-flex opacity-50" : "inline-flex"}>
-                            <CheckSwitch
-                              checked={checked}
-                              onChange={() => editable && changeMembership(row, column, !checked)}
-                              uncheckedBg="bg-gray-300"
-                            />
-                          </span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!rows.length && <div className="p-6 text-center text-sm text-gray-500">No rows found.</div>}
-        </div>
-      )}
-    </section>
+    <GenericTable<RecordItem>
+      rows={visible ? rows : []}
+      columns={visible ? tableColumns : []}
+      rowKeys={visible ? rowKeys : []}
+      title={title || "Relations"}
+      filters={filters}
+      isActionsActive={false}
+      isSearch={false}
+      isPagination={false}
+      isRowsPerPage={false}
+      isColumnFilter={false}
+      isExcel={false}
+    />
   );
 }
