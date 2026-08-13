@@ -569,8 +569,24 @@ export interface DistributionBlocksConfig {
   dynamicItem?: DistributionBlockItemConfig;
 }
 
+export interface RelationMatrixConfig {
+  rowSchemaName: string;
+  rowIdField: string;
+  rowLabelField: string;
+  columnSchemaName: string;
+  columnIdField: string;
+  columnLabelField: string;
+  targetArrayField: string;
+  targetItemMatchField: string;
+  columnLimit?: number;
+  toggles?: TableToggleConfig[];
+  visibilityToggle?: ToggleBinding;
+  editToggle?: ToggleBinding;
+}
+
 export type ComponentType =
   | "table"
+  | "relationMatrix"
   | "tabPanel"
   | "form"
   | "text"
@@ -616,6 +632,7 @@ export interface ComponentBlock {
   outputs?: ComponentOutputDefinition[];
   groupBy?: GroupBy; // Grouping configuration for table components
   table?: TableComponentConfig;
+  relationMatrix?: RelationMatrixConfig;
   form?: FormComponentConfig;
   isAuthorized?: boolean;
   authorizeRole?: string[];

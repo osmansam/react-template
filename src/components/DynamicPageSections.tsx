@@ -32,6 +32,7 @@ import UnifiedTabPanel from "./panelComponents/TabPanel/UnifiedTabPanel";
 const DynamicCalendar = lazy(() => import("./calendar/DynamicCalendar"));
 const DynamicChart = lazy(() => import("./charts/DynamicChart"));
 const DynamicForm = lazy(() => import("./forms/DynamicForm"));
+const RelationMatrix = lazy(() => import("./RelationMatrix"));
 
 const getChartTypeFromComponentType = (
   componentType: string,
@@ -169,6 +170,16 @@ const RenderReadyComponent: React.FC<{
   );
 
   switch (type) {
+    case "relationMatrix":
+      return component.relationMatrix ? (
+        <Suspense fallback={<LoadingPanel message="Loading relation matrix..." />}>
+          <RelationMatrix config={component.relationMatrix} title={title} />
+        </Suspense>
+      ) : (
+        <NoticePanel tone="warning">
+          Relation matrix requires configuration.
+        </NoticePanel>
+      );
     case "form": {
       const formConfig =
         component.form ||
