@@ -33,7 +33,10 @@ interface RouteConfig {
 
 const RouterContainer = () => {
   const location = useLocation();
-  const loadDynamicPages = shouldLoadDynamicPages(location.pathname, getProjectSessionItem("loggedIn", location.pathname));
+  const loadDynamicPages = shouldLoadDynamicPages(
+    location.pathname,
+    getProjectSessionItem("loggedIn", location.pathname) === "true",
+  );
   const { dynamicRoutes, isLoading, isError } = useDynamicPages(loadDynamicPages);
 
   // Combine static routes with dynamic routes
