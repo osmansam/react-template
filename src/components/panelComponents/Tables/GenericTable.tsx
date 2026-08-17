@@ -23,6 +23,8 @@ import {
   OutsideSearchProps,
 } from "../../../utils/outsideSearch";
 import { outsideSort } from "../../../utils/outsideSort";
+import { formatPopulatedArrayValue } from "../../../utils/populatedArrayDisplay";
+import { syncTranslatedTableColumns } from "../../../utils/tableColumns";
 import { GenericButton } from "../FormElements/GenericButton";
 import ImageModal from "../Modals/ImageModal";
 import { OrientationToggle } from "../TabPanel/OrientationToggle";
@@ -448,14 +450,11 @@ const GenericTable = <T,>({
 
   useEffect(() => {
     if (!title) return;
-    const existing = tableColumns[title];
-    if (!existing || existing.length !== columns.length) {
-      setTableColumns((prev) => ({
-        ...prev,
-        [title]: columns.map((column) => ({ ...column, isActive: true })),
-      }));
-    }
-  }, [title, columns, setTableColumns, tableColumns]);
+    setTableColumns((prev) => {
+      const synchronized = syncTranslatedTableColumns(prev[title], columns);
+      return synchronized === prev[title] ? prev : { ...prev, [title]: synchronized };
+    });
+  }, [title, columns, setTableColumns]);
 
   const checkHeaderScrollButtons = () => {
     if (headerScrollRef.current) {
@@ -642,7 +641,11 @@ const GenericTable = <T,>({
   const renderActionButtons = (row: T, actions: ActionType<T>[]) => (
     <div className="flex flex-row my-auto h-full gap-3 justify-center items-center">
       {actions?.map((action, index) => {
-        if (action?.isDisabled || action?.node === null) return null;
+        if (action?.isHidden?.(row) || action?.node === null) return null;
+        const isDisabled =
+          typeof action?.isDisabled === "function"
+            ? action.isDisabled(row)
+            : action?.isDisabled;
         if (action.node) return <div key={index}>{action.node(row)}</div>;
         return (
           <div
@@ -651,7 +654,10 @@ const GenericTable = <T,>({
               action.icon &&
               "rounded-full  h-6 w-6 flex my-auto items-center justify-center"
             } ${action?.className}`}
-            onClick={() => actionOnClick(action, row)}
+            onClick={() => {
+              if (!isDisabled) actionOnClick(action, row);
+            }}
+            aria-disabled={isDisabled || undefined}
           >
             {action.icon && (
               <ButtonTooltip content={action.name}>{action.icon}</ButtonTooltip>
@@ -748,6 +754,10 @@ const GenericTable = <T,>({
               typeof rowKey?.className === "function"
                 ? rowKey.className(row)
                 : rowKey?.className || "";
+            const computedStyle =
+              typeof rowKey?.style === "function"
+                ? rowKey.style(row)
+                : rowKey?.style || {};
 
             const columnClassName =
               usedColumns?.[keyIndex]?.generalColumnClassName || "";
@@ -758,7 +768,9 @@ const GenericTable = <T,>({
                   key={keyIndex}
                   className={`px-4 py-3 min-w-20 ${columnClassName}`}
                 >
-                  <span className={computedClassName}>{rowKey.node(row)}</span>
+                  <span className={computedClassName} style={computedStyle}>
+                    {rowKey.node(row)}
+                  </span>
                 </td>
               );
             }
@@ -773,7 +785,9 @@ const GenericTable = <T,>({
                   key={keyIndex}
                   className={`px-4 py-3 min-w-20 ${columnClassName}`}
                 >
-                  <span className={computedClassName}>-</span>
+                  <span className={computedClassName} style={computedStyle}>
+                    -
+                  </span>
                 </td>
               );
             }
@@ -788,7 +802,9 @@ const GenericTable = <T,>({
                   key={keyIndex}
                   className={`px-4 py-3 min-w-20 ${columnClassName}`}
                 >
-                  <P1 className={computedClassName}>{formattedValue} ₺</P1>
+                  <P1 className={computedClassName} style={computedStyle}>
+                    {formattedValue} ₺
+                  </P1>
                 </td>
               );
             }
@@ -797,13 +813,15 @@ const GenericTable = <T,>({
             const rawValue = row[rowKey.key as keyof T];
             const cellValue = rowKey.isDate
               ? formatDate(rawValue) || `${rawValue}`
-              : `${rawValue}`;
+              : Array.isArray(rawValue)
+                ? formatPopulatedArrayValue(rawValue)
+                : `${rawValue}`;
 
             const displayValue =
               cellValue.length > tooltipLimit && isToolTipEnabled
                 ? `${cellValue.substring(0, tooltipLimit)}...`
                 : cellValue;
-            let style: React.CSSProperties = {};
+            let style: React.CSSProperties = { ...computedStyle };
 
             if (rowKey.isOptional && rowKey.options) {
               const matchedOption = rowKey.options.find(
@@ -869,7 +887,9 @@ const GenericTable = <T,>({
                   })()
                 ) : cellValue.length > tooltipLimit && isToolTipEnabled ? (
                   <CustomTooltip content={cellValue}>
-                    <P1 className={computedClassName}>{displayValue}</P1>
+                    <P1 className={computedClassName} style={style}>
+                      {displayValue}
+                    </P1>
                   </CustomTooltip>
                 ) : (
                   <P1 className={computedClassName} style={style}>
@@ -959,6 +979,10 @@ const GenericTable = <T,>({
                                 typeof rowKey?.className === "function"
                                   ? rowKey.className(collapsibleRow)
                                   : rowKey?.className || "";
+                              const computedStyle =
+                                typeof rowKey?.style === "function"
+                                  ? rowKey.style(collapsibleRow)
+                                  : rowKey?.style || {};
 
                               const columnClassName =
                                 row?.collapsible?.collapsibleColumns?.[keyIndex]
@@ -970,7 +994,10 @@ const GenericTable = <T,>({
                                     key={keyIndex}
                                     className={`px-4 py-3 min-w-20 border-b ${columnClassName}`}
                                   >
-                                    <P1 className={computedClassName}>
+                                    <P1
+                                      className={computedClassName}
+                                      style={computedStyle}
+                                    >
                                       {rowKey.node(collapsibleRow)}
                                     </P1>
                                   </td>
@@ -984,6 +1011,7 @@ const GenericTable = <T,>({
                                       row?.collapsible?.collapsibleRows.length -
                                         1 && "border-b"
                                   }`}
+                                  style={computedStyle}
                                 >
                                   {cellValue}
                                 </td>

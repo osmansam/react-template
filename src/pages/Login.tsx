@@ -1,5 +1,4 @@
 import { useQueryClient } from "@tanstack/react-query";
-import Cookies from "js-cookie";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FcGoogle } from "react-icons/fc";
@@ -20,6 +19,7 @@ import {
   redirectAfterGoogleLogin,
   refreshAfterGoogleLogin,
 } from "./googleCallbackAuth";
+import { setProjectSessionItem } from "../utils/projectSessionStorage";
 
 const Login = () => {
   const { t } = useTranslation();
@@ -83,19 +83,11 @@ const Login = () => {
       if (event.origin !== window.location.origin) return;
 
       if (event.data.type === "GOOGLE_AUTH_SUCCESS") {
-        const { accessToken, refreshToken, user } = event.data;
-
-        // Store tokens FIRST
-        Cookies.set("jwt", accessToken);
-        localStorage.setItem("jwt", accessToken);
-        localStorage.setItem("loggedIn", "true");
-
-        if (refreshToken) {
-          localStorage.setItem("refreshToken", refreshToken);
-        }
+        const { user } = event.data;
+        setProjectSessionItem("loggedIn", "true");
 
         if (user) {
-          localStorage.setItem("user", JSON.stringify(user));
+          setProjectSessionItem("user", JSON.stringify(user));
           setUser(user);
         }
 

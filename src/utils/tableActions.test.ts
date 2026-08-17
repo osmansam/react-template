@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { canUseConfiguredBulkSchemaActions } from "./tableActions";
+import {
+  canUseConfiguredBulkSchemaActions,
+  getTableActionRowState,
+} from "./tableActions";
 
 describe("canUseConfiguredBulkSchemaActions", () => {
   it("allows configured bulk actions for workflow-backed tables with a target schema", () => {
@@ -20,5 +23,16 @@ describe("canUseConfiguredBulkSchemaActions", () => {
         workflowName: "products-with-external-prices",
       }),
     ).toBe(false);
+  });
+});
+
+describe("getTableActionRowState", () => {
+  it("hides an action when its hidden condition matches the row", () => {
+    expect(
+      getTableActionRowState(
+        { hiddenCondition: "status == 'INACTIVE'" },
+        { _id: "row-1", status: "INACTIVE" },
+      ),
+    ).toEqual({ hidden: true, disabled: false });
   });
 });

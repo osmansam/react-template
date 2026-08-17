@@ -1,5 +1,6 @@
 import { createContext, PropsWithChildren, useContext, useState } from "react";
 import { User } from "../types";
+import { getProjectSessionItem } from "../utils/projectSessionStorage";
 
 type UserContextType = {
   user?: User;
@@ -14,7 +15,7 @@ const UserContext = createContext<UserContextType>({
 
 export const UserContextProvider = ({ children }: PropsWithChildren) => {
   const [user, setUser] = useState<User | undefined>(() => {
-    const user = localStorage.getItem("user");
+    const user = getProjectSessionItem("user");
     return user ? JSON.parse(user) : undefined;
   });
   return (

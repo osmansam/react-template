@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Cookies from "js-cookie";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -11,6 +10,7 @@ import { User } from "../../types";
 import { get, post } from "./index";
 import { redirectAfterAuth } from "./authRedirect";
 import { notifyApiError } from "./errorMessage";
+import { removeProjectSessionItem, setProjectSessionItem } from "../projectSessionStorage";
 
 interface LoginError {
   response: {
@@ -59,8 +59,6 @@ export interface LoginResponse {
   status: number;
   message: string;
   data: {
-    accessToken: string;
-    refreshToken: string;
     user: User;
   };
 }
@@ -90,16 +88,11 @@ export function useLogin(
     mutationFn: loginMethod,
     // We are updating tables query data with new item
     onSuccess: async (response: LoginResponse) => {
-      const { accessToken, refreshToken, user } = response.data;
-
-      // Set token in both cookie and localStorage FIRST
-      Cookies.set("jwt", accessToken, { expires: 7, sameSite: "lax" }); // 7 days expiry
-      localStorage.setItem("jwt", accessToken);
-      localStorage.setItem("refreshToken", refreshToken);
-      localStorage.setItem("loggedIn", "true");
+      const { user } = response.data;
+      setProjectSessionItem("loggedIn", "true");
 
       if (user) {
-        localStorage.setItem("user", JSON.stringify(user));
+        setProjectSessionItem("user", JSON.stringify(user));
         setUser(user);
       }
 
@@ -151,16 +144,11 @@ export function useRegister(
   >({
     mutationFn: registerMethod,
     onSuccess: async (response: LoginResponse) => {
-      const { accessToken, refreshToken, user } = response.data;
-
-      // Set token in both cookie and localStorage FIRST
-      Cookies.set("jwt", accessToken, { expires: 7, sameSite: "lax" }); // 7 days expiry
-      localStorage.setItem("jwt", accessToken);
-      localStorage.setItem("refreshToken", refreshToken);
-      localStorage.setItem("loggedIn", "true");
+      const { user } = response.data;
+      setProjectSessionItem("loggedIn", "true");
 
       if (user) {
-        localStorage.setItem("user", JSON.stringify(user));
+        setProjectSessionItem("user", JSON.stringify(user));
         setUser(user);
       }
 
@@ -205,10 +193,10 @@ export function useLogout(onError?: (error: unknown) => void) {
       const tenant = tIndex !== -1 ? pathParts[tIndex + 1] : "";
       const project = pIndex !== -1 ? pathParts[pIndex + 1] : "";
 
-      localStorage.clear();
-      localStorage.setItem("loggedOut", "true");
-      setTimeout(() => localStorage.removeItem("loggedOut"), 500);
-      Cookies.remove("jwt");
+      setProjectSessionItem("loggedOut", "true");
+      removeProjectSessionItem("loggedIn");
+      removeProjectSessionItem("user");
+      setTimeout(() => removeProjectSessionItem("loggedOut"), 500);
       setUser(undefined);
       queryClient.clear();
 

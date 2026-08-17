@@ -2,9 +2,9 @@ import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUserContext } from "../context/User.context";
 import { PublicRoutes } from "../navigation/constants";
-import { ACCESS_TOKEN } from "../utils/api/axiosClient";
-import { validateTokenForTenantProject } from "../utils/jwtUtils";
+import { axiosClient } from "../utils/api/axiosClient";
 import { useTenantProject } from "./useTenantProject";
+import { projectSessionStorageKey } from "../utils/projectSessionStorage";
 // import { getUserWithToken } from "../utils/api/user";
 
 const useAuth = () => {
@@ -16,37 +16,14 @@ const useAuth = () => {
   useEffect(() => {
     const getUser = async (): Promise<void> => {
       if (user) return;
-      const token = localStorage.getItem(ACCESS_TOKEN);
-
       const loginPath =
         tenant && project ? buildPath("/login") : PublicRoutes.Login;
 
-      if (!token) {
-        navigate(loginPath, {
-          replace: true,
-          state: { from: location },
-        });
-        return;
-      }
-
-      // Validate token for tenant/project if they exist in URL
-      if (tenant && project) {
-        const isValid = validateTokenForTenantProject(token, tenant, project);
-        if (!isValid) {
-          localStorage.removeItem(ACCESS_TOKEN);
-          navigate(loginPath, {
-            replace: true,
-            state: { from: location },
-          });
-          return;
-        }
-      }
-
       try {
-        // const loggedInUser = await getUserWithToken();
-        // setUser(loggedInUser);
-      } catch (e) {
-        console.log(e);
+        const { data } = await axiosClient.get("/auth/session");
+        if (!data?.authenticated) throw new Error("Unauthenticated");
+        if (data.user) setUser(data.user);
+      } catch {
         navigate(loginPath, {
           replace: true,
           state: { from: location },
@@ -55,7 +32,7 @@ const useAuth = () => {
     };
 
     const handleStorageEvent = (event: StorageEvent) => {
-      if (event.key === "loggedOut" && event.newValue === "true") {
+      if (event.key === projectSessionStorageKey("loggedOut", location.pathname) && event.newValue === "true") {
         setUser(undefined);
         const loginPath =
           tenant && project ? buildPath("/login") : PublicRoutes.Login;

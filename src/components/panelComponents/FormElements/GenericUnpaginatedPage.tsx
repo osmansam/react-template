@@ -1,31 +1,46 @@
 import { useQueries } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { IoCheckmark, IoCloseOutline } from "react-icons/io5";
 import { CheckSwitch } from "../../../common/CheckSwitch";
 import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { LinkCell, renderLinkedCellContent } from "../../../components/LinkCell";
-import { useGeneralContext } from "../../../context/General.context";
 import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
+import TableOutputPublisher from "../../../pageRuntime/TableOutputPublisher";
+import { resolveSelectedRowIds, type TableOutputState } from "../../../pageRuntime/tableOutputAdapter";
 import { FormElementsState } from "../../../types";
 import {
+  ComponentOutputDefinition,
+  DataBinding,
   TableActionConfig,
   TableActionFormFieldConfig,
   TableComponentConfig,
 } from "../../../types/page";
 import { UpdatePayload, get } from "../../../utils/api";
 import {
+  applyHiddenActionValues,
+  buildActionInitialValues,
+  partitionActionConstantValues,
+} from "../../../utils/actionConstantValues";
+import {
   ContainerModel,
   Field,
   Types,
   useGetContainers,
 } from "../../../utils/api/container";
-import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
+import {
+  useDynamicCrud,
+  useExportDynamicItems,
+  useGetDynamicItems,
+} from "../../../utils/dynamic";
+import { mergeTableConstantValues, omitTableConstantKeys } from "../../../utils/tableConstantValues";
 import {
   RawContainer,
   evaluateRowCondition,
   fieldToInput,
   getFieldLabel,
+  getMatchingRowClassPresentation,
   getMatchingRowClassNames,
   humanize,
   isDisplayablePrimitive,
@@ -34,9 +49,14 @@ import {
   tailwindBgToStyle,
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
+import { formatPopulatedArrayValue } from "../../../utils/populatedArrayDisplay";
 import { getSelectionQueryConfig } from "../../../utils/selectionQuery";
+import { renderTableColumnTemplate } from "../../../utils/tableColumnTemplate";
+import { getTableActionRowState } from "../../../utils/tableActions";
 import {
+  applyTableArraySource,
   applyTableNestedRows,
+  getArraySourceMutationTarget,
   getComputedLabelValue,
   getLookupLabelValue,
   getProgressBarValue,
@@ -45,7 +65,24 @@ import {
   getTableLinkConfig,
   isTableSearchEnabled,
 } from "../../../utils/tableConfig";
+import { addDynamicArrayRow, deleteDynamicArrayRow, reorderDynamicArrayRows, updateDynamicArrayRow } from "../../../utils/api/dynamicArray";
 import { useTableLookupSelectionData } from "../../../utils/tableLookupSelection";
+import { useGeneratedRelationTableColumns } from "../../../utils/useGeneratedRelationTableColumns";
+import { resolveTableActionFormLayout } from "../../../utils/tableActionFormLayout";
+import {
+  reorderCurrentPageRows,
+  resolveTableDragState,
+  sortRowsByOrderField,
+} from "../../../utils/tableRowReorder";
+import {
+  appendShowFiltersControl,
+  createTableToggleState,
+  isBooleanColumnEditable,
+  isBooleanColumnSwitchPresentation,
+  isTableColumnVisible,
+  isTableToggleUpperSide,
+  resolveToggleRequestEffects,
+} from "../../../utils/tableToggles";
 import {
   buildConfiguredFilterInputs,
   getFilterDefaultValues,
@@ -59,6 +96,7 @@ import { Header } from "../../header/Header";
 import SwitchButton from "../common/SwitchButton";
 import { FormKeyTypeEnum, GenericInputType, InputTypes } from "../shared/types";
 import GenericTable from "../Tables/GenericTable";
+import ExportModal from "../Modals/ExportModal";
 import GenericAddEditPanel from "./GenericAddEditPanel";
 
 type GenericItem = Record<string, unknown> & { _id: string };
@@ -292,8 +330,14 @@ type Props = {
   excludeFields?: string[];
   actionsEnabled?: boolean;
   isHeader?: boolean;
+  constantFilter?: Record<string, unknown>;
   customTitle?: string;
   tableConfig?: TableComponentConfig;
+  dataBinding?: DataBinding;
+  componentId?: string;
+  outputs?: ComponentOutputDefinition[];
+  resolvedParams?: Record<string, unknown>;
+  sourceRevision?: string;
 };
 
 export default function GenericUnpaginatedPage({
@@ -302,14 +346,38 @@ export default function GenericUnpaginatedPage({
   excludeFields,
   actionsEnabled = true,
   isHeader = false,
+  constantFilter,
   customTitle,
   tableConfig,
+  componentId,
+  outputs,
+  resolvedParams,
+  sourceRevision = "",
 }: Props) {
   const { t } = useTranslation();
-  const { selectedRows, setSelectedRows, setIsSelectionActive } =
-    useGeneralContext();
   const { user } = useUserContext();
+  const configuredTableToggles = useMemo(
+    () => tableConfig?.toggles || [],
+    [tableConfig?.toggles],
+  );
+  const [tableToggleState, setTableToggleState] = useState(() =>
+    createTableToggleState(configuredTableToggles),
+  );
+  useEffect(() => {
+    setTableToggleState(createTableToggleState(configuredTableToggles));
+  }, [configuredTableToggles]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedRows, setSelectedRows] = useState<GenericItem[]>([]);
+  const [isSelectionActive, setIsSelectionActive] = useState(false);
+  const [isSelectionInitialized, setIsSelectionInitialized] = useState(false);
+  const handleSelectedRowsChange = useCallback((nextRows: GenericItem[]) => {
+    setIsSelectionInitialized(true);
+    setSelectedRows(nextRows);
+  }, []);
+  const handleSelectionActiveChange = useCallback((nextActive: boolean) => {
+    setIsSelectionInitialized(true);
+    setIsSelectionActive(nextActive);
+  }, []);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -347,7 +415,55 @@ export default function GenericUnpaginatedPage({
     });
   }, [configuredFilterDefaults]);
 
-  const items = useGetDynamicItems<GenericItem>(schemaName, filterFormElements);
+  const tableDragState = useMemo(
+    () =>
+      resolveTableDragState(
+        tableConfig?.drag,
+        filterFormElements.sort,
+        tableConfig?.constantSort?.sort,
+      ),
+    [
+      filterFormElements.sort,
+      tableConfig?.constantSort?.sort,
+      tableConfig?.drag,
+    ],
+  );
+
+  const requestFilters = useMemo(
+    () => ({
+      ...filterFormElements,
+      ...(!filterFormElements.sort && tableConfig?.constantSort?.sort
+        ? {
+            sort: tableConfig.constantSort.sort,
+            asc: tableConfig.constantSort.asc ?? 1,
+          }
+        : !filterFormElements.sort && tableDragState.defaultSort
+          ? { sort: tableDragState.defaultSort, asc: 1 }
+          : {}),
+      ...resolveToggleRequestEffects(
+        configuredTableToggles,
+        tableToggleState,
+      ),
+      ...(tableConfig?.constantFilters || {}),
+      ...(constantFilter || {}),
+      ...(resolvedParams || {}),
+    }),
+    [
+      filterFormElements,
+      configuredTableToggles,
+      tableToggleState,
+      tableConfig?.constantFilters,
+      tableConfig?.constantSort,
+      tableDragState.defaultSort,
+      constantFilter,
+      resolvedParams,
+    ],
+  );
+  const items = useGetDynamicItems<GenericItem>(
+    schemaName,
+    requestFilters as FormElementsState,
+    sourceRevision,
+  );
   const rawContainers = useGetContainers();
 
   const container: ContainerModel | undefined = useMemo(() => {
@@ -429,6 +545,13 @@ export default function GenericUnpaginatedPage({
 
     if (tableConfig?.columns?.length) {
       fields = tableConfig.columns
+        .filter((column) =>
+          isTableColumnVisible(
+            column.visibilityToggle,
+            tableToggleState,
+            configuredTableToggles,
+          ),
+        )
         .map((column) => {
           const field = fields.find((item) => item.name === column.field);
           return (
@@ -469,13 +592,35 @@ export default function GenericUnpaginatedPage({
     });
 
     return fields;
-  }, [container, includeFields, excludeFields, user, tableConfig]);
+  }, [
+    container,
+    includeFields,
+    excludeFields,
+    user,
+    tableConfig,
+    tableToggleState,
+    configuredTableToggles,
+  ]);
 
   // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
   const lookupSelectionDataMap = useTableLookupSelectionData(tableConfig);
 
-  const rowKeys = useMemo(
+  const generatedRelationTableColumns = useGeneratedRelationTableColumns({
+    tableConfig,
+    toggleState: tableToggleState,
+    toggles: configuredTableToggles,
+    updateRow: async (id, updates, row) => {
+      const target = getArraySourceMutationTarget(row);
+      if (target) {
+        await updateDynamicArrayRow({ schemaName, parentId: target.parentId, arrayField: target.arrayField, rowIdentityField: target.rowIdentityField, rowIdentity: target.rowIdentity, updates });
+        return;
+      }
+      updateDynamicItem(id, updates);
+    },
+  });
+
+  const baseRowKeys = useMemo(
     () =>
       displayFields.map((f) => {
         const fieldType = (f.type || "").toLowerCase();
@@ -503,6 +648,7 @@ export default function GenericUnpaginatedPage({
           isDate?: boolean;
           isBoolean?: boolean;
           className?: string | ((row: GenericItem) => string);
+          style?: React.CSSProperties | ((row: GenericItem) => React.CSSProperties);
           node?: (row: GenericItem) => React.ReactNode;
         } = {
           key: f.name,
@@ -519,12 +665,27 @@ export default function GenericUnpaginatedPage({
         // Compute className based on table column cellClassName conditions
         if (rowKeyClassName) {
           rowKey.className = (row: GenericItem) =>
-            getMatchingRowClassNames(row, rowKeyClassName);
+            getMatchingRowClassPresentation(row, rowKeyClassName).className;
+          rowKey.style = (row: GenericItem) =>
+            getMatchingRowClassPresentation(row, rowKeyClassName).style;
         }
 
         const columnConfig = tableConfig?.columns?.find(
           (column) => column.field === f.name,
         );
+        if (columnConfig?.type === "template") {
+          rowKey.node = (row: GenericItem) =>
+            renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
+              <span>
+                {renderTableColumnTemplate(columnConfig.template, row)}
+              </span>,
+            );
+          return rowKey;
+        }
+
         if (columnConfig?.type === "computedLabel") {
           const getComputedValue = (row: GenericItem) =>
             getComputedLabelValue(
@@ -536,10 +697,15 @@ export default function GenericUnpaginatedPage({
 
           if (rowKeyClassName) {
             rowKey.className = (row: GenericItem) =>
-              getMatchingRowClassNames(
+              getMatchingRowClassPresentation(
                 { ...row, [f.name]: getComputedValue(row) },
                 rowKeyClassName,
-              );
+              ).className;
+            rowKey.style = (row: GenericItem) =>
+              getMatchingRowClassPresentation(
+                { ...row, [f.name]: getComputedValue(row) },
+                rowKeyClassName,
+              ).style;
           }
 
           rowKey.node = (row: GenericItem) =>
@@ -558,10 +724,15 @@ export default function GenericUnpaginatedPage({
 
           if (rowKeyClassName) {
             rowKey.className = (row: GenericItem) =>
-              getMatchingRowClassNames(
+              getMatchingRowClassPresentation(
                 { ...row, [f.name]: getLookupValue(row) },
                 rowKeyClassName,
-              );
+              ).className;
+            rowKey.style = (row: GenericItem) =>
+              getMatchingRowClassPresentation(
+                { ...row, [f.name]: getLookupValue(row) },
+                rowKeyClassName,
+              ).style;
           }
 
           rowKey.node = (row: GenericItem) =>
@@ -739,6 +910,31 @@ export default function GenericUnpaginatedPage({
         if (columnConfig?.type === "booleanSwitch") {
           rowKey.node = (row: GenericItem) => {
             const isChecked = isTruthyBooleanValue(row[f.name]);
+            if (
+              !isBooleanColumnSwitchPresentation(
+                columnConfig.booleanDisplayToggle,
+                tableToggleState,
+                configuredTableToggles,
+              ) ||
+              !isBooleanColumnEditable(
+                columnConfig.booleanEditToggle,
+                tableToggleState,
+                configuredTableToggles,
+              )
+            ) {
+              const label = getTableDisplayName(tableConfig, f);
+              return (
+                <span
+                  aria-label={`${label}: ${isChecked ? "Yes" : "No"}`}
+                >
+                  {isChecked ? (
+                    <IoCheckmark className="text-blue-500 text-2xl" />
+                  ) : (
+                    <IoCloseOutline className="text-red-800 text-2xl" />
+                  )}
+                </span>
+              );
+            }
             return (
               <CheckSwitch
                 checked={isChecked}
@@ -778,7 +974,9 @@ export default function GenericUnpaginatedPage({
           rowKey.node = (row: GenericItem) => {
             const v = row[f.name];
             if (v === undefined || v === null) return <span>-</span>;
-            const content = Array.isArray(v) ? v.join(", ") : String(v);
+            const content = Array.isArray(v)
+              ? formatPopulatedArrayValue(v)
+              : String(v);
             return renderLinkedCellContent(f, row, linkConfig, <span>{content || "-"}</span>);
           };
           return rowKey;
@@ -802,7 +1000,7 @@ export default function GenericUnpaginatedPage({
           rowKey.node = (row: GenericItem) => {
             const value = row[f.name];
             const content = Array.isArray(value)
-              ? value.join(", ")
+              ? formatPopulatedArrayValue(value)
               : String(value || "");
             return linkConfig?.linkTemplate ? (
               <LinkCell field={f} row={row} linkConfig={linkConfig} />
@@ -904,22 +1102,32 @@ export default function GenericUnpaginatedPage({
       lookupSelectionDataMap,
       t,
       tableConfig,
+      tableToggleState,
+      configuredTableToggles,
     ],
   );
 
+  const rowKeys = useMemo(
+    () => [...baseRowKeys, ...generatedRelationTableColumns.rowKeys],
+    [baseRowKeys, generatedRelationTableColumns.rowKeys],
+  );
+
   const columns = useMemo(() => {
-    const baseCols = displayFields.map((f) => ({
+    const baseCols = [
+      ...displayFields.map((f) => ({
       key: t(getTableDisplayName(tableConfig, f) || getFieldLabel(f)),
       isSortable:
         tableConfig?.columns?.find((column) => column.field === f.name)
           ?.type !== "computedLabel",
       correspondingKey: f.name,
-    }));
+      })),
+      ...generatedRelationTableColumns.columns,
+    ];
     if (actionsEnabled) {
       return [...baseCols, { key: t("Actions"), isSortable: false }];
     }
     return baseCols;
-  }, [displayFields, t, actionsEnabled, tableConfig]);
+  }, [displayFields, t, actionsEnabled, tableConfig, generatedRelationTableColumns.columns]);
 
   const { inputs, formKeys } = useMemo(() => {
     const ins = displayFields
@@ -1043,20 +1251,70 @@ export default function GenericUnpaginatedPage({
   }, [displayFields, t, selectionDataMap]);
 
   const handleSubmitItem = useCallback(
-    (item: GenericItem | UpdatePayload<GenericItem>) => {
+    async (item: GenericItem | UpdatePayload<GenericItem>) => {
       if ("id" in item && "updates" in item) {
+        const target = getArraySourceMutationTarget(rowToAction || undefined);
+        if (target) {
+          await updateDynamicArrayRow({ schemaName, parentId: target.parentId, arrayField: target.arrayField, rowIdentityField: target.rowIdentityField, rowIdentity: target.rowIdentity, updates: item.updates as Record<string, unknown> });
+          return;
+        }
         updateDynamicItem(
           item.id as string | number,
-          item.updates as Partial<GenericItem>,
+          omitTableConstantKeys(
+            item.updates as GenericItem,
+            tableConfig?.constantFilters,
+            constantFilter,
+          ) as Partial<GenericItem>,
         );
       } else {
-        createDynamicItem(item as GenericItem);
+        const addConstants = partitionActionConstantValues(
+          tableConfig?.addButton?.constantValues,
+          formKeys.map((formKey) => formKey.key),
+        );
+        const nextItem = mergeTableConstantValues(
+            applyHiddenActionValues(
+              item as GenericItem,
+              addConstants.hiddenValues,
+            ) as GenericItem,
+            undefined,
+            tableConfig?.constantFilters,
+            constantFilter,
+          );
+        const source = tableConfig?.arraySource;
+        const parentId = items?.[0]?._id;
+        if (source?.enabled && source.field && source.rowIdentityField && parentId != null) {
+          await addDynamicArrayRow({ schemaName, parentId, arrayField: source.field, rowIdentityField: source.rowIdentityField, item: nextItem as Record<string, unknown> });
+          return;
+        }
+        createDynamicItem(nextItem);
       }
     },
-    [updateDynamicItem, createDynamicItem],
+    [
+      updateDynamicItem,
+      createDynamicItem,
+      tableConfig,
+      constantFilter,
+      formKeys,
+      rowToAction,
+      schemaName,
+      items,
+    ],
   );
 
+  const deleteTableRow = useCallback(async (row: GenericItem) => {
+    const target = getArraySourceMutationTarget(row);
+    if (target) {
+      await deleteDynamicArrayRow({ schemaName, parentId: target.parentId, arrayField: target.arrayField, rowIdentityField: target.rowIdentityField, rowIdentity: target.rowIdentity });
+      return;
+    }
+    deleteDynamicItem(row._id);
+  }, [deleteDynamicItem, schemaName]);
+
   const addButton = useMemo(() => {
+    const addConstants = partitionActionConstantValues(
+      tableConfig?.addButton?.constantValues,
+      formKeys.map((formKey) => formKey.key),
+    );
     return {
       name: t("Add"),
       isModal: true,
@@ -1067,7 +1325,20 @@ export default function GenericUnpaginatedPage({
           inputs={inputs}
           formKeys={formKeys}
           submitItem={handleSubmitItem}
-          topClassName="flex flex-col gap-2"
+          itemToEdit={
+            Object.keys(addConstants.visibleDefaults).length
+              ? {
+                  id: "",
+                  updates: {
+                    ...addConstants.visibleDefaults,
+                    _id: "",
+                  } as GenericItem,
+                }
+              : undefined
+          }
+          {...resolveTableActionFormLayout(tableConfig?.addButton, {
+            topClassName: "flex flex-col gap-2",
+          })}
         />
       ),
       isModalOpen: isAddOpen,
@@ -1076,7 +1347,7 @@ export default function GenericUnpaginatedPage({
       icon: null,
       className: "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
     };
-  }, [t, isAddOpen, inputs, formKeys, handleSubmitItem]);
+  }, [t, isAddOpen, inputs, formKeys, handleSubmitItem, tableConfig?.addButton]);
 
   const actionSelectionDataMap = useActionFormSelectionData(
     tableConfig?.actions || [],
@@ -1112,6 +1383,14 @@ export default function GenericUnpaginatedPage({
       );
       return {
         name: deleteActionConfig?.label || t("Delete"),
+        isHidden: (row: GenericItem) =>
+          deleteActionConfig
+            ? getTableActionRowState(deleteActionConfig, row).hidden
+            : false,
+        isDisabled: (row: GenericItem) =>
+          deleteActionConfig
+            ? getTableActionRowState(deleteActionConfig, row).disabled
+            : false,
         icon: <DeleteIcon />,
         setRow: setRowToAction as (value: GenericItem) => void,
         modal: rowToAction ? (
@@ -1119,7 +1398,7 @@ export default function GenericUnpaginatedPage({
             isOpen={isDeleteOpen}
             close={() => setIsDeleteOpen(false)}
             confirm={() => {
-              deleteDynamicItem(rowToAction._id);
+              void deleteTableRow(rowToAction);
               setIsDeleteOpen(false);
             }}
             title={deleteActionConfig?.confirmTitle || t("Delete")}
@@ -1155,8 +1434,20 @@ export default function GenericUnpaginatedPage({
         editActionConfig?.formFields !== undefined
           ? buildActionFormKeys(editActionConfig, editInputs)
           : formKeys.filter((formKey) => editInputKeys.has(formKey.key));
+      const editConstantValues = partitionActionConstantValues(
+        editActionConfig ? parseActionConstantValues(editActionConfig) : {},
+        editFormKeys.map((formKey) => formKey.key),
+      );
       return {
         name: editActionConfig?.label || t("Edit"),
+        isHidden: (row: GenericItem) =>
+          editActionConfig
+            ? getTableActionRowState(editActionConfig, row).hidden
+            : false,
+        isDisabled: (row: GenericItem) =>
+          editActionConfig
+            ? getTableActionRowState(editActionConfig, row).disabled
+            : false,
         icon: <EditIcon />,
         className:
           editActionConfig?.className || "text-blue-500 cursor-pointer text-xl",
@@ -1200,16 +1491,29 @@ export default function GenericUnpaginatedPage({
                   close={() => setIsEditOpen(false)}
                   inputs={editInputs}
                   formKeys={editFormKeys}
-                  submitItem={handleSubmitItem}
+                  submitItem={(item) => {
+                    if ("id" in item && "updates" in item) {
+                      handleSubmitItem({
+                        id: item.id as string | number,
+                        updates: applyHiddenActionValues(
+                          item.updates as Record<string, unknown>,
+                          editConstantValues.hiddenValues,
+                        ) as Partial<GenericItem>,
+                      });
+                    }
+                  }}
                   isEditMode
                   buttonName={editActionConfig?.buttonName || t("Edit")}
-                  topClassName="flex flex-col gap-2"
+                  {...resolveTableActionFormLayout(editActionConfig, {
+                    topClassName: "flex flex-col gap-2",
+                  })}
                   itemToEdit={{
                     id: rowToAction._id,
-                    updates: {
-                      ...normalizedUpdates,
-                      ...editDefaultValues,
-                    },
+                    updates: buildActionInitialValues(
+                      editDefaultValues,
+                      editConstantValues.visibleDefaults,
+                      normalizedUpdates,
+                    ) as GenericItem,
                   }}
                 />
               );
@@ -1224,7 +1528,6 @@ export default function GenericUnpaginatedPage({
     const buildCustomAction = (action: TableActionConfig, index: number) => {
       const actionId = getActionId(action, index);
       const ActionIcon = getIconByName(action.icon || "FiCheck");
-      const constantValues = parseActionConstantValues(action);
       const defaultValues = getActionDefaultValues(action);
       const actionInputs = buildActionInputs(
         action,
@@ -1233,6 +1536,10 @@ export default function GenericUnpaginatedPage({
         actionSelectionDataMap,
       );
       const actionFormKeys = buildActionFormKeys(action, actionInputs);
+      const constantValues = partitionActionConstantValues(
+        parseActionConstantValues(action),
+        actionFormKeys.map((formKey) => formKey.key),
+      );
       const workflowSubmit = action.submit;
       const isWorkflowAction = Boolean(
         workflowSubmit?.workflowName && workflowSubmit?.workflowSchema,
@@ -1244,6 +1551,10 @@ export default function GenericUnpaginatedPage({
 
       return {
         name: action.label || t("Action"),
+        isHidden: (row: GenericItem) =>
+          getTableActionRowState(action, row).hidden,
+        isDisabled: (row: GenericItem) =>
+          getTableActionRowState(action, row).disabled,
         icon: <ActionIcon />,
         className:
           action.className || "text-emerald-600 cursor-pointer text-xl ",
@@ -1268,12 +1579,18 @@ export default function GenericUnpaginatedPage({
               executeWorkflow({
                 workflowName: workflowSubmit?.workflowName || "",
                 workflowSchema: workflowSubmit?.workflowSchema,
-                record: { ...row, ...constantValues },
+                record: applyHiddenActionValues(
+                  row,
+                  constantValues.hiddenValues,
+                ),
                 oldRecord: row,
               });
               return;
             }
-            updateDynamicItem(row._id, constantValues as Partial<GenericItem>);
+            updateDynamicItem(
+              row._id,
+              constantValues.hiddenValues as Partial<GenericItem>,
+            );
           }
         },
         modal:
@@ -1285,11 +1602,10 @@ export default function GenericUnpaginatedPage({
               formKeys={actionFormKeys}
               submitItem={(item) => {
                 if ("id" in item && "updates" in item) {
-                  const record = {
+                  const record = applyHiddenActionValues({
                     ...rowToAction,
                     ...(item.updates as Record<string, unknown>),
-                    ...constantValues,
-                  };
+                  }, constantValues.hiddenValues);
                   if (isWorkflowAction) {
                     executeWorkflow({
                       workflowName: workflowSubmit?.workflowName || "",
@@ -1308,14 +1624,16 @@ export default function GenericUnpaginatedPage({
               }}
               isEditMode
               buttonName={action.buttonName || action.label || t("Update")}
-              topClassName="flex flex-col gap-2"
+              {...resolveTableActionFormLayout(action, {
+                topClassName: "flex flex-col gap-2",
+              })}
               itemToEdit={{
                 id: rowToAction._id,
-                updates: {
-                  ...rowToAction,
-                  ...defaultValues,
-                  ...constantValues,
-                },
+                updates: buildActionInitialValues(
+                  defaultValues,
+                  constantValues.visibleDefaults,
+                  rowToAction,
+                ) as GenericItem,
               }}
             />
           ) : null,
@@ -1644,9 +1962,19 @@ export default function GenericUnpaginatedPage({
       }
     }
 
+    const bulkConstants = partitionActionConstantValues(
+      bulkEditActionConfig
+        ? parseActionConstantValues(bulkEditActionConfig)
+        : {},
+      bulkSelectedKeys,
+    );
+    const submittedUpdates = applyHiddenActionValues(
+      updates,
+      bulkConstants.hiddenValues,
+    );
     const items = (selectedRows as GenericItem[]).map((r) => ({
       _id: r._id,
-      updates,
+      updates: submittedUpdates,
     }));
     if (bulkEditActionConfig?.submit?.workflowName) {
       executeWorkflow({
@@ -1654,7 +1982,7 @@ export default function GenericUnpaginatedPage({
         workflowSchema: bulkEditActionConfig.submit.workflowSchema || schemaName,
         record: {
           selectedIds: (selectedRows as GenericItem[]).map((r) => r._id),
-          updates,
+          updates: submittedUpdates,
           items,
           functionName: bulkEditActionConfig.submit.functionName,
         },
@@ -1730,7 +2058,17 @@ export default function GenericUnpaginatedPage({
             });
         }
 
-        setBulkForm((prev) => ({ ...prev, ...initialBulkValues }));
+        const bulkConstants = partitionActionConstantValues(
+          bulkEditActionConfig
+            ? parseActionConstantValues(bulkEditActionConfig)
+            : {},
+          selectedKeys,
+        );
+        setBulkForm((prev) => ({
+          ...prev,
+          ...initialBulkValues,
+          ...bulkConstants.visibleDefaults,
+        }));
         setIsBulkStepTwo(true);
       }
     }
@@ -1853,23 +2191,45 @@ export default function GenericUnpaginatedPage({
   ]);
   const hasFilterPanelInputs = filterPanelInputs.length > 0;
 
-  const filters = useMemo(
-    () =>
+  const filters = useMemo(() => {
+    const displayToggleControls = configuredTableToggles.map((toggle) => ({
+        label: toggle.label || toggle.id,
+        isUpperSide: isTableToggleUpperSide(toggle),
+        node: (
+          <SwitchButton
+            checked={tableToggleState[toggle.id] ?? toggle.defaultValue}
+            onChange={() =>
+              setTableToggleState((current) => ({
+                ...current,
+                [toggle.id]: !(current[toggle.id] ?? toggle.defaultValue),
+              }))
+            }
+          />
+        ),
+      }));
+    return appendShowFiltersControl(
+      displayToggleControls,
       hasFilterPanelInputs
-        ? [
-            {
-              label: t("Show Filters"),
-              isUpperSide: true,
-              node: (
-                <SwitchButton
-                  checked={showFilters}
-                  onChange={() => setShowFilters(!showFilters)}
-                />
-              ),
-            },
-          ]
-        : [],
-    [t, showFilters, hasFilterPanelInputs],
+        ? {
+            label: t("Show Filters"),
+            isUpperSide: true,
+            node: (
+              <SwitchButton
+                checked={showFilters}
+                onChange={() => setShowFilters(!showFilters)}
+              />
+            ),
+          }
+        : undefined,
+    );
+  },
+    [
+      t,
+      showFilters,
+      hasFilterPanelInputs,
+      configuredTableToggles,
+      tableToggleState,
+    ],
   );
 
   const filterPanel = useMemo(
@@ -1939,8 +2299,10 @@ export default function GenericUnpaginatedPage({
             setForm={handleBulkFormChange}
             submitItem={() => {}}
             isEditMode={false}
-            topClassName="flex flex-col gap-2"
-            generalClassName="overflow-visible"
+            {...resolveTableActionFormLayout(bulkEditActionConfig, {
+              topClassName: "flex flex-col gap-2",
+              generalClassName: "overflow-visible",
+            })}
                   buttonName={t(
                     bulkEditActionConfig?.buttonName ||
                       bulkEditActionConfig?.label ||
@@ -1983,13 +2345,88 @@ export default function GenericUnpaginatedPage({
     ],
   );
 
-  const rows = useMemo(
-    () => applyTableNestedRows(items || [], tableConfig, t, lookupSelectionDataMap),
-    [items, tableConfig, t, lookupSelectionDataMap],
+  const rows = useMemo(() => {
+    const sourceRows = applyTableArraySource(items || [], tableConfig);
+    const nestedRows = applyTableNestedRows(
+      sourceRows,
+      tableConfig,
+      t,
+      lookupSelectionDataMap,
+    );
+    return tableDragState.enabled
+      ? sortRowsByOrderField(nestedRows, tableDragState.orderField)
+      : nestedRows;
+  }, [items, tableConfig, t, lookupSelectionDataMap, tableDragState]);
+  const filtersById = useMemo(() => {
+    const normalized: Record<string, unknown> = {};
+    (configuredFilterInputs || []).forEach((filter) => {
+      if (filter.id && filter.formKey && Object.hasOwn(filterFormElements, filter.formKey)) {
+        normalized[filter.id] = filterFormElements[filter.formKey];
+      }
+    });
+    return normalized;
+  }, [configuredFilterInputs, filterFormElements]);
+  const selectedIds = useMemo(
+    () => resolveSelectedRowIds(selectedRows, isSelectionInitialized),
+    [isSelectionInitialized, selectedRows],
+  );
+  const tableOutputState = useMemo<TableOutputState>(
+    () => ({
+      filters: filtersById,
+      search: String(filterFormElements.search ?? ""),
+      selectedIds,
+    }),
+    [filterFormElements.search, filtersById, selectedIds],
+  );
+  const handleRowDrag = useCallback(
+    (draggedRow: GenericItem, targetRow: GenericItem) => {
+      const result = reorderCurrentPageRows(
+        rows,
+        draggedRow,
+        targetRow,
+        tableDragState.orderField,
+        1,
+      );
+      if (result.updates.length) {
+        const firstTarget = getArraySourceMutationTarget(result.rows[0]);
+        if (firstTarget) {
+          void reorderDynamicArrayRows({ schemaName, parentId: firstTarget.parentId, arrayField: firstTarget.arrayField, rowIdentityField: firstTarget.rowIdentityField, orderField: tableDragState.orderField, rowIdentities: result.rows.map((row) => getArraySourceMutationTarget(row)?.rowIdentity) });
+          return;
+        }
+        updateMultipleDynamicItem(result.updates);
+      }
+    },
+    [rows, tableDragState.orderField, updateMultipleDynamicItem, schemaName],
+  );
+  const { exportDynamicItems } = useExportDynamicItems();
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const handleExport = useCallback(
+    (
+      selectedFields: string[],
+      includeSearch: boolean,
+      includeFilters: boolean,
+    ) => {
+      exportDynamicItems({
+        schemaName,
+        fields: selectedFields,
+        filters: includeFilters ? requestFilters : {},
+        search: includeSearch ? String(filterFormElements.search || "") : "",
+        limit: 0,
+        page: 1,
+      });
+    },
+    [exportDynamicItems, filterFormElements.search, requestFilters, schemaName],
   );
 
   return (
     <>
+      {componentId && outputs && outputs.length > 0 && (
+        <TableOutputPublisher
+          componentId={componentId}
+          outputs={outputs}
+          state={tableOutputState}
+        />
+      )}
       {isHeader && <Header />}
       <div className="w-full mx-auto">
         <GenericTable
@@ -1997,6 +2434,8 @@ export default function GenericUnpaginatedPage({
           actions={actions}
           columns={columns}
           rows={rows || []}
+          isDraggable={tableDragState.enabled}
+          onDragEnter={tableDragState.enabled ? handleRowDrag : undefined}
           rowStyleFunction={rowStyleFunction}
           title={customTitle || t(humanize(schemaName))}
           addButton={addButton}
@@ -2007,11 +2446,28 @@ export default function GenericUnpaginatedPage({
           isSelectionEnabled={isBulkSelectionEnabled}
           isExcel={!hasImageField}
           onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
+          onExcelExport={
+            actionsEnabled ? () => setIsExportModalOpen(true) : undefined
+          }
           filters={filters}
           filterPanel={filterPanel}
           containerFields={container?.fields}
+          localSelectedRows={selectedRows}
+          localSetSelectedRows={handleSelectedRowsChange}
+          localIsSelectionActive={isSelectionActive}
+          localSetIsSelectionActive={handleSelectionActiveChange}
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
+        />
+        <ExportModal
+          isOpen={isExportModalOpen}
+          close={() => setIsExportModalOpen(false)}
+          fields={displayFields}
+          onExport={handleExport}
+          schemaName={humanize(schemaName)}
+          currentPage={1}
+          totalPages={1}
+          showPaginationScopes={false}
         />
       </div>
     </>

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useFilteredRoutes } from "../../hooks/useFilteredRoutes";
 import { Logo } from "../Logo";
 import { PageSelector } from "./PageSelector";
+import { LanguageSelector } from "./LanguageSelector";
 
 interface HeaderProps {
   logoSrc?: string;
@@ -59,6 +60,7 @@ export function Header({
             </Link>
           </div>
           <div className="w-auto h-full flex items-center justify-end gap-x-3">
+            <LanguageSelector />
             {showMobileMenu && (
               <div className="lg:hidden">
                 <PageSelector routes={routes} />

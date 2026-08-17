@@ -1,5 +1,4 @@
-import axios, { AxiosHeaders } from "axios";
-import Cookies from "js-cookie";
+import axios from "axios";
 import { camelCase, isArray, isPlainObject, transform } from "lodash";
 
 // Recursively convert all keys in an object from PascalCase to camelCase
@@ -47,21 +46,13 @@ function getTenantAndProject(): { tenant: string; project: string } | null {
 export const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   responseType: "json",
+  withCredentials: true,
 });
 
 export const ACCESS_TOKEN = "jwt";
 
 axiosClient.interceptors.request.use(
   async (req) => {
-    const accessToken = localStorage.getItem(ACCESS_TOKEN);
-
-    if (accessToken) {
-      (req.headers as AxiosHeaders).set(
-        "Authorization",
-        `Bearer ${accessToken}`
-      );
-    }
-
     // Inject tenant and project into the URL path
     const tenantProject = getTenantAndProject();
     if (tenantProject && req.url) {
@@ -83,10 +74,24 @@ axiosClient.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
-    if (error?.response?.data?.statusCode === 401) {
-      Cookies.remove(ACCESS_TOKEN);
+  async (error) => {
+    const originalRequest = error.config;
+    const is401 = error?.response?.status === 401 || error?.response?.data?.statusCode === 401;
+    if (!is401 || originalRequest?._retry || originalRequest?.url?.includes("/auth/refresh")) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+    originalRequest._retry = true;
+    const context = getTenantAndProject();
+    if (!context) return Promise.reject(error);
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_URL}/${context.tenant}/${context.project}/auth/refresh`,
+        undefined,
+        { withCredentials: true },
+      );
+      return axiosClient(originalRequest);
+    } catch (refreshError) {
+      return Promise.reject(refreshError);
+    }
   }
 );

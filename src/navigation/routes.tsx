@@ -11,6 +11,7 @@ import { RouteLoadingFallback } from "./RouteLoadingFallback";
 import { getPreferredLandingPath } from "./landingRoute";
 import { PrivateRoutes } from "./PrivateRoutes";
 import { shouldLoadDynamicPages } from "./dynamicPagesLoading";
+import { getProjectSessionItem } from "../utils/projectSessionStorage";
 
 const GoogleCallback = lazy(() => import("../pages/GoogleCallback"));
 const Login = lazy(() => import("../pages/Login"));
@@ -32,8 +33,7 @@ interface RouteConfig {
 
 const RouterContainer = () => {
   const location = useLocation();
-  const token = localStorage.getItem("jwt");
-  const loadDynamicPages = shouldLoadDynamicPages(location.pathname, token);
+  const loadDynamicPages = shouldLoadDynamicPages(location.pathname, getProjectSessionItem("loggedIn", location.pathname));
   const { dynamicRoutes, isLoading, isError } = useDynamicPages(loadDynamicPages);
 
   // Combine static routes with dynamic routes

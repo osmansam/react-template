@@ -6,13 +6,13 @@ import {
   MenuList,
 } from "@material-tailwind/react";
 import { useQueryClient } from "@tanstack/react-query";
-import Cookies from "js-cookie";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FiChevronDown } from "react-icons/fi";
 import { IoIosLogOut } from "react-icons/io";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTenantProject } from "../../hooks/useTenantProject";
+import { removeProjectSessionItem, setProjectSessionItem } from "../../utils/projectSessionStorage";
 
 export interface MenuRoute {
   name: string;
@@ -65,10 +65,10 @@ export function PageSelector({
       onLogout();
     } else {
       // Default logout behavior
-      localStorage.clear();
-      localStorage.setItem("loggedOut", "true");
-      setTimeout(() => localStorage.removeItem("loggedOut"), 500);
-      Cookies.remove("jwt");
+      setProjectSessionItem("loggedOut", "true");
+      removeProjectSessionItem("loggedIn");
+      removeProjectSessionItem("user");
+      setTimeout(() => removeProjectSessionItem("loggedOut"), 500);
       queryClient.clear();
 
       // Redirect to login with tenant/project context preserved using buildPath
