@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { FormComponentConfig } from "../types/page";
-import { buildFormSubmitRequestBody } from "./formConfig";
+import { buildFormConfigReference, buildFormSubmitRequestBody } from "./formConfig";
 
 describe("buildFormSubmitRequestBody calculations", () => {
+  it("creates a trusted config reference only for calculated workflow forms", () => {
+    const calculated = { schemaName: "orders", objectLists: [{ key: "items", fieldMappings: [{ sourceFormKey: "productId", sourceField: "price", targetField: "unitPrice" }] }] } as FormComponentConfig;
+    expect(buildFormConfigReference(calculated, "page-1", "cmp-1")).toEqual({ pageId: "page-1", componentId: "cmp-1" });
+    expect(buildFormConfigReference({ schemaName: "orders" }, "page-1", "cmp-1")).toBeUndefined();
+  });
   it("includes calculated targets while excluding transient picker fields", () => {
     const form: FormComponentConfig = {
       schemaName: "davinciOrder",

@@ -57,6 +57,8 @@ const useRuntimeContext = (): PageRuntimeContextValue => {
 export const usePageRuntimeStore = (): PageRuntimeStore =>
   useRuntimeContext().store;
 
+export const usePageRuntimePage = (): PageModel => useRuntimeContext().page;
+
 export function usePageRuntimeSelector<T>(
   selector: (snapshot: RuntimeSnapshot) => T,
 ): T {

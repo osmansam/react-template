@@ -498,14 +498,16 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     workflowSchema,
     record,
     oldRecord,
+    formConfigRef,
   }: {
     workflowName: string;
     workflowSchema?: string;
     record: Record<string, unknown>;
     oldRecord?: Record<string, unknown>;
+    formConfigRef?: { pageId: string; componentId: string };
   }) {
     const targetSchema = workflowSchema || schemaName;
-    const payload = { record, oldRecord };
+    const payload = { record, oldRecord, formConfigRef };
     const { data } = await withIdempotency(
       targetSchema,
       `workflow:${workflowName}`,
@@ -543,6 +545,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     workflowName: string;
     workflowSchema?: string;
     record: Record<string, unknown>;
+    formConfigRef?: { pageId: string; componentId: string };
     oldRecord?: Record<string, unknown>;
   }) => executeWorkflowMutation.mutate(payload);
   return {

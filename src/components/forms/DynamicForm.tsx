@@ -14,6 +14,7 @@ import {
   addOrReplaceObjectListItem,
   adjustObjectListNumber,
   buildFormInputs,
+  buildFormConfigReference,
   buildFormSubmitPayload,
   buildFormSubmitRequestBody,
   buildInitialFormState,
@@ -35,6 +36,7 @@ import DynamicFormField from "./DynamicFormField";
 import DynamicFormObjectList from "./DynamicFormObjectList";
 import DynamicFormSummary from "./DynamicFormSummary";
 import { useFormSelectionData } from "./useFormSelectionData";
+import { usePageRuntimePage } from "../../pageRuntime/PageRuntimeProvider";
 import {
   FormCalculationError,
   recalculateFormState,
@@ -44,6 +46,7 @@ import {
 type Props = {
   form: FormComponentConfig;
   title?: string;
+  componentId?: string;
 };
 
 type DynamicRecord = Record<string, unknown> & { _id: string | number };
@@ -67,8 +70,9 @@ const isEmpty = (value: unknown) =>
   value === "" ||
   (Array.isArray(value) && value.length === 0);
 
-const DynamicForm = ({ form, title }: Props) => {
+const DynamicForm = ({ form, title, componentId }: Props) => {
   const { t } = useTranslation();
+  const runtimePage = usePageRuntimePage();
   const selectionDataMap = useFormSelectionData(form);
   const inputs = useMemo(
     () => buildFormInputs(form, selectionDataMap),
@@ -291,6 +295,11 @@ const DynamicForm = ({ form, title }: Props) => {
         workflowName: form.submit.workflowName,
         workflowSchema: form.submit.workflowSchema,
         record,
+        formConfigRef: buildFormConfigReference(
+          form,
+          runtimePage.id || runtimePage._id,
+          componentId,
+        ),
       });
     } else {
       await createMutation.mutateAsync(
