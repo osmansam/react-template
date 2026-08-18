@@ -483,6 +483,38 @@ export interface FormObjectActionConfig {
   step?: number;
 }
 
+export interface FormFieldMappingConfig {
+  sourceFormKey: string;
+  sourceField: string;
+  targetField: string;
+  required?: boolean;
+}
+
+export interface FormItemCalculationConfig {
+  operation: "multiply";
+  inputs: string[];
+  targetField: string;
+  precision?: number;
+}
+
+export interface FormValueFormatConfig {
+  style?: "currency" | "number";
+  currency?: string;
+  precision?: number;
+}
+
+export interface FormSummaryConfig {
+  key: string;
+  label?: string;
+  area?: FormAreaKey;
+  order?: number;
+  operation: "sum" | "copy";
+  objectListKey?: string;
+  sourceField: string;
+  targetField: string;
+  format?: FormValueFormatConfig;
+}
+
 export type FormActionKind = "addObject" | "submit";
 
 export interface FormActionConfig {
@@ -504,6 +536,8 @@ export interface FormObjectListConfig {
   area?: FormAreaKey;
   source?: "embedded";
   itemFields?: string[];
+  fieldMappings?: FormFieldMappingConfig[];
+  itemCalculations?: FormItemCalculationConfig[];
   addAction?: FormActionConfig;
   display?: FormObjectListDisplayConfig;
   actions?: FormObjectActionConfig[];
@@ -526,6 +560,7 @@ export interface FormComponentConfig {
   layout?: FormLayoutConfig;
   fields?: FormFieldConfig[];
   objectLists?: FormObjectListConfig[];
+  summaries?: FormSummaryConfig[];
   actions?: FormActionConfig[];
   submit?: FormSubmitConfig;
 }
