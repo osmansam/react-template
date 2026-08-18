@@ -306,6 +306,11 @@ export interface TableActionFormOptionConfig {
   label: string;
 }
 
+export interface SelectOptionDisplayConfig {
+  leftTemplate?: string;
+  rightTemplate?: string;
+}
+
 export interface TableActionFormFieldConfig {
   id?: string;
   formKey: string;
@@ -325,6 +330,8 @@ export interface TableActionFormFieldConfig {
   sourceSchemaName?: string;
   sourceValueField?: string;
   sourceLabelField?: string;
+  sourceDataFields?: string[];
+  optionDisplay?: SelectOptionDisplayConfig;
   sourceRequestFilters?: Record<string, unknown>;
   sourceFilterCondition?: string;
   invalidateKeys?: string[];

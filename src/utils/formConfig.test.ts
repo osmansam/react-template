@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { FormComponentConfig } from "../types/page";
-import { buildFormConfigReference, buildFormSubmitRequestBody } from "./formConfig";
+import { buildFormConfigReference, buildFormInputs, buildFormSubmitRequestBody } from "./formConfig";
 
 describe("buildFormSubmitRequestBody calculations", () => {
+  it("builds options with left and right labels and retained dependencies", () => {
+    const form: FormComponentConfig = { schemaName: "orders", fields: [{ formKey: "productId", type: "select", optionsSource: "schema", sourceValueField: "_id", sourceLabelField: "name", sourceDataFields: ["price"], optionDisplay: { leftTemplate: "{{name}}", rightTemplate: "{{price}} ₺" } }] };
+    const sourceItem = { _id: "p1", name: "Syrup", price: 120 };
+    const inputs = buildFormInputs(form, new Map([["productId", [sourceItem]]]));
+    expect(inputs[0].options).toEqual([{ value: "p1", label: "Syrup", leftLabel: "Syrup", rightLabel: "120 ₺", sourceItem }]);
+  });
   it("creates a trusted config reference only for calculated workflow forms", () => {
     const calculated = { schemaName: "orders", objectLists: [{ key: "items", fieldMappings: [{ sourceFormKey: "productId", sourceField: "price", targetField: "unitPrice" }] }] } as FormComponentConfig;
     expect(buildFormConfigReference(calculated, "page-1", "cmp-1")).toEqual({ pageId: "page-1", componentId: "cmp-1" });

@@ -13,6 +13,7 @@ import {
     FormFieldConfig,
     FormObjectListConfig,
 } from "../types/page";
+import { renderOptionTemplate } from "./selectOptionConfig";
 import { evaluateRowCondition } from "./genericPageHelpers";
 
 export type EmbeddedFormObject = Record<string, unknown>;
@@ -93,6 +94,8 @@ const getFieldOptions = (
   return (selectionDataMap.get(field.formKey) || []).map((item) => ({
     value: String(item[valueField] ?? item._id ?? ""),
     label: String(item[labelField] ?? item[valueField] ?? item._id ?? ""),
+    leftLabel: field.optionDisplay?.leftTemplate ? renderOptionTemplate(field.optionDisplay.leftTemplate, item) : String(item[labelField] ?? item[valueField] ?? item._id ?? ""),
+    rightLabel: field.optionDisplay?.rightTemplate ? renderOptionTemplate(field.optionDisplay.rightTemplate, item) : "",
     sourceItem: item,
   }));
 };
