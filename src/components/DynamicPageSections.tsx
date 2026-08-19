@@ -185,7 +185,7 @@ const RenderReadyComponent: React.FC<{
         component.form ||
         (props?.form as ComponentBlock["form"] | undefined);
       return formConfig ? (
-        <DynamicForm form={formConfig} title={title} />
+        <DynamicForm form={formConfig} title={title} componentId={component.id} />
       ) : (
         <NoticePanel tone="warning">
           Form component requires form configuration.

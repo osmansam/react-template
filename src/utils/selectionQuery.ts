@@ -12,6 +12,7 @@ export interface SelectionQueryConfigParams {
   extraParams?: ExtraSelectionParams;
   filterParams?: Record<string, unknown>;
   sourceRevision?: string;
+  dataFields?: string[];
 }
 
 const cleanEntries = (params: Record<string, unknown>) => {
@@ -76,6 +77,7 @@ export const getSelectionQueryConfig = ({
   extraParams = {},
   filterParams = {},
   sourceRevision = "",
+  dataFields = [],
 }: SelectionQueryConfigParams) => {
   const routeScope = getSelectionScopeFromLocation();
   const resolvedTenantSlug = tenantSlug ?? routeScope.tenantSlug ?? "";
@@ -84,6 +86,7 @@ export const getSelectionQueryConfig = ({
     schemaName,
     fieldName,
     valueField,
+    dataFields: Array.from(new Set(dataFields.map((field) => field.trim()).filter(Boolean))).sort().join(","),
   };
   const extraEntries = isEntryArray(extraParams)
     ? extraParams
@@ -106,6 +109,7 @@ export const getSelectionQueryConfig = ({
       schemaName,
       fieldName,
       valueField,
+      Array.from(new Set(dataFields.map((field) => field.trim()).filter(Boolean))).sort().join(","),
       sourceRevision,
       stableValue(extraParams),
       stableValue(filterParams),
