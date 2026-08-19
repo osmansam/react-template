@@ -24,6 +24,20 @@ const form: FormComponentConfig = {
 };
 
 describe("form calculations", () => {
+  it("snapshots and calculates with a qualified additional option field", () => {
+    const configured: FormObjectListConfig = {
+      key: "items",
+      itemFields: ["productId", "quantity"],
+      itemCalculations: [{ operation: "multiply", inputs: ["productId.price", "quantity"], targetField: "lineTotal", precision: 2 }],
+    };
+    const snapshot = snapshotMappedFields(configured, { productId: "p1", quantity: 3 }, {
+      productId: { _id: "p1", name: "Tea", price: 19.99 },
+    });
+
+    expect(snapshot).toEqual({ productId: "p1", quantity: 3, _optionData: { productId: { price: 19.99 } } });
+    expect(calculateObjectListItem(configured, snapshot)).toMatchObject({ lineTotal: 59.97 });
+  });
+
   it("snapshots required source values", () => {
     expect(snapshotMappedFields(objectList, { productId: "p1", quantity: 3 }, { productId: { price: 19.99 } })).toEqual({ productId: "p1", quantity: 3, unitPrice: 19.99 });
     expect(() => snapshotMappedFields(objectList, { productId: "p1", quantity: 1 }, { productId: {} })).toThrowError(expect.objectContaining({ code: "missing_mapping" }));

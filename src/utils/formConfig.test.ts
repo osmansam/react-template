@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { FormComponentConfig } from "../types/page";
-import { buildFormConfigReference, buildFormInputs, buildFormSubmitRequestBody } from "./formConfig";
+import { buildFormConfigReference, buildFormInputs, buildFormSubmitRequestBody, getObjectListDisplayValues } from "./formConfig";
 
 describe("buildFormSubmitRequestBody calculations", () => {
+  it("resolves a right-side object-list template", () => {
+    expect(getObjectListDisplayValues(
+      { productLabel: "Tea", quantity: 2, lineTotal: 240 },
+      { primaryField: "productLabel", secondaryTemplate: "{{quantity}} items", rightTemplate: "{{lineTotal}} TRY" },
+    )).toEqual({ primary: "Tea", secondary: "2 items", right: "240 TRY" });
+  });
+
   it("builds options with left and right labels and retained dependencies", () => {
     const form: FormComponentConfig = { schemaName: "orders", fields: [{ formKey: "productId", type: "select", optionsSource: "schema", sourceValueField: "_id", sourceLabelField: "name", sourceDataFields: ["price"], optionDisplay: { leftTemplate: "{{name}}", rightTemplate: "{{price}} ₺" } }] };
     const sourceItem = { _id: "p1", name: "Syrup", price: 120 };
