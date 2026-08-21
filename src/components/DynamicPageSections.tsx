@@ -429,6 +429,8 @@ const RenderReadyComponent: React.FC<{
           dataBinding={resolvedDataBinding}
           resolvedParams={resolvedParams}
           sourceRevision={requestSourceRevision}
+          componentId={component.id}
+          outputs={component.outputs}
         />
       );
     case "distributionBlocks":

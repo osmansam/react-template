@@ -40,6 +40,22 @@ const pageWith = (
 });
 
 describe("createPageRuntimeStore", () => {
+  it("accepts typed info-block selection outputs", () => {
+    const page = pageWith([
+      {
+        id: "stock-summary",
+        type: "infoBlocks",
+        outputs: [{
+          id: "minimum",
+          key: "minimum",
+          type: "number",
+          source: { kind: "infoBlockSelection", valueKey: "minimum" },
+        }],
+      },
+    ]);
+
+    expect(() => createPageRuntimeStore(page)).not.toThrow();
+  });
   it("initializes variables and all declared outputs without breaking legacy pages", () => {
     const page = pageWith([table("products", [output("search")])], {
       variables: [

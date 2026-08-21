@@ -243,20 +243,28 @@ const validateOutput = (
   ) {
     throw new Error(`Component "${component.id}" has a malformed output definition.`);
   }
-  if (component.type !== "table") {
-    throw new Error(
-      `Output "${candidate.id}" can only be declared by a table component.`,
-    );
-  }
   const source = candidate.source;
   if (
-    !["tableFilter", "tableSelectedIds", "tableSearch"].includes(
+    !["tableFilter", "tableSelectedIds", "tableSearch", "infoBlockSelection"].includes(
       source.kind as string,
     ) ||
     (source.kind === "tableFilter" &&
       (typeof source.filterId !== "string" || source.filterId.length === 0))
   ) {
     throw new Error(`Output "${candidate.id}" has an invalid source definition.`);
+  }
+  if (
+    source.kind === "infoBlockSelection" &&
+    (component.type !== "infoBlocks" ||
+      typeof source.valueKey !== "string" ||
+      source.valueKey.length === 0)
+  ) {
+    throw new Error(`Output "${candidate.id}" has an invalid source definition.`);
+  }
+  if (source.kind !== "infoBlockSelection" && component.type !== "table") {
+    throw new Error(
+      `Output "${candidate.id}" can only be declared by a table component.`,
+    );
   }
   if (source.kind === "tableSearch" && candidate.type !== "string") {
     throw new Error(`A tableSearch output must have type "string".`);
