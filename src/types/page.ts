@@ -62,6 +62,10 @@ export type ComponentOutputSource =
     }
   | {
       kind: "tableSearch";
+    }
+  | {
+      kind: "infoBlockSelection";
+      valueKey: string;
     };
 
 export interface ComponentOutputDefinition {
@@ -587,6 +591,7 @@ export interface InfoBlockItemConfig {
   color?: string;
   titleColorRules?: InfoBlockColorRule[];
   footerColorRules?: InfoBlockColorRule[];
+  clickValues?: Record<string, unknown>;
 }
 
 export interface InfoBlocksConfig {

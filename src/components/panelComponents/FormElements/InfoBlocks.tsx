@@ -1,5 +1,11 @@
-import React, { useMemo } from "react";
-import { DataBinding, InfoBlocksConfig } from "../../../types/page";
+import React, { useMemo, useState } from "react";
+import {
+  ComponentOutputDefinition,
+  DataBinding,
+  InfoBlocksConfig,
+} from "../../../types/page";
+import InfoBlockOutputPublisher from "../../../pageRuntime/InfoBlockOutputPublisher";
+import { toggleInfoBlockSelection } from "../../../pageRuntime/infoBlockOutputAdapter";
 import {
   resolveConditionalColor,
   resolveTemplate,
@@ -15,6 +21,8 @@ type InfoBlocksProps = {
   resolvedParams?: Record<string, unknown>;
   sourceRevision?: string;
   enabled?: boolean;
+  componentId?: string;
+  outputs?: ComponentOutputDefinition[];
 };
 
 const CURATED_COLORS = [
@@ -36,7 +44,10 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({
   resolvedParams,
   sourceRevision = "",
   enabled = true,
+  componentId,
+  outputs = [],
 }) => {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const source = config?.source || "static";
   const isDynamic = config?.isDynamic || false;
   const limit = isDynamic ? (config?.dynamicLimit || 50) : 1;
@@ -142,12 +153,22 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({
   if (resolvedItems.length === 0) return null;
 
   return (
-    <div
-      className="grid gap-4"
-      style={{
-        gridTemplateColumns: "repeat(auto-fit, minmax(min(170px, 100%), 1fr))",
-      }}
-    >
+    <>
+      {componentId && outputs.length > 0 && (
+        <InfoBlockOutputPublisher
+          componentId={componentId}
+          outputs={outputs}
+          selectedItem={
+            selectedIndex === null ? undefined : resolvedItems[selectedIndex]
+          }
+        />
+      )}
+      <div
+        className="grid gap-4"
+        style={{
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(170px, 100%), 1fr))",
+        }}
+      >
       {resolvedItems.map((item, index) => {
         const itemContext = (item as any).itemContext || context;
         const color = item.color?.trim();
@@ -159,10 +180,28 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({
           item.footerColorRules,
           itemContext,
         );
+        const interactive = Boolean(componentId && outputs.length > 0);
+        const selected = selectedIndex === index;
         return (
-          <div
+          <button
+            type="button"
             key={`${item.title || "info-block"}-${index}`}
-            className="group relative min-h-[86px] overflow-hidden rounded-lg border border-neutral-200/80 bg-white px-4.5 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.08)]"
+            aria-pressed={interactive ? selected : undefined}
+            disabled={!interactive}
+            onClick={() =>
+              setSelectedIndex((current) =>
+                toggleInfoBlockSelection(current, index, item),
+              )
+            }
+            className={`group relative min-h-[86px] overflow-hidden rounded-lg border bg-white px-4.5 py-3.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[border-color,box-shadow,transform] duration-200 ${
+              selected
+                ? "border-neutral-500 ring-2 ring-neutral-300"
+                : "border-neutral-200/80"
+            } ${
+              interactive
+                ? "cursor-pointer hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 focus-visible:ring-offset-2"
+                : "cursor-default"
+            }`}
             style={
               color
                 ? {
@@ -189,10 +228,11 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({
                 {resolveTemplate(item.footer, itemContext)}
               </div>
             </div>
-          </div>
+          </button>
         );
       })}
-    </div>
+      </div>
+    </>
   );
 };
 
