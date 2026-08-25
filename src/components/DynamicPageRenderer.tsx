@@ -6,6 +6,9 @@ import PageFilterRenderer from "../pageRuntime/PageFilterRenderer";
 import "./dynamic-page-renderer.css";
 import { PageSectionView } from "./DynamicPageSections";
 import { Header } from "./header/Header";
+import { useTenantProject } from "../hooks/useTenantProject";
+import { PageNavigator } from "../navigation/PageNavigator";
+import { buildPageNavigatorViewModel } from "../navigation/pageNavigatorIntegration";
 
 /**
  * Main DynamicPageRenderer component
@@ -16,15 +19,18 @@ import { Header } from "./header/Header";
 interface DynamicPageRendererProps {
   sections: PageSection[];
   page?: PageModel;
+  pages?: PageModel[];
   className?: string;
 }
 
 export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
   sections,
   page,
+  pages = [],
   className = "",
 }) => {
   const routeParams = useParams();
+  const { buildPath } = useTenantProject();
   const runtimePage = React.useMemo(
     () => page ?? { name: "", sections },
     [page, sections],
@@ -33,22 +39,16 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
   const navbarFilters = (runtimePage.filters ?? []).filter(
     (filter) => filter.placement.kind === "navbar",
   );
-
-  if (!renderedSections || renderedSections.length === 0) {
-    return (
-      <PageRuntimeProvider page={runtimePage}>
-        <Header />
-        <div className="p-8 text-center text-gray-500">
-          <p>No content configured for this page</p>
-        </div>
-      </PageRuntimeProvider>
-    );
-  }
+  const navigatorItems = React.useMemo(
+    () => buildPageNavigatorViewModel({ pages, page, routeParams, buildPath }),
+    [buildPath, page, pages, routeParams],
+  );
 
   return (
     <PageRuntimeProvider page={runtimePage}>
       <Header />
       <div className={`dynamic-page-renderer ${className}`}>
+        <PageNavigator items={navigatorItems} />
         {navbarFilters.length > 0 && (
           <div className="relative z-[1000] mb-4 flex flex-wrap gap-3">
             {navbarFilters.map((filter) => (
@@ -56,8 +56,13 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
             ))}
           </div>
         )}
-        <div className="sections-container relative z-0 space-y-6">
-          {[...renderedSections]
+        {!renderedSections || renderedSections.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            <p>No content configured for this page</p>
+          </div>
+        ) : (
+          <div className="sections-container relative z-0 space-y-6">
+            {[...renderedSections]
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
             .map((section, index) => (
               <PageSectionView
@@ -68,8 +73,9 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
                 pageFilters={runtimePage.filters ?? []}
                 routeParams={routeParams}
               />
-            ))}
-        </div>
+              ))}
+          </div>
+        )}
       </div>
     </PageRuntimeProvider>
   );
