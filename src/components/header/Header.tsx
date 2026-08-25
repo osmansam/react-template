@@ -3,6 +3,8 @@ import { useFilteredRoutes } from "../../hooks/useFilteredRoutes";
 import { Logo } from "../Logo";
 import { PageSelector } from "./PageSelector";
 import { LanguageSelector } from "./LanguageSelector";
+import { useBranding } from "../../context/useBranding";
+import { BrandedImage } from "../BrandedImage";
 
 interface HeaderProps {
   logoSrc?: string;
@@ -14,14 +16,18 @@ interface HeaderProps {
 }
 
 export function Header({
-  logoSrc = "",
-  logoAlt = "logo",
-  appName = "AutoAPI",
+  logoSrc,
+  logoAlt,
+  appName,
   homeRoute = "/test",
   showMobileMenu = true,
   className = "",
 }: HeaderProps) {
   const routes = useFilteredRoutes();
+  const branding = useBranding();
+  const effectiveLogo = logoSrc ?? branding.logoUrl;
+  const effectiveAlt = logoAlt ?? branding.logoAlt;
+  const effectiveName = appName ?? branding.displayName;
 
   const handleScrollToTop = () => {
     if (location.pathname === homeRoute) {
@@ -39,15 +45,12 @@ export function Header({
               onClick={handleScrollToTop}
               className="flex items-center"
             >
-              {logoSrc ? (
-                <img
-                  src={logoSrc}
-                  alt={logoAlt}
-                  className="w-8 h-8 rounded-lg"
-                />
-              ) : (
-                <Logo size={32} />
-              )}
+              <BrandedImage
+                src={effectiveLogo}
+                alt={effectiveAlt}
+                className="h-8 w-8"
+                fallback={<Logo size={32} />}
+              />
             </Link>
             <Link
               to={homeRoute}
@@ -55,7 +58,7 @@ export function Header({
               onClick={handleScrollToTop}
             >
               <span className="text-sm font-semibold text-neutral-900 tracking-tight group-hover:text-neutral-700 transition-colors">
-                {appName}
+                {effectiveName}
               </span>
             </Link>
           </div>

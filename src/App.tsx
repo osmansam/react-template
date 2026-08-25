@@ -11,6 +11,7 @@ import { UserContextProvider, useUserContext } from "./context/User.context";
 import { baseQueryOptions } from "./config/queryClient";
 import { useWebSocket } from "./hooks/useWebSocket";
 import RouterContainer from "./navigation/routes";
+import { BrandingProvider } from "./context/Branding.context";
 
 function AppContent() {
   const location = useLocation();
@@ -56,7 +57,9 @@ function App() {
     <div className="App">
       <UserContextProvider>
         <GeneralContextProvider>
-          <AppContent />
+          <BrandingProvider>
+            <AppContent />
+          </BrandingProvider>
         </GeneralContextProvider>
       </UserContextProvider>
     </div>
