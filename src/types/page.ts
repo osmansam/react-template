@@ -486,6 +486,14 @@ export interface FormObjectListDisplayConfig {
   secondaryTemplate?: string;
   rightTemplate?: string;
   imageField?: string;
+  priceComparison?: FormPriceComparisonConfig;
+}
+
+export interface FormPriceComparisonConfig {
+  originalField: string;
+  discountedField: string;
+  currency?: string;
+  precision?: number;
 }
 
 export type FormObjectActionKind =
@@ -513,9 +521,12 @@ export interface FormFieldMappingConfig {
 }
 
 export interface FormItemCalculationConfig {
-  operation: "multiply";
+  operation: "multiply" | "quantityDiscount";
   inputs: string[];
+  originalTargetField?: string;
   targetField: string;
+  minimumQuantity?: number;
+  discountPercentage?: number;
   precision?: number;
 }
 
