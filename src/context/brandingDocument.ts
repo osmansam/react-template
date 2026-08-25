@@ -30,6 +30,7 @@ export function browserBrandingDocument(document: Document): BrandingDocument {
       document.documentElement.style.removeProperty("--brand-primary"),
     getProjectFavicon: () =>
       document.querySelector<HTMLLinkElement>("link[data-project-favicon]") ||
+      document.querySelector<HTMLLinkElement>("link[rel~='icon']") ||
       undefined,
     createProjectFavicon: () => {
       const link = document.createElement("link");

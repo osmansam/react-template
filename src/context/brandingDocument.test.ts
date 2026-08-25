@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { EffectiveBranding } from "../types/branding";
-import { applyBrandingToDocument, type BrandingDocument } from "./brandingDocument";
+import {
+  applyBrandingToDocument,
+  browserBrandingDocument,
+  type BrandingDocument,
+} from "./brandingDocument";
 
 function fakeBrandingDocument(): BrandingDocument {
   const properties = new Map<string, string>();
@@ -61,5 +65,23 @@ describe("project branding document effects", () => {
 
     expect(target.title).toBe("Beta");
     expect(target.getProjectFavicon()?.href).toBe("beta.png");
+  });
+
+  it("uses the existing static application favicon instead of adding a competing link", () => {
+    const staticFavicon = { href: "default.svg" };
+    const appended: unknown[] = [];
+    const documentStub = {
+      title: "AutoAPI",
+      documentElement: { style: { getPropertyValue: () => "", setProperty: () => {}, removeProperty: () => {} } },
+      querySelector: (selector: string) =>
+        selector === "link[rel~='icon']" ? staticFavicon : null,
+      createElement: () => ({ rel: "", dataset: {}, href: "", remove: () => {} }),
+      head: { appendChild: (link: unknown) => appended.push(link) },
+    } as unknown as Document;
+
+    applyBrandingToDocument(branding, browserBrandingDocument(documentStub));
+
+    expect(staticFavicon.href).toBe("favicon.png");
+    expect(appended).toHaveLength(0);
   });
 });
