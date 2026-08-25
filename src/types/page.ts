@@ -520,6 +520,11 @@ export interface FormFieldMappingConfig {
   required?: boolean;
 }
 
+export interface FormObjectListMergeConfig {
+  matchField: string;
+  quantityField: string;
+}
+
 export interface FormItemCalculationConfig {
   operation: "multiply" | "quantityDiscount";
   inputs: string[];
@@ -569,6 +574,7 @@ export interface FormObjectListConfig {
   area?: FormAreaKey;
   source?: "embedded";
   itemFields?: string[];
+  mergeOnAdd?: FormObjectListMergeConfig;
   fieldMappings?: FormFieldMappingConfig[];
   itemCalculations?: FormItemCalculationConfig[];
   addAction?: FormActionConfig;
