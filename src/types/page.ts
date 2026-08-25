@@ -773,6 +773,31 @@ export interface PageModel {
   isAuthenticated?: boolean;
   isAuthorized?: boolean;
   authorizeRole?: string[];
+  pageNavigator?: PageNavigatorConfig;
   sections: PageSection[];
   subPage?: PageModel; // Nested sub-page
+}
+
+export type PageNavigatorMode = "automatic" | "custom";
+export type PageNavigatorDestination =
+  | { type: "page"; pageId: string }
+  | { type: "external"; url: string };
+export interface PageNavigatorOverride {
+  pageId: string;
+  label?: string;
+  hidden?: boolean;
+}
+export interface PageNavigatorAdditionalItem {
+  id: string;
+  label: string;
+  destination: PageNavigatorDestination;
+  openInNewTab?: boolean;
+}
+export interface PageNavigatorConfig {
+  enabled: boolean;
+  mode: PageNavigatorMode;
+  showHome: boolean;
+  homeLabel?: string;
+  overrides?: PageNavigatorOverride[];
+  additionalItems?: PageNavigatorAdditionalItem[];
 }
