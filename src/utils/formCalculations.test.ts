@@ -3,6 +3,8 @@ import { FormComponentConfig, FormObjectListConfig } from "../types/page";
 import {
   calculateFormSummaries,
   calculateObjectListItem,
+  getNextQuantityDiscountTier,
+  getQuantityDiscountTiers,
   recalculateFormState,
   snapshotMappedFields,
 } from "./formCalculations";
@@ -74,6 +76,71 @@ describe("form calculations", () => {
       { unitPrice: 100, quantity: 7, originalLineTotal: 700, lineTotal: 490 },
     ]);
     expect(inputs[1]).toEqual({ unitPrice: 100, quantity: 6 });
+  });
+
+  it("normalizes configured and legacy quantity discount tiers", () => {
+    expect(getQuantityDiscountTiers({
+      operation: "quantityDiscount",
+      inputs: ["unitPrice", "quantity"],
+      originalTargetField: "originalLineTotal",
+      targetField: "lineTotal",
+      discountTiers: [
+        { minimumQuantity: 6, discountPercentage: 30 },
+        { minimumQuantity: 10, discountPercentage: 40 },
+      ],
+    })).toEqual([
+      { minimumQuantity: 6, discountPercentage: 30 },
+      { minimumQuantity: 10, discountPercentage: 40 },
+    ]);
+    expect(getQuantityDiscountTiers({
+      operation: "quantityDiscount",
+      inputs: ["unitPrice", "quantity"],
+      originalTargetField: "originalLineTotal",
+      targetField: "lineTotal",
+      minimumQuantity: 6,
+      discountPercentage: 30,
+    })).toEqual([{ minimumQuantity: 6, discountPercentage: 30 }]);
+  });
+
+  it("returns only the next quantity discount tier", () => {
+    const calculation = {
+      operation: "quantityDiscount" as const,
+      inputs: ["unitPrice", "quantity"],
+      originalTargetField: "originalLineTotal",
+      targetField: "lineTotal",
+      discountTiers: [
+        { minimumQuantity: 6, discountPercentage: 30 },
+        { minimumQuantity: 10, discountPercentage: 40 },
+      ],
+    };
+    expect(getNextQuantityDiscountTier(calculation, 3)).toEqual({ minimumQuantity: 6, discountPercentage: 30 });
+    expect(getNextQuantityDiscountTier(calculation, 6)).toEqual({ minimumQuantity: 10, discountPercentage: 40 });
+    expect(getNextQuantityDiscountTier(calculation, 8)).toEqual({ minimumQuantity: 10, discountPercentage: 40 });
+    expect(getNextQuantityDiscountTier(calculation, 10)).toBeUndefined();
+  });
+
+  it("applies the highest reached tier to the complete row", () => {
+    const configured: FormObjectListConfig = {
+      key: "items",
+      itemCalculations: [{
+        operation: "quantityDiscount",
+        inputs: ["unitPrice", "quantity"],
+        originalTargetField: "originalLineTotal",
+        targetField: "lineTotal",
+        discountTiers: [
+          { minimumQuantity: 6, discountPercentage: 30 },
+          { minimumQuantity: 10, discountPercentage: 40 },
+        ],
+        precision: 2,
+      }],
+    };
+    expect([3, 6, 8, 10, 12].map((quantity) => calculateObjectListItem(configured, { unitPrice: 100, quantity }))).toEqual([
+      { unitPrice: 100, quantity: 3, originalLineTotal: 300, lineTotal: 300 },
+      { unitPrice: 100, quantity: 6, originalLineTotal: 600, lineTotal: 420 },
+      { unitPrice: 100, quantity: 8, originalLineTotal: 800, lineTotal: 560 },
+      { unitPrice: 100, quantity: 10, originalLineTotal: 1000, lineTotal: 600 },
+      { unitPrice: 100, quantity: 12, originalLineTotal: 1200, lineTotal: 720 },
+    ]);
   });
 
   it("rounds the original and discounted totals like the backend fixture", () => {
