@@ -18,6 +18,9 @@ import { useTenantProject } from "../hooks/useTenantProject";
 import { getIconByName, getMenuIcon } from "../utils/menuIcons";
 import { getTabSlug } from "../utils/slug";
 import SidebarTooltip from "./SidebarTooltip";
+import { useBranding } from "../context/useBranding";
+import { BrandedImage } from "../components/BrandedImage";
+import { navigationLogo } from "../components/brandingSelection";
 
 const getRouteIcon = (item: SidebarRouteItem) =>
   item.icon && /^[A-Z][a-z]+[A-Z]/.test(item.icon)
@@ -38,6 +41,7 @@ export const Sidebar = () => {
   const previousRouteRef = useRef<string | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isExpanded = isSidebarOpen || isHoverExpanded;
+  const branding = useBranding();
 
   const {
     routes,
@@ -231,6 +235,19 @@ export const Sidebar = () => {
         </div>
 
         <div className="flex flex-col h-[calc(100%-3.5rem)] py-2 px-2 bg-white overflow-y-auto custom-scrollbar">
+          <div className={`mb-3 flex h-11 items-center rounded-lg border border-neutral-200 bg-neutral-50 ${isExpanded ? "gap-3 px-3" : "justify-center px-1"}`}>
+            <BrandedImage
+              src={navigationLogo(branding, isExpanded)}
+              alt={branding.logoAlt}
+              className="h-8 w-8 shrink-0"
+              fallbackSize={32}
+            />
+            {isExpanded && (
+              <span className="truncate text-sm font-semibold text-neutral-900">
+                {branding.displayName}
+              </span>
+            )}
+          </div>
           <div className="mb-3">
             {isExpanded ? (
               <AutocompleteInput

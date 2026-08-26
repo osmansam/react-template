@@ -93,8 +93,8 @@ export const useDynamicPages = (enabled: boolean = true) => {
   );
 
   // Memoize element factory to prevent function recreation
-  const createPageElement = useCallback((page: PageModel) => {
-    return () => <DynamicPageRenderer page={page} sections={page.sections} />;
+  const createPageElement = useCallback((page: PageModel, allPages: PageModel[]) => {
+    return () => <DynamicPageRenderer page={page} pages={allPages} sections={page.sections} />;
   }, []);
 
   // Helper to build hierarchical structure
@@ -133,7 +133,7 @@ export const useDynamicPages = (enabled: boolean = true) => {
         }
 
         if (!page.isGroupOnly && path) {
-          route.element = createPageElement(page);
+          route.element = createPageElement(page, allPages);
         }
 
         if (childPages.length > 0) {
@@ -148,7 +148,7 @@ export const useDynamicPages = (enabled: boolean = true) => {
                     isMainPage: page.isMainPage === true,
                     icon: page.icon,
                     tabs: tabs.length > 0 ? tabs : undefined,
-                    element: createPageElement(page),
+                    element: createPageElement(page, allPages),
                   },
                 ]),
             ...childPages.map((childPage) => createRoute(childPage)),

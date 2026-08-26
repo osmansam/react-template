@@ -159,6 +159,14 @@ export type TableColumnType =
   | "badge"
   | "array";
 
+export type TableDateFormat =
+  | "MM/DD/YYYY"
+  | "DD/MM/YYYY"
+  | "YYYY/MM/DD"
+  | "DD-MM-YYYY"
+  | "MM-DD-YYYY"
+  | "YYYY-MM-DD";
+
 export interface TableComputedLabelRule {
   condition?: string;
   value?: string;
@@ -230,6 +238,7 @@ export interface TableColumnConfig {
   field: string;
   type?: TableColumnType;
   displayName?: string;
+  dateFormat?: TableDateFormat;
   lookup?: TableLookupLabelConfig;
   computedLabelRules?: TableComputedLabelRule[];
   template?: string;
@@ -250,6 +259,7 @@ export interface TableNestedRowColumnConfig {
   field: string;
   displayName?: string;
   type?: TableColumnType;
+  dateFormat?: TableDateFormat;
   lookup?: TableLookupLabelConfig;
   fallbackValue?: string;
 }
@@ -476,6 +486,14 @@ export interface FormObjectListDisplayConfig {
   secondaryTemplate?: string;
   rightTemplate?: string;
   imageField?: string;
+  priceComparison?: FormPriceComparisonConfig;
+}
+
+export interface FormPriceComparisonConfig {
+  originalField: string;
+  discountedField: string;
+  currency?: string;
+  precision?: number;
 }
 
 export type FormObjectActionKind =
@@ -502,10 +520,24 @@ export interface FormFieldMappingConfig {
   required?: boolean;
 }
 
+export interface FormObjectListMergeConfig {
+  matchField: string;
+  quantityField: string;
+}
+
+export interface FormQuantityDiscountTierConfig {
+  minimumQuantity: number;
+  discountPercentage: number;
+}
+
 export interface FormItemCalculationConfig {
-  operation: "multiply";
+  operation: "multiply" | "quantityDiscount";
   inputs: string[];
+  originalTargetField?: string;
   targetField: string;
+  minimumQuantity?: number;
+  discountPercentage?: number;
+  discountTiers?: FormQuantityDiscountTierConfig[];
   precision?: number;
 }
 
@@ -548,6 +580,7 @@ export interface FormObjectListConfig {
   area?: FormAreaKey;
   source?: "embedded";
   itemFields?: string[];
+  mergeOnAdd?: FormObjectListMergeConfig;
   fieldMappings?: FormFieldMappingConfig[];
   itemCalculations?: FormItemCalculationConfig[];
   addAction?: FormActionConfig;
@@ -746,6 +779,31 @@ export interface PageModel {
   isAuthenticated?: boolean;
   isAuthorized?: boolean;
   authorizeRole?: string[];
+  pageNavigator?: PageNavigatorConfig;
   sections: PageSection[];
   subPage?: PageModel; // Nested sub-page
+}
+
+export type PageNavigatorMode = "automatic" | "custom";
+export type PageNavigatorDestination =
+  | { type: "page"; pageId: string }
+  | { type: "external"; url: string };
+export interface PageNavigatorOverride {
+  pageId: string;
+  label?: string;
+  hidden?: boolean;
+}
+export interface PageNavigatorAdditionalItem {
+  id: string;
+  label: string;
+  destination: PageNavigatorDestination;
+  openInNewTab?: boolean;
+}
+export interface PageNavigatorConfig {
+  enabled: boolean;
+  mode: PageNavigatorMode;
+  showHome: boolean;
+  homeLabel?: string;
+  overrides?: PageNavigatorOverride[];
+  additionalItems?: PageNavigatorAdditionalItem[];
 }

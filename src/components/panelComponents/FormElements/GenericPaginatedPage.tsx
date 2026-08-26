@@ -60,6 +60,7 @@ import {
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
 import { formatPopulatedArrayValue } from "../../../utils/populatedArrayDisplay";
+import { formatTableDate } from "../../../utils/tableDateFormat";
 import { getSelectionQueryConfig } from "../../../utils/selectionQuery";
 import { renderTableColumnTemplate } from "../../../utils/tableColumnTemplate";
 import {
@@ -969,33 +970,13 @@ export default function GenericPaginatedPage({
           rowKey.node = (row: GenericItem) => {
             const v = row[f.name];
             if (!v) return <span>-</span>;
-            try {
-              const d = new Date(v as string | number);
-              if (isNaN(d.getTime())) {
-                return renderLinkedCellContent(
-                  f,
-                  row,
-                  linkConfig,
-                  <span>{String(v)}</span>,
-                );
-              }
-              return renderLinkedCellContent(
-                f,
-                row,
-                linkConfig,
-                <span>
-                  {String(d.getDate()).padStart(2, "0")}/
-                  {String(d.getMonth() + 1).padStart(2, "0")}/{d.getFullYear()}
-                </span>,
-              );
-            } catch {
-              return renderLinkedCellContent(
-                f,
-                row,
-                linkConfig,
-                <span>{String(v)}</span>,
-              );
-            }
+            const formatted = formatTableDate(v, columnConfig.dateFormat);
+            return renderLinkedCellContent(
+              f,
+              row,
+              linkConfig,
+              <span>{formatted || String(v)}</span>,
+            );
           };
           return rowKey;
         }

@@ -20,6 +20,9 @@ import {
   refreshAfterGoogleLogin,
 } from "./googleCallbackAuth";
 import { setProjectSessionItem } from "../utils/projectSessionStorage";
+import { useBranding } from "../context/useBranding";
+import { BrandedImage } from "../components/BrandedImage";
+import { loginBranding } from "../components/brandingSelection";
 
 const Login = () => {
   const { t } = useTranslation();
@@ -30,6 +33,7 @@ const Login = () => {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const { setUser } = useUserContext();
+  const effectiveBranding = loginBranding(useBranding());
 
   // Don't pass redirectPath - let useLogin determine the first page automatically
   const { login } = useLogin();
@@ -151,6 +155,21 @@ const Login = () => {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
         <div className="p-8">
           <div className="text-center mb-10">
+            {effectiveBranding && (
+              <div className="mb-6">
+                <div className="mx-auto flex h-16 max-w-48 items-center justify-center">
+                  <BrandedImage
+                    src={effectiveBranding.logoUrl}
+                    alt={effectiveBranding.logoAlt}
+                    className="max-h-16 max-w-48"
+                    fallbackSize={48}
+                  />
+                </div>
+                <p className="mt-3 text-sm font-semibold text-gray-800">
+                  {effectiveBranding.displayName}
+                </p>
+              </div>
+            )}
             <H1 className="text-3xl font-bold text-gray-900 mb-2">
               {isRegisterMode ? t("Create Account") : t("Welcome Back")}
             </H1>
@@ -178,6 +197,7 @@ const Login = () => {
               type="submit"
               variant="primary"
               className="w-full py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+              style={effectiveBranding ? { backgroundColor: effectiveBranding.primaryColor } : undefined}
             >
               {isRegisterMode ? t("Sign Up") : t("Sign In")}
             </GenericButton>

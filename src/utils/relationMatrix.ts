@@ -35,6 +35,7 @@ export const buildRelationMatrixTableDescriptors = (
         key: column.label,
         isSortable: false,
         correspondingKey: column.key,
+        className: "mx-auto justify-center",
       })),
     ],
     rowKeys: [config.rowLabelField, ...dynamic.map((column) => column.key)],
@@ -74,3 +75,37 @@ export const buildRelationArrayTarget = (
   arrayField: config.targetArrayField,
   rowIdentityField: config.targetItemMatchField,
 });
+
+export const replaceRelationParentInDynamicData = <T>(
+  data: T,
+  parent: Record<string, unknown> | undefined,
+  idField: string,
+): T => {
+  if (!parent) return data;
+  const parentId = normalizeRelationId(parent[idField]);
+  if (!parentId) return data;
+
+  const replaceRecord = (record: unknown) => {
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+      return record;
+    }
+    const typed = record as Record<string, unknown>;
+    return normalizeRelationId(typed[idField]) === parentId ? parent : record;
+  };
+
+  if (Array.isArray(data)) {
+    return data.map(replaceRecord) as T;
+  }
+
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+    if (Array.isArray(record.items)) {
+      return {
+        ...record,
+        items: record.items.map(replaceRecord),
+      } as T;
+    }
+  }
+
+  return data;
+};
