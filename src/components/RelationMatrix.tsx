@@ -1,7 +1,25 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import { IoCheckmark, IoCloseOutline } from "react-icons/io5";
 import { CheckSwitch } from "../common/CheckSwitch";
+import type { RelationMatrixConfig } from "../types/page";
+import {
+  addDynamicArrayRow,
+  deleteDynamicArrayRow,
+} from "../utils/api/dynamicArray";
+import { useGetPaginatedItems } from "../utils/dynamic";
+import {
+  buildRelationArrayTarget,
+  buildRelationMatrixTableDescriptors,
+  isRelationMatrixMember,
+  normalizeRelationId,
+  replaceRelationParentInDynamicData,
+} from "../utils/relationMatrix";
+import {
+  createTableToggleState,
+  isBooleanColumnEditable,
+} from "../utils/tableToggles";
 import GenericTable from "./panelComponents/Tables/GenericTable";
 import SwitchButton from "./panelComponents/common/SwitchButton";
 import type {
@@ -9,30 +27,15 @@ import type {
   FilterType,
   RowKeyType,
 } from "./panelComponents/shared/types";
-import type { RelationMatrixConfig } from "../types/page";
-import { useGetPaginatedItems } from "../utils/dynamic";
-import {
-  addDynamicArrayRow,
-  deleteDynamicArrayRow,
-} from "../utils/api/dynamicArray";
-import {
-  buildRelationArrayTarget,
-  buildRelationMatrixTableDescriptors,
-  isRelationMatrixMember,
-  normalizeRelationId,
-} from "../utils/relationMatrix";
-import {
-  createTableToggleState,
-  isBooleanColumnEditable,
-  isTableColumnVisible,
-} from "../utils/tableToggles";
 
 type RecordItem = Record<string, unknown>;
 
 const valueLabel = (value: unknown): string => {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const record = value as RecordItem;
-    return String(record.name ?? record.label ?? record._id ?? record.id ?? "-");
+    return String(
+      record.name ?? record.label ?? record._id ?? record.id ?? "-",
+    );
   }
   return value == null || value === "" ? "-" : String(value);
 };
@@ -45,7 +48,9 @@ export default function RelationMatrix({
   title?: string;
 }) {
   const queryClient = useQueryClient();
-  const toggles = config.toggles || [];
+  const toggles = (config.toggles || []).filter(
+    (toggle) => toggle.id !== "show-relations",
+  );
   const [toggleState, setToggleState] = useState(() =>
     createTableToggleState(toggles),
   );
@@ -53,23 +58,16 @@ export default function RelationMatrix({
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const rowLimit = 100;
   const columnLimit = Math.min(100, Math.max(1, config.columnLimit || 100));
-  const rows = useGetPaginatedItems<RecordItem>(
-    1,
-    rowLimit,
-    config.rowSchemaName,
-    {},
-  )?.items || [];
-  const columns = useGetPaginatedItems<RecordItem>(
-    1,
-    columnLimit,
-    config.columnSchemaName,
-    {},
-  )?.items || [];
-  const visible = isTableColumnVisible(
-    config.visibilityToggle,
-    toggleState,
-    toggles,
-  );
+  const rows =
+    useGetPaginatedItems<RecordItem>(1, rowLimit, config.rowSchemaName, {})
+      ?.items || [];
+  const columns =
+    useGetPaginatedItems<RecordItem>(
+      1,
+      columnLimit,
+      config.columnSchemaName,
+      {},
+    )?.items || [];
   const editable = isBooleanColumnEditable(
     config.editToggle,
     toggleState,
@@ -93,14 +91,21 @@ export default function RelationMatrix({
     setPending((current) => ({ ...current, [key]: true }));
     const target = buildRelationArrayTarget(column, config);
     try {
-      if (nextChecked) {
-        await addDynamicArrayRow({
-          ...target,
-          item: { [config.targetItemMatchField]: rowId },
-        });
-      } else {
-        await deleteDynamicArrayRow({ ...target, rowIdentity: rowId });
-      }
+      const result = nextChecked
+        ? await addDynamicArrayRow({
+            ...target,
+            item: { [config.targetItemMatchField]: rowId },
+          })
+        : await deleteDynamicArrayRow({ ...target, rowIdentity: rowId });
+      queryClient.setQueriesData(
+        { queryKey: ["dynamic", config.columnSchemaName] },
+        (data) =>
+          replaceRelationParentInDynamicData(
+            data,
+            result?.parent,
+            config.columnIdField,
+          ),
+      );
       await queryClient.invalidateQueries({
         queryKey: ["dynamic", config.columnSchemaName],
       });
@@ -148,12 +153,28 @@ export default function RelationMatrix({
             );
             const checked = overrides[key] ?? serverChecked;
             return (
-              <span className={pending[key] ? "inline-flex opacity-50" : "inline-flex"}>
-                <CheckSwitch
-                  checked={checked}
-                  onChange={() => editable && changeMembership(row, column, !checked)}
-                  uncheckedBg="bg-gray-300"
-                />
+              <span
+                className={
+                  pending[key] ? "inline-flex opacity-50" : "inline-flex"
+                }
+              >
+                {editable ? (
+                  <CheckSwitch
+                    checked={checked}
+                    onChange={() => changeMembership(row, column, !checked)}
+                    uncheckedBg="bg-gray-300"
+                  />
+                ) : checked ? (
+                  <IoCheckmark
+                    className="text-blue-500 text-2xl"
+                    aria-label="Related: Yes"
+                  />
+                ) : (
+                  <IoCloseOutline
+                    className="text-red-800 text-2xl"
+                    aria-label="Related: No"
+                  />
+                )}
               </span>
             );
           },
@@ -166,7 +187,7 @@ export default function RelationMatrix({
     () =>
       toggles.map((toggle) => ({
         label: toggle.label,
-        isUpperSide: toggle.isUpperSide !== false,
+        isUpperSide: false,
         node: (
           <SwitchButton
             checked={toggleState[toggle.id] ?? toggle.defaultValue}
@@ -184,9 +205,9 @@ export default function RelationMatrix({
 
   return (
     <GenericTable<RecordItem>
-      rows={visible ? rows : []}
-      columns={visible ? tableColumns : []}
-      rowKeys={visible ? rowKeys : []}
+      rows={rows}
+      columns={tableColumns}
+      rowKeys={rowKeys}
       title={title || "Relations"}
       filters={filters}
       isActionsActive={false}
@@ -195,6 +216,7 @@ export default function RelationMatrix({
       isRowsPerPage={false}
       isColumnFilter={false}
       isExcel={false}
+      showOrientationToggle={false}
     />
   );
 }
