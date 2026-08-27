@@ -1,5 +1,40 @@
 import type { DynamicArrayTarget } from "./api/dynamicArray";
 
+type MatrixRequestConfig = Pick<
+  import("../types/page").RelationMatrixConfig,
+  "rowSchemaName" | "columnSchemaName" | "columnLimit"
+>;
+
+export const compactRelationMatrixRowFilters = (
+  values: Record<string, unknown>,
+): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(values).filter(([, value]) => {
+      if (value == null) return false;
+      if (typeof value === "string") return value.trim().length > 0;
+      if (Array.isArray(value)) return value.length > 0;
+      return true;
+    }),
+  );
+
+export const buildRelationMatrixRequests = (
+  config: MatrixRequestConfig,
+  appliedRowFilters: Record<string, unknown>,
+) => ({
+  row: {
+    page: 1,
+    limit: 100,
+    schemaName: config.rowSchemaName,
+    filters: compactRelationMatrixRowFilters({ ...appliedRowFilters }),
+  },
+  column: {
+    page: 1,
+    limit: Math.min(100, Math.max(1, config.columnLimit || 100)),
+    schemaName: config.columnSchemaName,
+    filters: {} as Record<string, unknown>,
+  },
+});
+
 type MatrixColumnConfig = Pick<
   import("../types/page").RelationMatrixConfig,
   "rowLabelField" | "columnIdField" | "columnLabelField"

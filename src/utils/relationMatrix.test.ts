@@ -3,8 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  buildRelationMatrixRequests,
   buildRelationMatrixTableDescriptors,
   buildRelationArrayTarget,
+  compactRelationMatrixRowFilters,
   isRelationMatrixMember,
   normalizeRelationId,
   replaceRelationParentInDynamicData,
@@ -16,6 +18,61 @@ const componentSource = readFileSync(
 );
 
 describe("relation matrix helpers", () => {
+  it("omits empty row-filter values without dropping valid falsy values", () => {
+    const date = new Date("2026-08-27T00:00:00.000Z");
+    expect(
+      compactRelationMatrixRowFilters({
+        empty: "",
+        whitespace: "   ",
+        nil: null,
+        missing: undefined,
+        emptyList: [],
+        enabled: false,
+        count: 0,
+        statuses: ["active"],
+        createdAt: date,
+        name: " Tea ",
+      }),
+    ).toEqual({
+      enabled: false,
+      count: 0,
+      statuses: ["active"],
+      createdAt: date,
+      name: " Tea ",
+    });
+  });
+
+  it("applies filters to the row request and never the column request", () => {
+    const applied = { status: "active" };
+    const requests = buildRelationMatrixRequests(
+      {
+        rowSchemaName: "product",
+        columnSchemaName: "countList",
+        columnLimit: 120,
+      },
+      applied,
+    );
+
+    expect(requests).toEqual({
+      row: {
+        page: 1,
+        limit: 100,
+        schemaName: "product",
+        filters: { status: "active" },
+      },
+      column: {
+        page: 1,
+        limit: 100,
+        schemaName: "countList",
+        filters: {},
+      },
+    });
+
+    applied.status = "inactive";
+    expect(requests.row.filters).toEqual({ status: "active" });
+    expect(requests.column.filters).toEqual({});
+  });
+
   it("adapts row and column records to generic table descriptors", () => {
     expect(
       buildRelationMatrixTableDescriptors(
