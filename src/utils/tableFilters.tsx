@@ -1,6 +1,7 @@
 import { useQueries } from "@tanstack/react-query";
 import {
   GenericInputType,
+  FormElementsState,
   InputTypes,
   OptionType,
 } from "../components/panelComponents/shared/types";
@@ -169,8 +170,8 @@ export const buildConfiguredFilterInputs = (
 
 export const getFilterDefaultValues = (
   fields: TableFilterPanelInputConfig[] | undefined,
-): Record<string, unknown> =>
-  (fields || []).reduce<Record<string, unknown>>((values, field) => {
+): FormElementsState =>
+  (fields || []).reduce<FormElementsState>((values, field) => {
     if (field.formKey && field.defaultValue !== undefined) {
       values[field.formKey] = field.defaultValue;
     }

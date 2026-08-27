@@ -71,7 +71,7 @@ export interface ColumnType {
   node?: () => React.ReactNode;
   onClick?: () => void;
 }
-type FormElementValue =
+export type FormElementValue =
   | string
   | number
   | boolean
@@ -84,7 +84,7 @@ type FormElementValue =
   | null
   | undefined;
 
-type FormElementsState = {
+export type FormElementsState = {
   [key: string]: FormElementValue;
 };
 

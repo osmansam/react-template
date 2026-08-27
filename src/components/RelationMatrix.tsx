@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { IoCheckmark, IoCloseOutline } from "react-icons/io5";
 import { CheckSwitch } from "../common/CheckSwitch";
@@ -11,11 +11,17 @@ import {
 import { useGetPaginatedItems } from "../utils/dynamic";
 import {
   buildRelationArrayTarget,
+  buildRelationMatrixRequests,
   buildRelationMatrixTableDescriptors,
   isRelationMatrixMember,
   normalizeRelationId,
   replaceRelationParentInDynamicData,
 } from "../utils/relationMatrix";
+import {
+  buildConfiguredFilterInputs,
+  getFilterDefaultValues,
+  useFilterPanelSelectionData,
+} from "../utils/tableFilters";
 import {
   createTableToggleState,
   isBooleanColumnEditable,
@@ -25,6 +31,7 @@ import SwitchButton from "./panelComponents/common/SwitchButton";
 import type {
   ColumnType,
   FilterType,
+  PanelFilterType,
   RowKeyType,
 } from "./panelComponents/shared/types";
 
@@ -56,17 +63,40 @@ export default function RelationMatrix({
   );
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [pending, setPending] = useState<Record<string, boolean>>({});
-  const rowLimit = 100;
-  const columnLimit = Math.min(100, Math.max(1, config.columnLimit || 100));
+  const configuredFilters = config.filterPanel?.inputs;
+  const defaultFilters = useMemo(
+    () => getFilterDefaultValues(configuredFilters),
+    [configuredFilters],
+  );
+  const [appliedRowFilters, setAppliedRowFilters] = useState<
+    PanelFilterType["formElements"]
+  >(() => defaultFilters);
+  useEffect(() => {
+    setAppliedRowFilters(defaultFilters);
+  }, [defaultFilters]);
+  const selectionData = useFilterPanelSelectionData(configuredFilters || []);
+  const filterInputs = useMemo(
+    () => buildConfiguredFilterInputs(configuredFilters, [], selectionData),
+    [configuredFilters, selectionData],
+  );
+  const requests = useMemo(
+    () => buildRelationMatrixRequests(config, appliedRowFilters),
+    [config, appliedRowFilters],
+  );
   const rows =
-    useGetPaginatedItems<RecordItem>(1, rowLimit, config.rowSchemaName, {})
+    useGetPaginatedItems<RecordItem>(
+      requests.row.page,
+      requests.row.limit,
+      requests.row.schemaName,
+      requests.row.filters,
+    )
       ?.items || [];
   const columns =
     useGetPaginatedItems<RecordItem>(
-      1,
-      columnLimit,
-      config.columnSchemaName,
-      {},
+      requests.column.page,
+      requests.column.limit,
+      requests.column.schemaName,
+      requests.column.filters,
     )?.items || [];
   const editable = isBooleanColumnEditable(
     config.editToggle,
@@ -210,6 +240,19 @@ export default function RelationMatrix({
       rowKeys={rowKeys}
       title={title || "Relations"}
       filters={filters}
+      filterPanel={
+        configuredFilters
+          ? {
+              inputs: filterInputs,
+              formElements: appliedRowFilters,
+              setFormElements: setAppliedRowFilters,
+              closeFilters: () => undefined,
+              isFilterPanelActive: filterInputs.length > 0,
+              isApplyButtonActive: true,
+              isCloseButtonActive: false,
+            }
+          : undefined
+      }
       isActionsActive={false}
       isSearch={false}
       isPagination={false}

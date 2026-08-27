@@ -1,4 +1,5 @@
 import type { DynamicArrayTarget } from "./api/dynamicArray";
+import type { FormElementsState } from "../components/panelComponents/shared/types";
 
 type MatrixRequestConfig = Pick<
   import("../types/page").RelationMatrixConfig,
@@ -6,8 +7,8 @@ type MatrixRequestConfig = Pick<
 >;
 
 export const compactRelationMatrixRowFilters = (
-  values: Record<string, unknown>,
-): Record<string, unknown> =>
+  values: FormElementsState,
+): FormElementsState =>
   Object.fromEntries(
     Object.entries(values).filter(([, value]) => {
       if (value == null) return false;
@@ -19,7 +20,7 @@ export const compactRelationMatrixRowFilters = (
 
 export const buildRelationMatrixRequests = (
   config: MatrixRequestConfig,
-  appliedRowFilters: Record<string, unknown>,
+  appliedRowFilters: FormElementsState,
 ) => ({
   row: {
     page: 1,
@@ -31,7 +32,7 @@ export const buildRelationMatrixRequests = (
     page: 1,
     limit: Math.min(100, Math.max(1, config.columnLimit || 100)),
     schemaName: config.columnSchemaName,
-    filters: {} as Record<string, unknown>,
+    filters: {} as FormElementsState,
   },
 });
 
