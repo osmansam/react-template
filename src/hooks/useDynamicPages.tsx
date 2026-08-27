@@ -203,6 +203,7 @@ export const useDynamicPages = (enabled: boolean = true) => {
     routeEnums,
     isLoading: pages.isLoading,
     isError: pages.isError,
+    error: pages.error,
     pages: pageData,
   };
 };

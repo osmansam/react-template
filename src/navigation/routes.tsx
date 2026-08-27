@@ -10,8 +10,14 @@ import { allRoutes, PublicRoutes } from "./constants";
 import { RouteLoadingFallback } from "./RouteLoadingFallback";
 import { getPreferredLandingPath } from "./landingRoute";
 import { PrivateRoutes } from "./PrivateRoutes";
-import { shouldLoadDynamicPages } from "./dynamicPagesLoading";
-import { getProjectSessionItem } from "../utils/projectSessionStorage";
+import {
+  getDynamicPagesAuthFailureRedirect,
+  shouldLoadDynamicPages,
+} from "./dynamicPagesLoading";
+import {
+  getProjectSessionItem,
+  removeProjectSessionItem,
+} from "../utils/projectSessionStorage";
 
 const GoogleCallback = lazy(() => import("../pages/GoogleCallback"));
 const Login = lazy(() => import("../pages/Login"));
@@ -37,7 +43,7 @@ const RouterContainer = () => {
     location.pathname,
     getProjectSessionItem("loggedIn", location.pathname) === "true",
   );
-  const { dynamicRoutes, isLoading, isError } = useDynamicPages(loadDynamicPages);
+  const { dynamicRoutes, isLoading, isError, error } = useDynamicPages(loadDynamicPages);
 
   // Combine static routes with dynamic routes
   const combinedRoutes = useMemo(() => {
@@ -76,6 +82,14 @@ const RouterContainer = () => {
   }
 
   if (loadDynamicPages && isError) {
+    const loginRedirect = getDynamicPagesAuthFailureRedirect(
+      location.pathname,
+      error,
+    );
+    if (loginRedirect) {
+      removeProjectSessionItem("loggedIn", location.pathname);
+      return <Navigate to={loginRedirect} state={{ from: location }} replace />;
+    }
     return (
       <div className="flex min-h-screen items-center justify-center bg-white p-8 text-center">
         <div>
