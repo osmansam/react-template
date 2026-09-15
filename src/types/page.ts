@@ -538,6 +538,7 @@ export interface FormItemCalculationConfig {
   minimumQuantity?: number;
   discountPercentage?: number;
   discountTiers?: FormQuantityDiscountTierConfig[];
+  discountMessage?: string;
   precision?: number;
 }
 
@@ -660,6 +661,7 @@ export interface RelationMatrixConfig {
   targetArrayField: string;
   targetItemMatchField: string;
   columnLimit?: number;
+  filterPanel?: TableFilterPanelConfig;
   toggles?: TableToggleConfig[];
   visibilityToggle?: ToggleBinding;
   editToggle?: ToggleBinding;

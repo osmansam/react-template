@@ -1,4 +1,40 @@
 import type { DynamicArrayTarget } from "./api/dynamicArray";
+import type { FormElementsState } from "../components/panelComponents/shared/types";
+
+type MatrixRequestConfig = Pick<
+  import("../types/page").RelationMatrixConfig,
+  "rowSchemaName" | "columnSchemaName" | "columnLimit"
+>;
+
+export const compactRelationMatrixRowFilters = (
+  values: FormElementsState,
+): FormElementsState =>
+  Object.fromEntries(
+    Object.entries(values).filter(([, value]) => {
+      if (value == null) return false;
+      if (typeof value === "string") return value.trim().length > 0;
+      if (Array.isArray(value)) return value.length > 0;
+      return true;
+    }),
+  );
+
+export const buildRelationMatrixRequests = (
+  config: MatrixRequestConfig,
+  appliedRowFilters: FormElementsState,
+) => ({
+  row: {
+    page: 1,
+    limit: 100,
+    schemaName: config.rowSchemaName,
+    filters: compactRelationMatrixRowFilters({ ...appliedRowFilters }),
+  },
+  column: {
+    page: 1,
+    limit: Math.min(100, Math.max(1, config.columnLimit || 100)),
+    schemaName: config.columnSchemaName,
+    filters: {} as FormElementsState,
+  },
+});
 
 type MatrixColumnConfig = Pick<
   import("../types/page").RelationMatrixConfig,
