@@ -1114,7 +1114,7 @@ export default function GenericUnpaginatedPage({
       ...generatedRelationTableColumns.columns,
     ];
     if (actionsEnabled) {
-      return [...baseCols, { key: t("Actions"), isSortable: false }];
+      return [...baseCols, { key: t("Actions"), label: tableConfig?.actionsColumnLabel?.trim() ? tableConfig.actionsColumnLabel : undefined, isSortable: false }];
     }
     return baseCols;
   }, [displayFields, t, actionsEnabled, tableConfig, generatedRelationTableColumns.columns]);
@@ -2420,6 +2420,7 @@ export default function GenericUnpaginatedPage({
       {isHeader && <Header />}
       <div className="w-full mx-auto">
         <GenericTable
+          searchPlaceholder={tableConfig?.searchPlaceholder}
           rowKeys={rowKeys}
           actions={actions}
           columns={columns}

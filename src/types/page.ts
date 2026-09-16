@@ -32,6 +32,7 @@ export interface PageFilterPlacement {
 }
 
 export interface PageFilterDefinition {
+  language?: string;
   id: string;
   key: string;
   label: string;
@@ -414,6 +415,8 @@ export interface TableActionConfig {
 }
 
 export interface TableComponentConfig {
+  actionsColumnLabel?: string;
+  searchPlaceholder?: string;
   dataMode?: "paginated" | "all" | "arrayField";
   title?: string;
   enableSearch?: boolean;
