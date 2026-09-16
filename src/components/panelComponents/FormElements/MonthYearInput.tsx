@@ -6,49 +6,30 @@ import { LuCalendar } from "react-icons/lu";
 
 type MonthYearInputProps = {
   label?: string;
+  language?: string;
   value?: string; // Expected format: "MM-YYYY"
   onChange: (value: string) => void;
   requiredField?: boolean;
   isReadOnly?: boolean;
 };
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-const FULL_MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
 const MonthYearInput = ({
   label,
+  language,
   value,
   onChange,
   requiredField = false,
   isReadOnly = false,
 }: MonthYearInputProps) => {
+  const isTurkish = language === "tr";
+  const { months, fullMonths } = useMemo(() => {
+    const locale = isTurkish ? "tr-TR" : "en-US";
+    const names = (month: "short" | "long") => {
+      const formatter = new Intl.DateTimeFormat(locale, { month, timeZone: "UTC" });
+      return Array.from({ length: 12 }, (_, index) => formatter.format(new Date(Date.UTC(2026, index, 1))));
+    };
+    return { months: names("short"), fullMonths: names("long") };
+  }, [isTurkish]);
   const [isOpen, setIsOpen] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({
     left: 0,
@@ -160,7 +141,7 @@ const MonthYearInput = ({
   );
 
   const displayText = value
-    ? `${FULL_MONTHS[selectedMonth - 1]} ${selectedYear}`
+    ? `${fullMonths[selectedMonth - 1]} ${selectedYear}`
     : "";
 
   const isCurrentMonth = (monthIndex: number) =>
@@ -190,6 +171,7 @@ const MonthYearInput = ({
       <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
+          aria-label={isTurkish ? "Önceki yıl" : "Previous year"}
           onClick={() => setViewYear((y) => y - 1)}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
         >
@@ -200,6 +182,7 @@ const MonthYearInput = ({
         </span>
         <button
           type="button"
+          aria-label={isTurkish ? "Sonraki yıl" : "Next year"}
           onClick={() => setViewYear((y) => y + 1)}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
         >
@@ -209,7 +192,7 @@ const MonthYearInput = ({
 
       {/* Month Grid */}
       <div className="grid grid-cols-4 gap-1.5">
-        {MONTHS.map((month, index) => {
+        {months.map((month, index) => {
           const active = isCurrentMonth(index);
           return (
             <button
@@ -284,7 +267,7 @@ const MonthYearInput = ({
                   : "text-neutral-400"
               }
             >
-              {displayText || "Select month"}
+              {displayText || (isTurkish ? "Ay seçin" : "Select month")}
             </span>
           </span>
 
@@ -293,6 +276,7 @@ const MonthYearInput = ({
               <span
                 role="button"
                 tabIndex={-1}
+                aria-label={isTurkish ? "Tarihi temizle" : "Clear date"}
                 onClick={handleClear}
                 className="rounded-full p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-red-500"
               >

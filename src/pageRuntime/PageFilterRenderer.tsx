@@ -118,6 +118,7 @@ export const PageFilterRenderer: React.FC<PageFilterRendererProps> = ({
     return (
       <div className="min-w-44">
         <MonthYearInput
+          language={filter.language}
           label={label || undefined}
           value={typeof value === "string" ? value : ""}
           onChange={setValue}

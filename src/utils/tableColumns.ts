@@ -7,7 +7,7 @@ export function syncTranslatedTableColumns(
   if (!existing || existing.length !== incoming.length) {
     return incoming.map((column) => ({ ...column, isActive: true }));
   }
-  if (incoming.every((column, index) => column.key === existing[index]?.key)) {
+  if (incoming.every((column, index) => column.key === existing[index]?.key && column.label === existing[index]?.label)) {
     return existing;
   }
   return incoming.map((column, index) => {

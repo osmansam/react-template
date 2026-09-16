@@ -18,3 +18,10 @@ describe("syncTranslatedTableColumns", () => {
     ]);
   });
 });
+
+it("refreshes custom labels without changing the column identity or visibility", () => {
+  const existing = [{ key: "Actions", label: "Actions", isSortable: false, isActive: true }];
+  const updated = syncTranslatedTableColumns(existing, [{ key: "Actions", label: "İşlemler", isSortable: false }]);
+  expect(updated[0]).toEqual({ key: "Actions", label: "İşlemler", isSortable: false, isActive: true });
+  expect(syncTranslatedTableColumns(updated, [{ key: "Actions", isSortable: false }])[0].label).toBeUndefined();
+});

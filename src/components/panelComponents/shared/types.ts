@@ -61,6 +61,7 @@ export interface RowKeyType<T> {
 }
 
 export interface ColumnType {
+  label?: string;
   key: string;
   isSortable: boolean;
   isAddable?: boolean;

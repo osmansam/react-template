@@ -72,3 +72,10 @@ describe("PageFilterRenderer", () => {
     }
   });
 });
+
+it.each([["tr", "Eylül 2026"], ["en", "September 2026"]])("uses the configured %s filter language", (language, expected) => {
+  const filter = { id: "month", key: "month", label: "", type: "monthYear" as const, defaultValue: "09-2026", language, placement: { kind: "navbar" as const } };
+  const page = { name: "Reports", filters: [filter], sections: [] };
+  const markup = renderToStaticMarkup(React.createElement(PageRuntimeProvider, { page }, React.createElement(PageFilterRenderer, { filter })));
+  expect(markup).toContain(expected);
+});

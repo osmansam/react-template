@@ -59,6 +59,7 @@ type OutsideSortProps = {
 };
 
 type Props<T> = {
+  searchPlaceholder?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rows: any[];
   isDraggable?: boolean;
@@ -111,6 +112,7 @@ type Props<T> = {
 };
 
 const GenericTable = <T,>({
+  searchPlaceholder,
   rows,
   columns,
   rowKeys,
@@ -912,7 +914,7 @@ const GenericTable = <T,>({
                             } ${column?.generalColumnClassName || ""}`}
                           >
                             <h2 className="font-semibold text-sm ">
-                              {column.key}
+                              {column.label ?? column.key}
                             </h2>
                           </th>
                         ),
@@ -1065,7 +1067,7 @@ const GenericTable = <T,>({
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  placeholder={t("Search")}
+                  placeholder={searchPlaceholder?.trim() ? searchPlaceholder : t("Search")}
                   className="h-9 w-56 border border-gray-300 rounded-lg pl-9 pr-8 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 />
                 {searchQuery && (
@@ -1079,7 +1081,7 @@ const GenericTable = <T,>({
                 )}
               </div>
             )}
-            {outsideSearchProps && outsideSearch(outsideSearchProps)}
+            {outsideSearchProps && outsideSearch({ ...outsideSearchProps, placeholder: searchPlaceholder })}
             {(showOrientationToggle ?? allowOrientationToggle) && (
               <div className="hidden sm:flex items-center mt-2">
                 <OrientationToggle
@@ -1363,7 +1365,7 @@ const GenericTable = <T,>({
                                   />
                                 )}
                                 <span className="select-none">
-                                  {column.key}
+                                  {column.label ?? column.key}
                                 </span>
                               </span>
                               <div className="inline-flex items-center">
