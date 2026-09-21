@@ -25,11 +25,11 @@ describe("getTableSourceQueryKey", () => {
     expect(first).not.toEqual(second);
   });
 
-  it("changes when source revision changes with identical values", () => {
+  it("keeps identical transmitted requests on one cache key across source revisions", () => {
     const first = getTableSourceQueryKey(1, 20, binding, {}, {}, "revision-a");
     const second = getTableSourceQueryKey(1, 20, binding, {}, {}, "revision-b");
 
-    expect(first).not.toEqual(second);
+    expect(first).toEqual(second);
   });
 
   it("is stable across object insertion order", () => {

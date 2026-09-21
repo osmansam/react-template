@@ -50,6 +50,9 @@ export const invalidateDynamicMutationQueries = (
     queryKey: ["dynamic", schemaName],
   });
 
+export const shouldInvalidateAfterDynamicUpdate = (error: unknown) =>
+  error != null;
+
 const qs = (params: Record<string, unknown>) =>
   new URLSearchParams(
     Object.entries(params)
@@ -323,8 +326,10 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       const errorMessage = getApiErrorMessage(_err);
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
-    onSettled: () => {
-      invalidateSchemaQueries();
+    onSettled: (_data, error) => {
+      if (shouldInvalidateAfterDynamicUpdate(error)) {
+        invalidateSchemaQueries();
+      }
     },
   });
 

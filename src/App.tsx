@@ -17,7 +17,7 @@ function AppContent() {
   const location = useLocation();
   const { isSidebarOpen, isHoverExpanded } = useGeneralContext();
   const { user } = useUserContext();
-  useWebSocket(user?._id);
+  useWebSocket();
 
   // Don't show sidebar on public routes or if user is not authenticated
   // Check for login and auth callback routes (both legacy and multi-tenant paths)

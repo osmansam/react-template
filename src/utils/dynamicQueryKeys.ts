@@ -176,7 +176,7 @@ export function getTableSourceQueryKey(
   binding: DynamicTableSourceBinding,
   filters: Record<string, unknown>,
   resolvedParams?: Record<string, unknown>,
-  sourceRevision = "",
+  _sourceRevision = "",
 ) {
   const queryEntries = getTableSourceQueryEntries(
     page,
@@ -193,7 +193,6 @@ export function getTableSourceQueryKey(
     binding.kind || "schema",
     binding.pipelineName || "",
     binding.workflowName || "",
-    sourceRevision,
     canonicalizeRuntimeValue(queryEntries),
   ] as const;
 }
