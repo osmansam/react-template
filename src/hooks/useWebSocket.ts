@@ -54,6 +54,23 @@ function toWsUrl(
   return u.toString();
 }
 
+export function handleWebSocketVisibilityChange({
+  visibilityState,
+  socketReadyState,
+  reconnect,
+}: {
+  visibilityState: DocumentVisibilityState;
+  socketReadyState: number | null;
+  reconnect: () => void;
+}) {
+  if (
+    visibilityState === "visible" &&
+    socketReadyState !== WebSocket.OPEN
+  ) {
+    reconnect();
+  }
+}
+
 export function useWebSocket() {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
@@ -165,17 +182,14 @@ export function useWebSocket() {
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        console.log("Tab became visible, refreshing data and checking WS...");
-        // Always invalidate to get fresh data
-        queryClient.invalidateQueries();
-
-        // Reconnect if not open
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      handleWebSocketVisibilityChange({
+        visibilityState: document.visibilityState,
+        socketReadyState: wsRef.current?.readyState ?? null,
+        reconnect: () => {
           console.log("WS not open, forcing reconnect...");
           setConnectTrigger((prev: number) => prev + 1);
-        }
-      }
+        },
+      });
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
