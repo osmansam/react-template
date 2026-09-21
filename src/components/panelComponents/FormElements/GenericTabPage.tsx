@@ -81,7 +81,10 @@ const PaginatedTabContent = ({
   );
 
   return tab.component ? (
-    <ComponentRequestBoundary component={tab.component}>
+    <ComponentRequestBoundary
+      component={tab.component}
+      sourceRevision={tab.sourceRevision ?? ""}
+    >
       {({ values, sourceRevisionFor }) =>
         renderPage(
           values,
