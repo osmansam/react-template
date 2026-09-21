@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleWebSocketVisibilityChange } from "./useWebSocket";
+import {
+  handleWebSocketVisibilityChange,
+  shouldHandleDynamicInvalidation,
+} from "./useWebSocket";
 
 describe("handleWebSocketVisibilityChange", () => {
   it("does nothing when the visible tab already has an open socket", () => {
@@ -24,5 +27,16 @@ describe("handleWebSocketVisibilityChange", () => {
     });
 
     expect(reconnect).toHaveBeenCalledOnce();
+  });
+});
+
+describe("shouldHandleDynamicInvalidation", () => {
+  it("ignores the current user's event because the mutation already invalidates locally", () => {
+    expect(shouldHandleDynamicInvalidation("user-1", "user-1")).toBe(false);
+  });
+
+  it("handles events from other users and external writers", () => {
+    expect(shouldHandleDynamicInvalidation("user-2", "user-1")).toBe(true);
+    expect(shouldHandleDynamicInvalidation(undefined, "user-1")).toBe(true);
   });
 });
