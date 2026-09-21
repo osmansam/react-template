@@ -71,7 +71,12 @@ export function handleWebSocketVisibilityChange({
   }
 }
 
-export function useWebSocket() {
+export const shouldHandleDynamicInvalidation = (
+  eventUserId?: string,
+  currentUserId?: string,
+) => !eventUserId || !currentUserId || eventUserId !== currentUserId;
+
+export function useWebSocket(currentUserId?: string) {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const stateRef = useRef({ userClosed: false, delay: 1000 });
@@ -134,6 +139,9 @@ export function useWebSocket() {
 
           // Handle schema invalidate event
           if (msg?.type !== "invalidate" || !msg?.schema) return;
+          if (!shouldHandleDynamicInvalidation(msg.userId, currentUserId)) {
+            return;
+          }
 
           console.log("WS invalidating queries for schema:", msg.schema);
           await queryClient.invalidateQueries({
@@ -178,7 +186,7 @@ export function useWebSocket() {
       }
       wsRef.current = null;
     };
-  }, [queryClient, connectTrigger]);
+  }, [queryClient, connectTrigger, currentUserId]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {

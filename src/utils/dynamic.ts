@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  QueryClient,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import { FormElementsState } from "../types";
@@ -36,6 +41,14 @@ export type TableSourceBinding = DynamicTableSourceBinding;
 
 const BASE = "/dynamic";
 const idempotencyKeys = new Map<string, string>();
+
+export const invalidateDynamicMutationQueries = (
+  queryClient: Pick<QueryClient, "invalidateQueries">,
+  schemaName: string,
+) =>
+  queryClient.invalidateQueries({
+    queryKey: ["dynamic", schemaName],
+  });
 
 const qs = (params: Record<string, unknown>) =>
   new URLSearchParams(
@@ -167,10 +180,8 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   const queryKey = (customQueryKey || listKey(schemaName)) as unknown[];
   const qc = useQueryClient();
   const { t } = useTranslation();
-  const invalidateSchemaQueries = () => {
-    qc.invalidateQueries({ queryKey });
-    qc.invalidateQueries({ queryKey: ["dynamic", schemaName] });
-  };
+  const invalidateSchemaQueries = () =>
+    invalidateDynamicMutationQueries(qc, schemaName);
 
   // Custom create function that handles FormData
   async function createRequest(payload: Partial<T>) {
