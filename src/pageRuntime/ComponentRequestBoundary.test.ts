@@ -1,11 +1,15 @@
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { ComponentBlock } from "../types/page";
+import type { ComponentBlock, PageModel } from "../types/page";
 import {
+  ComponentRequestBoundary,
   createSourceRevisionResolver,
   getComponentRequestSourceRevision,
   getParameterErrorNames,
   resolveReadySourceRevision,
 } from "./ComponentRequestBoundary";
+import { PageRuntimeProvider } from "./PageRuntimeProvider";
 
 const component = (overrides: Partial<ComponentBlock> = {}): ComponentBlock => ({
   id: "summary",
@@ -190,5 +194,39 @@ describe("getParameterErrorNames", () => {
         { code: "invalid_field", parameter: null, message: "internal detail" },
       ]),
     ).toEqual(["account", "secret"]);
+  });
+});
+
+describe("ComponentRequestBoundary", () => {
+  it("uses a supplied source revision without requiring container metadata", () => {
+    const table = component({ id: "orders-table" });
+    const page: PageModel = {
+      name: "Orders",
+      sections: [
+        {
+          id: "orders-section",
+          type: "component",
+          component: table,
+        },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(
+      React.createElement(
+        PageRuntimeProvider,
+        { page },
+        React.createElement(
+          ComponentRequestBoundary,
+          {
+            component: table,
+            sourceRevision: "orders-revision",
+            children: ({ sourceRevision }) =>
+              React.createElement("span", null, sourceRevision),
+          },
+        ),
+      ),
+    );
+
+    expect(markup).toContain("orders-revision");
   });
 });

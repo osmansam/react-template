@@ -195,11 +195,28 @@ export const resolveReadySourceRevision = (
 
 type ComponentRequestBoundaryProps = {
   component: ComponentBlock;
+  sourceRevision?: string;
   children: (request: {
     values: Record<string, unknown>;
     sourceRevision: string;
     sourceRevisionFor: SourceRevisionResolver;
   }) => ReactNode;
+};
+
+const ReadyComponentRequestWithRevision = ({
+  values,
+  sourceRevision,
+  children,
+}: ComponentRequestBoundaryProps & {
+  values: Record<string, unknown>;
+  sourceRevision: string;
+}) => {
+  const sourceRevisionFor = useMemo(
+    () => () => sourceRevision,
+    [sourceRevision],
+  );
+
+  return children({ values, sourceRevision, sourceRevisionFor });
 };
 
 const ReadyComponentRequestBoundary = ({
@@ -222,6 +239,7 @@ const ReadyComponentRequestBoundary = ({
 
 export const ComponentRequestBoundary = ({
   component,
+  sourceRevision,
   children,
 }: ComponentRequestBoundaryProps) => {
   const resolution = useResolvedComponentParameters(component.id);
@@ -238,6 +256,18 @@ export const ComponentRequestBoundary = ({
           ? `Unable to resolve parameters: ${parameterNames.join(", ")}.`
           : "Unable to resolve component parameters."}
       </NoticePanel>
+    );
+  }
+
+  if (sourceRevision !== undefined) {
+    return (
+      <ReadyComponentRequestWithRevision
+        component={component}
+        values={resolution.values}
+        sourceRevision={sourceRevision}
+      >
+        {children}
+      </ReadyComponentRequestWithRevision>
     );
   }
 
