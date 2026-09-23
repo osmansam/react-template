@@ -65,6 +65,7 @@ import {
   getTableDisplayName,
   getTableLinkConfig,
   isTableSearchEnabled,
+  normalizeConfiguredTableRows,
 } from "../../../utils/tableConfig";
 import { addDynamicArrayRow, deleteDynamicArrayRow, reorderDynamicArrayRows, updateDynamicArrayRow } from "../../../utils/api/dynamicArray";
 import { useTableLookupSelectionData } from "../../../utils/tableLookupSelection";
@@ -2336,7 +2337,10 @@ export default function GenericUnpaginatedPage({
   );
 
   const rows = useMemo(() => {
-    const sourceRows = applyTableArraySource(items || [], tableConfig);
+    const sourceRows = applyTableArraySource(
+      normalizeConfiguredTableRows(items || [], tableConfig),
+      tableConfig,
+    );
     const nestedRows = applyTableNestedRows(
       sourceRows,
       tableConfig,
