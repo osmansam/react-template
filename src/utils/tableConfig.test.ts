@@ -8,7 +8,49 @@ import {
   getTableLinkConfig,
   getTableLookupKey,
   isTableSearchEnabled,
+  normalizeConfiguredTableRows,
 } from "./tableConfig";
+
+describe("normalizeConfiguredTableRows", () => {
+  it("restores configured snake_case fields from camel-cased response keys", () => {
+    const rows = [
+      {
+        _id: "pet-1",
+        name: "Boncuk",
+        ownerUserId: "user-1",
+        birthDate: "2023-07-01T00:00:00Z",
+        weightKg: 3.3,
+      },
+    ];
+
+    const result = normalizeConfiguredTableRows(rows, {
+      columns: [
+        { field: "name", type: "field" },
+        { field: "owner_user_id", type: "field" },
+        { field: "birth_date", type: "field" },
+        { field: "weight_kg", type: "field" },
+      ],
+    });
+
+    expect(result[0]).toMatchObject({
+      name: "Boncuk",
+      owner_user_id: "user-1",
+      birth_date: "2023-07-01T00:00:00Z",
+      weight_kg: 3.3,
+    });
+    expect(result[0]).not.toBe(rows[0]);
+    expect(rows[0]).not.toHaveProperty("birth_date");
+  });
+
+  it("does not overwrite a response value already using the configured key", () => {
+    const [row] = normalizeConfiguredTableRows(
+      [{ birth_date: "snake-value", birthDate: "camel-value" }],
+      { columns: [{ field: "birth_date", type: "field" }] },
+    );
+
+    expect(row.birth_date).toBe("snake-value");
+  });
+});
 
 describe("applyTableNestedRows", () => {
   it("builds table rows from a configured array source", () => {

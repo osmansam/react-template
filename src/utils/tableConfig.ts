@@ -4,6 +4,7 @@ import {
   TableLookupLabelConfig,
   TableNestedRowColumnConfig,
 } from "../types/page";
+import { camelCase } from "lodash";
 import { Field, Frontend } from "./api/container";
 import { getTableTemplateFields } from "./tableColumnTemplate";
 
@@ -23,6 +24,35 @@ export const getTableColumnConfig = (
 export const isTableSearchEnabled = (
   tableConfig: TableComponentConfig | undefined,
 ): boolean => tableConfig?.enableSearch !== false;
+
+export const normalizeConfiguredTableRows = <T extends GenericTableRow>(
+  rows: T[],
+  tableConfig: TableComponentConfig | undefined,
+): T[] => {
+  const configuredFields = (tableConfig?.columns || [])
+    .map((column) => column.field?.trim())
+    .filter((field): field is string => Boolean(field));
+
+  if (configuredFields.length === 0) return rows;
+
+  return rows.map((row) => {
+    let normalizedRow: GenericTableRow = row;
+
+    configuredFields.forEach((field) => {
+      const responseField = camelCase(field);
+      if (
+        responseField !== field &&
+        !Object.hasOwn(row, field) &&
+        Object.hasOwn(row, responseField)
+      ) {
+        if (normalizedRow === row) normalizedRow = { ...row };
+        normalizedRow[field] = row[responseField];
+      }
+    });
+
+    return normalizedRow as T;
+  });
+};
 
 type GenericTableRow = Record<string, unknown>;
 type LookupColumnConfig =

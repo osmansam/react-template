@@ -93,6 +93,7 @@ import {
   getTableDisplayName,
   getTableLinkConfig,
   isTableSearchEnabled,
+  normalizeConfiguredTableRows,
 } from "../../../utils/tableConfig";
 import { addDynamicArrayRow, deleteDynamicArrayRow, reorderDynamicArrayRows, updateDynamicArrayRow } from "../../../utils/api/dynamicArray";
 import {
@@ -1375,7 +1376,10 @@ export default function GenericPaginatedPage({
     () =>
       applyTableNestedRows(
         applyTableArraySource(
-          (itemsPayload?.items || []) as GenericItem[],
+          normalizeConfiguredTableRows(
+            (itemsPayload?.items || []) as GenericItem[],
+            tableConfig,
+          ),
           tableConfig,
         ),
         tableConfig,
