@@ -3,6 +3,7 @@
 import { lazy, type ComponentType } from "react";
 
 const AuditLogs = lazy(() => import("../pages/AuditLogs"));
+const SeoControlPage = lazy(() => import("../pages/SeoControlPage"));
 
 // Removed all missing page imports - only keeping existing pages
 export enum PublicRoutes {
@@ -13,6 +14,7 @@ export enum PublicRoutes {
 
 export enum Routes {
   AuditLogs = "/audit-logs",
+  Seo = "/seo",
 }
 
 // Static/hardcoded routes (you can keep these or move them to dynamic pages)
@@ -26,6 +28,13 @@ export const staticRoutes: {
   element?: ComponentType;
   children?: typeof staticRoutes;
 }[] = [
+  {
+    name: "SEO Control",
+    path: Routes.Seo,
+    element: SeoControlPage,
+    isOnSidebar: true,
+    icon: "FiSearch",
+  },
   {
     name: "Audit Logs",
     path: Routes.AuditLogs,
