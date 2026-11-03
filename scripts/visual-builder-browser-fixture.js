@@ -19,7 +19,11 @@ async (page) => {
     ],
   };
   page.__visualFixture = { pages: [first, { id: "222222222222222222222222", name: "Overview", slug: "overview", sections: [] }], requests: [], saves: [], readStatus: 200, writeStatus: 200, refreshStatus: 200, saveDelay: 0 };
-  await page.routeWebSocket("**/*", socket => socket.close());
+  await page.routeWebSocket("**/*", socket => {
+    const url = new URL(socket.url());
+    if (url.hostname === "127.0.0.1" && url.port === "3015") socket.connectToServer();
+    else socket.close();
+  });
   await page.route("**/*", async route => {
     const request = route.request(); const url = new URL(request.url());
     const fixture = page.__visualFixture;

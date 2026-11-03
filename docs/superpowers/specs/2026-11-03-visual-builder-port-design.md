@@ -1,7 +1,7 @@
 # Visual builder port into react-template
 
 Date: 2026-11-03
-Status: Approved by the user on 2026-11-03; product implementation has not started.
+Status: Approved and implemented on 2026-11-03. See the verification record for results and limitations.
 
 ## Intent and agreed direction
 
