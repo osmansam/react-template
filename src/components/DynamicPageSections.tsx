@@ -29,6 +29,7 @@ import DistributionBlocks from "./panelComponents/FormElements/DistributionBlock
 import InfoBlocks from "./panelComponents/FormElements/InfoBlocks";
 import UnifiedTabPanel from "./panelComponents/TabPanel/UnifiedTabPanel";
 
+const VisualBlock = lazy(() => import("../visualBuilder/VisualBlock"));
 const DynamicCalendar = lazy(() => import("./calendar/DynamicCalendar"));
 const DynamicChart = lazy(() => import("./charts/DynamicChart"));
 const DynamicForm = lazy(() => import("./forms/DynamicForm"));
@@ -445,6 +446,10 @@ const RenderReadyComponent: React.FC<{
           sourceRevision={requestSourceRevision}
         />
       );
+    case "custom":
+      return props?.visualBuilder !== undefined ? (
+        <Suspense fallback={<LoadingPanel message="Loading visual section..." />}><VisualBlock component={component} /></Suspense>
+      ) : <NoticePanel tone="error">Unknown component type: <code>{type}</code></NoticePanel>;
     case "barChart":
     case "lineChart":
     case "pieChart":

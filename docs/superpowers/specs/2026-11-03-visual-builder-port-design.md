@@ -1,7 +1,7 @@
 # Visual builder port into react-template
 
 Date: 2026-11-03
-Status: Proposed for user review; product implementation has not started.
+Status: Approved by the user on 2026-11-03; product implementation has not started.
 
 ## Intent and agreed direction
 
@@ -12,9 +12,9 @@ ozmishow visual builder available in react-template. After this foundation, they
 intend to add API-driven content, such as designing a card and repeating it for
 each response item.
 
-The user selected **port into react-template first**. This design proposes the
-remaining integration choices; they are recommendations, not requirements the
-user has already approved.
+The user selected **port into react-template first**, then approved this design
+with “looks good”. The integration choices below are the approved first-version
+scope.
 
 ## Approaches considered
 

@@ -1,26 +1,5 @@
 import axios from "axios";
-import { camelCase, isArray, isPlainObject, transform } from "lodash";
-
-// Recursively convert all keys in an object from PascalCase to camelCase
-// Special handling: preserve _id fields (don't convert to id)
-function toCamelCase(obj: unknown): unknown {
-  if (isArray(obj)) {
-    return obj.map((item) => toCamelCase(item));
-  }
-
-  if (isPlainObject(obj)) {
-    return transform(
-      obj as Record<string, unknown>,
-      (result: Record<string, unknown>, value: unknown, key: string) => {
-        // Preserve _id as-is (don't convert to id)
-        const camelKey = key === "_id" ? "_id" : camelCase(key);
-        result[camelKey] = toCamelCase(value);
-      }
-    );
-  }
-
-  return obj;
-}
+import { normalizeResponse } from "./normalizeResponse";
 
 // Helper to extract tenant and project from current URL
 function getTenantAndProject(): { tenant: string; project: string } | null {
@@ -70,7 +49,7 @@ axiosClient.interceptors.response.use(
   (response) => {
     // Transform response data from PascalCase to camelCase
     if (response.data) {
-      response.data = toCamelCase(response.data);
+      response.data = normalizeResponse(response.data);
     }
     return response;
   },
