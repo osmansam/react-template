@@ -53,6 +53,7 @@ const THEME_MODES = ["light", "dark", "system"] as const;
 
 function ThemeSwitcherControl({ node, context }: { node: ThemeSwitcherNode; context: SemanticRendererContext }) {
   const provider = useOptionalThemeMode();
+  if (provider?.canSwitch === false) return null;
   const mode = context.themeMode ?? provider?.mode ?? "system";
   const setMode = context.mode === "canvas" ? undefined : provider?.setMode;
   const choose = (nextMode: ThemeMode) => setMode?.(nextMode);

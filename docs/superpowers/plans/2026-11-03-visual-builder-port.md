@@ -1,3 +1,5 @@
+> Superseded on 2026-11-03 by the user’s architecture correction: authoring lives in Tenant Panel; react-template only renders saved content. See `docs/visual-builder-port.md`.
+
 # Visual Builder Port Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.

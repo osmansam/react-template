@@ -1,7 +1,7 @@
 export { VisualRenderer, VisualNodePreview, nodeClassNames, type VisualRendererProps, type VisualNodePreviewProps, type InlineTextEditProps, type SizeOverride } from "./VisualRenderer";
 export { InlineEditableText, InlineEntryText, INLINE_TEXT_KEYS, inlineTargetId, inlineTargetPatch, inlineTargetValue, inlineTextField, inlineTextValue, isInlineTargetEditable, type InlineEditTarget, type InlineEditableTextProps } from "./InlineTextEditor";
 export type { DisclosurePreviewState } from "./DisclosureRuntime";
-export type { ResolvedCollectionMap, ResolvedCollectionRecord } from "./repeaters";
+export type { ResolvedCollectionMap, ResolvedCollectionRecord, ResolvedCollectionState, ResolvedCollectionStateMap, CollectionStatus } from "./repeaters";
 export type { VisualSiteContext, VisualNavigationItem, VisualLocaleLink } from "./siteContext";
 export { BUILDER_SITE_PREVIEW } from "./siteContext";
 export {

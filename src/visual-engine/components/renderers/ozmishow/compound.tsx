@@ -3,6 +3,7 @@ import { AccordionRuntime } from "../../../renderer/DisclosureRuntime";
 import { ScrollStoryRuntime } from "../../../renderer/ScrollStoryRuntime";
 import { InfiniteSliderRenderer } from "./InfiniteSliderRenderer";
 import { ExpandableCardRenderer } from "./ExpandableCardRenderer";
+import { repeaterGridStyle } from "../../../renderer/repeaterLayout";
 import type { ComponentRendererMap } from "../types";
 
 export const compoundRenderers = {
@@ -29,6 +30,8 @@ export const compoundRenderers = {
   "scroll-scene": (node, context) => context.renderStructuralChildren(node),
   repeater: (node, context) => {
     const item = node.children.find((child): child is SlotNode => child.type === "slot" && child.name === "item");
-    return context.mode === "canvas" && item ? <div className={context.className} style={context.combineNodeStyles(node)}>{context.renderStructuralChildren(item)}</div> : null;
+    if (context.mode !== "canvas" || !item) return null;
+    const template = context.renderStructuralChildren(item);
+    return <div className={context.className} style={context.combineNodeStyles(node)}>{node.itemsLayout ? <div className="ve-repeater-grid" data-repeater-grid={node.id} style={repeaterGridStyle(node.itemsLayout, context.breakpoint)}><div className="ve-repeater-item">{template}</div></div> : template}</div>;
   },
 } satisfies Pick<ComponentRendererMap, "disclosure" | "accordion" | "tabs" | "sidebar" | "infinite-slider" | "expandable-card" | "scroll-story" | "scroll-scene" | "repeater">;

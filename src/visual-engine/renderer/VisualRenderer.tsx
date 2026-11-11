@@ -18,14 +18,16 @@ import { EffectHost, type EffectDiagnostic, type EffectRegistry } from "../effec
 import { DisclosureRuntime, type DisclosurePreviewState } from "./DisclosureRuntime";
 import { TabsRuntime } from "./TabsRuntime";
 import { SidebarRuntime } from "./SidebarRuntime";
-import { isStructuralNode, type NodePatch } from "../operations";
+import type { NodePatch } from "../operations";
+import { conditionalColorPresentation } from "./conditionalColors";
 import { bindNode } from "./bindings";
-import { boundedCollection, collectionSourceKey, type ResolvedCollectionMap, type ResolvedCollectionRecord } from "./repeaters";
+import { repeaterGridStyle } from "./repeaterLayout";
+import { instantiateNode, safeInstanceKey } from "./instances";
+import { boundedCollection, collectionSourceKey, recordIdentities, type ResolvedCollectionMap, type ResolvedCollectionRecord, type ResolvedCollectionState, type ResolvedCollectionStateMap } from "./repeaters";
 import { inlineTextValue, type InlineEditTarget } from "./InlineTextEditor";
 import { buildResponsiveSpacingCss, hasResponsiveChildGap, responsiveChildGapClassName, responsiveSpacingClassName } from "./responsiveSpacing";
 import "./visual-renderer.css";
 import {
-  gridPlacementClassNames,
   HEADING_BASE_CLASSES,
 
   TEXT_BASE_CLASSES,
@@ -33,6 +35,8 @@ import {
 } from "./styleTokens";
 import type { VisualSiteContext } from "./siteContext";
 import type { ThemeMode } from "../theme";
+
+export interface VisualHostActionEvent { nodeId: string; action: import("../model").HostActionSpec; item?: ResolvedCollectionRecord }
 
 export interface SpanOverride { nodeId: string; span: number }
 
@@ -57,6 +61,8 @@ export interface InlineTextEditProps {
 interface VisualRendererBaseProps {
   document: ComponentDocument;
   publicContext?: { rootId: string; priorityImageId?: string; item?: ResolvedCollectionRecord; inherited?: InheritedAnimation };
+  /** Host-only placement presentation: mark the single outer frame and its layout slot. */
+  fillContainerId?: string;
   selectedNodeId?: string;
   onSelect?: (nodeId: string) => void;
   spanOverride?: SpanOverride;
@@ -69,12 +75,19 @@ interface VisualRendererBaseProps {
   disclosurePreview?: DisclosurePreviewState;
   interactiveDisclosures?: boolean;
   resolvedCollections?: ResolvedCollectionMap;
+  /**
+   * Host-reported data status per repeater id. When a repeater has an entry, only `success` renders
+   * records (looked up by exact source key); other statuses render a local message instead.
+   */
+  collectionStates?: ResolvedCollectionStateMap;
   site?: VisualSiteContext;
   themeMode?: ThemeMode;
   inlineTextEdit?: InlineTextEditProps;
   nodeDrag?: CanvasNodeDragProps;
   /** Canvas-only structural edits triggered from controls rendered inside a node. */
   onNodePatch?: (nodeId: string, patch: NodePatch) => void;
+  onHostAction?: (event: VisualHostActionEvent) => void;
+  getHostActionState?: (event: VisualHostActionEvent) => { hidden?: boolean; disabled?: boolean; reason?: string };
 }
 
 export type VisualRendererProps = VisualRendererBaseProps & (
@@ -87,6 +100,8 @@ interface RendererContext {
   interactiveExpansions?: boolean;
   mode: "preview" | "canvas";
   breakpoint?: Breakpoint;
+  /** Host-only placement presentation: mark the single outer frame and its layout slot. */
+  fillContainerId?: string;
   selectedNodeId?: string;
   onSelect?: (nodeId: string) => void;
   spanOverride?: SpanOverride;
@@ -98,6 +113,9 @@ interface RendererContext {
   disclosurePreview?: DisclosurePreviewState;
   interactiveDisclosures?: boolean;
   resolvedCollections?: ResolvedCollectionMap;
+  collectionStates?: ResolvedCollectionStateMap;
+  /** Namespace of the enclosing repeater instance; keeps DOM ids unique per rendered record. */
+  instanceNamespace?: string;
   item?: ResolvedCollectionRecord;
   reducedMotion: boolean;
   site?: VisualSiteContext;
@@ -107,6 +125,8 @@ interface RendererContext {
   inlineTextEdit?: InlineTextEditProps;
   nodeDrag?: CanvasNodeDragProps;
   onNodePatch?: (nodeId: string, patch: NodePatch) => void;
+  onHostAction?: (event: VisualHostActionEvent) => void;
+  getHostActionState?: (event: VisualHostActionEvent) => { hidden?: boolean; disabled?: boolean; reason?: string };
   rootId: string;
   documentId: string;
 }
@@ -142,7 +162,7 @@ export function VisualNodePreview({ node, breakpoint, site, themeMode, effectReg
   })}</>;
 }
 
-export function VisualRenderer({ document, publicContext, mode = "preview", breakpoint, selectedNodeId, onSelect, spanOverride, sizeOverride, replayTokens, motionTime, effectRegistry, onEffectDiagnostic, disclosurePreview, interactiveDisclosures, resolvedCollections, site, themeMode, inlineTextEdit, nodeDrag, onNodePatch }: VisualRendererProps) {
+export function VisualRenderer({ document, publicContext, fillContainerId, mode = "preview", breakpoint, selectedNodeId, onSelect, spanOverride, sizeOverride, replayTokens, motionTime, effectRegistry, onEffectDiagnostic, disclosurePreview, interactiveDisclosures, resolvedCollections, collectionStates, site, themeMode, inlineTextEdit, nodeDrag, onNodePatch, onHostAction, getHostActionState }: VisualRendererProps) {
   const reducedMotion = useReducedMotion() ?? false;
   const [openMenuPanels, setOpenMenuPanels] = useState<ReadonlySet<string>>(() => new Set());
   const toggleMenuPanel = (nodeId: string) => setOpenMenuPanels((current) => {
@@ -154,13 +174,13 @@ export function VisualRenderer({ document, publicContext, mode = "preview", brea
     () => buildResponsiveSpacingCss(document.root, document.id, mode === "canvas" ? breakpoint : undefined),
     [mode, breakpoint, document.id, document.root],
   );
-  return <><ResponsiveSpacingStyle css={responsiveSpacingCss} />{renderNode(document.root, { priorityImageId: publicContext ? publicContext.priorityImageId : mode === "preview" ? leadingImageId(document.root, undefined, resolvedCollections) : undefined, item: publicContext?.item, mode, breakpoint, selectedNodeId, onSelect, spanOverride, sizeOverride, replayTokens, motionTime, effectRegistry, onEffectDiagnostic, disclosurePreview, interactiveDisclosures, resolvedCollections, reducedMotion, site, themeMode, openMenuPanels, toggleMenuPanel, inlineTextEdit, nodeDrag, onNodePatch, rootId: publicContext?.rootId ?? document.root.id, documentId: document.id }, publicContext?.inherited)}</>;
+  return <><ResponsiveSpacingStyle css={responsiveSpacingCss} />{renderNode(document.root, { priorityImageId: publicContext ? publicContext.priorityImageId : mode === "preview" ? leadingImageId(document.root, undefined, resolvedCollections) : undefined, item: publicContext?.item, mode, breakpoint, fillContainerId, selectedNodeId, onSelect, spanOverride, sizeOverride, replayTokens, motionTime, effectRegistry, onEffectDiagnostic, disclosurePreview, interactiveDisclosures, resolvedCollections, collectionStates, reducedMotion, site, themeMode, openMenuPanels, toggleMenuPanel, inlineTextEdit, nodeDrag, onNodePatch, onHostAction, getHostActionState, rootId: publicContext?.rootId ?? document.root.id, documentId: document.id }, publicContext?.inherited)}</>;
 }
 
 function renderNode(node: ComponentNode, context: RendererContext, inherited?: InheritedAnimation): ReactNode {
   const scale = heightScale(node.style?.sizing?.scaleFromHeight, node.style?.sizing?.height);
   const sizedNode = scale !== null ? { ...node, style: { ...node.style, sizing: { ...node.style?.sizing, height: node.style?.sizing?.scaleFromHeight } } } : node;
-  const renderedNode = context.item ? bindNode(sizedNode, context.item) : sizedNode;
+  const renderedNode = bindNode(sizedNode, context.item);
   const inlineEditValue = context.mode === "canvas" && context.inlineTextEdit !== undefined ? inlineTextValue(renderedNode) : null;
   const editingInline = inlineEditValue !== null
     && context.inlineTextEdit !== undefined
@@ -207,6 +227,7 @@ function renderNode(node: ComponentNode, context: RendererContext, inherited?: I
     <div
       className={`${nodeWrapperClassName(node)}${handleStartEdit !== undefined ? " ve-canvas-editable-text" : ""}${editingInline ? " ve-canvas-editing-text" : ""}`}
       style={scale !== null ? { zoom: scale } : undefined}
+      data-ve-fill-container={context.fillContainerId === node.id ? "true" : undefined}
       data-node-id={isCanvas ? node.id : undefined}
       data-selected={selected ? "true" : undefined}
       aria-label={isCanvas ? `Select ${node.type} ${node.id}` : undefined}
@@ -236,25 +257,74 @@ function renderStructuralChildren(node: StructuralNode, context: RendererContext
       <div
         key={child.id}
         {...structuralChildPresentation(node, child, context.breakpoint, override)}
+        data-ve-fill-slot={context.fillContainerId === child.id ? "true" : undefined}
         data-node-wrapper-id={child.id}
       >{renderNode(child, context, inherited)}</div>
     );
   });
 }
 
+function CollectionStatusMessage({ repeaterId, state }: { repeaterId: string; state: ResolvedCollectionState }) {
+  const failed = state.status === "error";
+  return (
+    <div className="ve-collection-status" role={failed ? "alert" : "status"} data-repeater-status={state.status} data-repeater-id={repeaterId} data-collection-reason={state.reason}>
+      <p>{state.message ?? (failed ? "This content could not be loaded." : state.status === "loading" ? "Loading…" : "No items to display.")}</p>
+      {failed && state.onRetry ? <button type="button" className="ve-collection-status__retry" onClick={state.onRetry}>{state.retryLabel ?? "Try again"}</button> : null}
+    </div>
+  );
+}
+
+function repeatedLayout(node: RepeaterNode, index: number, summary = false): RepeaterNode {
+  if (!node.layout?.start) return summary ? { ...node, layout: { ...node.layout, span: { mobile: 12, tablet: 12, desktop: 12 } } } : node;
+  const start = { ...node.layout.start };
+  for (const breakpoint of ["mobile", "tablet", "desktop"] as const) {
+    const position = start[breakpoint]; if (!position) continue;
+    const span = Math.min(12, Math.max(1, node.layout.span?.[breakpoint] ?? 1));
+    const column = Math.max(1, Math.min(position.column, 13 - span));
+    const perRow = Math.max(1, Math.floor((13 - column) / span));
+    start[breakpoint] = summary ? { column: 1, row: position.row + Math.floor(Math.max(0, index - 1) / perRow) + 1 } : { column: column + index % perRow * span, row: position.row + Math.floor(index / perRow) };
+  }
+  return { ...node, layout: { ...node.layout, start, ...(summary ? { span: { mobile: 12, tablet: 12, desktop: 12 } } : {}) } };
+}
+
 function renderRepeaterInstances(parent: StructuralNode, repeater: RepeaterNode, context: RendererContext): ReactNode[] {
   const item = repeater.children.find((child): child is SlotNode => child.type === "slot" && child.name === "item");
   if (!item) return [];
-  const records = boundedCollection(context.resolvedCollections?.[collectionSourceKey(repeater.source)] ?? context.resolvedCollections?.[repeater.source.schemaName], repeater.source.limit);
-  return records.map((record, index) => {
-    const identity = typeof record._id === "string" || typeof record._id === "number" ? String(record._id) : String(index);
+  // Inside a repeated instance, ids carry that instance's suffix; hosts key states by the pre-instance id.
+  const hostId = context.instanceNamespace && repeater.id.endsWith(`--${context.instanceNamespace}`) ? repeater.id.slice(0, -(context.instanceNamespace.length + 2)) : repeater.id;
+  const state = context.collectionStates?.[hostId];
+  if (state && state.status !== "success") return [<div key={`${repeater.id}:status`} {...structuralChildPresentation(parent, repeater, context.breakpoint)}><CollectionStatusMessage repeaterId={repeater.id} state={state} /></div>];
+  // Hosts that report status resolve exact source keys only; sample and legacy previews may still use the schema fallback.
+  const exact = context.resolvedCollections?.[collectionSourceKey(repeater.source)];
+  const records = boundedCollection(state ? exact : exact ?? context.resolvedCollections?.[repeater.source.schemaName], repeater.source.limit);
+  const identities = recordIdentities(records);
+  const rendered = records.map((record, index) => {
+    const identity = identities[index];
+    const namespace = `${context.instanceNamespace ? `${context.instanceNamespace}.` : ""}${safeInstanceKey(repeater.id)}.${identity}`;
+    const instanceItem = instantiateNode(item, namespace);
     const override = context.spanOverride?.nodeId === repeater.id ? context.spanOverride.span : undefined;
     return (
-      <div key={`${repeater.id}:${identity}`} className={[parent.type === "grid" ? "min-w-0" : "", repeater.style?.sizing?.height === "full" ? "h-full" : "", parent.type === "grid" ? gridPlacementClassNames(repeater, context.breakpoint, override) : ""].filter(Boolean).join(" ") || undefined} data-repeater-instance={`${repeater.id}:${identity}`} data-repeater-index={index}>
-        {renderStructuralChildren(item, { ...context, item: record, priorityImageId: index === 0 ? context.priorityImageId : undefined })}
+      <div key={`${repeater.id}:${identity}`} {...(repeater.itemsLayout ? { className: "ve-repeater-item" } : structuralChildPresentation(parent, repeatedLayout(repeater, index), context.breakpoint, override))} data-repeater-instance={`${repeater.id}:${identity}`} data-repeater-index={index}>
+        <ResponsiveSpacingStyle css={buildResponsiveSpacingCss(instanceItem, context.documentId, context.breakpoint)} />
+        {renderStructuralChildren(instanceItem, { ...context, item: record, instanceNamespace: namespace, priorityImageId: index === 0 && context.priorityImageId !== undefined ? `${context.priorityImageId}--${namespace}` : undefined })}
       </div>
     );
   });
+  if (repeater.itemsLayout) {
+    const surfaceClasses = [
+      nodeClassNames(repeater, context.breakpoint),
+      repeater.responsive?.spacing ? responsiveSpacingClassName(context.documentId, repeater.id) : "",
+      hasResponsiveChildGap(repeater) ? responsiveChildGapClassName(context.documentId, repeater.id) : "",
+    ].filter(Boolean).join(" ");
+    return [<div key={repeater.id} {...structuralChildPresentation(parent, repeater, context.breakpoint)} data-repeater-region={repeater.id}>
+      <div className={surfaceClasses} style={combineNodeStyles(repeater)}>
+        <div className="ve-repeater-grid" data-repeater-grid={repeater.id} style={repeaterGridStyle(repeater.itemsLayout, context.breakpoint)}>{rendered}</div>
+        {state?.message ? <p role="status" className="ve-collection-summary">{state.message}</p> : null}
+      </div>
+    </div>];
+  }
+  if (state?.message) rendered.push(<div key={`${repeater.id}:summary`} {...structuralChildPresentation(parent, repeatedLayout(repeater, records.length, true), context.breakpoint)}><p role="status" className="ve-collection-summary">{state.message}</p></div>);
+  return rendered;
 }
 
 function staggeredAnimation(node: StructuralNode): AnimationSpec | undefined {
@@ -278,9 +348,9 @@ function renderSemanticNode(node: ComponentNode, context: RendererContext): Reac
     return process.env.NODE_ENV === "production" ? null : <div className="border border-red-500 bg-red-50 p-2 text-sm text-red-700" role="alert">Unsupported visual node: {unknown.type ?? "unknown"} ({unknown.id ?? "unknown"})</div>;
   }
   const sizeDraft = context.sizeOverride?.nodeId === node.id ? context.sizeOverride : undefined;
-  const semanticNode = context.mode === "preview" && context.site?.pageHasBackground === true && node.id === context.rootId
-    ? withoutBackground(node)
-    : node;
+  const suppressBackground = context.mode === "preview" && context.site?.pageHasBackground === true && node.id === context.rootId;
+  const conditional = conditionalColorPresentation(node, context.item, suppressBackground);
+  const semanticNode = suppressBackground ? withoutBackground(conditional.node) : conditional.node;
   const responsiveClass = semanticNode.responsive?.spacing === undefined
     ? ""
     : ` ${responsiveSpacingClassName(context.documentId, semanticNode.id)}`;
@@ -306,13 +376,18 @@ function renderSemanticNode(node: ComponentNode, context: RendererContext): Reac
     onInlineTextCancel: context.inlineTextEdit?.onCancel,
     onInlineTextEditStart: context.inlineTextEdit?.onStartEdit,
     onNodePatch: context.onNodePatch,
+    hostActionState: node.type === "button" && node.action && context.mode === "preview"
+      ? context.getHostActionState?.({ nodeId: node.id, action: node.action, item: context.item }) : undefined,
+    onHostAction: node.type === "button" && node.action && context.mode === "preview" && context.onHostAction
+      ? () => context.onHostAction?.({ nodeId: node.id, action: structuredClone(node.action!), ...(context.item ? { item: structuredClone(context.item) } : {}) })
+      : undefined,
     onSelect: context.onSelect,
-    site: context.site,
+    site: conditional.textOverride && context.site ? { ...context.site, pageComponentColors: false } : context.site,
     themeMode: context.themeMode,
     currentNode: semanticNode,
     isMenuPanelOpen: (nodeId) => context.openMenuPanels.has(nodeId),
     toggleMenuPanel: context.toggleMenuPanel,
-    combineNodeStyles: (target, extra) => combineNodeStyles(target, target.id === node.id && sizeDraft !== undefined ? { ...sizeOverrideStyles(sizeDraft), ...extra } : extra),
+    combineNodeStyles: (target, extra) => combineNodeStyles(target, target.id === node.id && (sizeDraft !== undefined || conditional.styles) ? { ...(sizeDraft ? sizeOverrideStyles(sizeDraft) : {}), ...extra, ...conditional.styles } : extra),
     renderNode: (child, instanceKey, options) => renderNodeInstance(child, context, instanceKey, options),
     renderPreviewNode: (child, instanceKey, options) => renderNodeInstance(child, { ...context, mode: "preview", interactiveExpansions: false, selectedNodeId: undefined, onSelect: undefined, inlineTextEdit: undefined, nodeDrag: undefined, onNodePatch: undefined }, instanceKey, options),
     renderStructuralChildren: (parent) => renderStructuralChildren(parent, context),
@@ -323,35 +398,12 @@ function renderSemanticNode(node: ComponentNode, context: RendererContext): Reac
 
 function renderNodeInstance(child: ComponentNode, context: RendererContext, instanceKey?: string, options?: RenderNodeOptions): ReactNode {
   if (instanceKey !== undefined || options?.imagePriority === false) context = { ...context, priorityImageId: undefined };
-  const instance = instanceKey === undefined ? child : sliderInstance(child, instanceKey);
+  const instance = instanceKey === undefined ? child : instantiateNode(child, instanceKey);
   const content = instance.type === "repeater" && context.mode === "preview"
     ? renderStructuralChildren({ id: `${instance.id}-slide`, type: "section", children: [instance] }, context)
     : renderNode(instance, context);
   return instanceKey === undefined ? content : <><ResponsiveSpacingStyle css={buildResponsiveSpacingCss(instance, context.documentId, context.breakpoint)} />{content}</>;
 }
-
-/** Runtime copies keep document identities intact while giving DOM controls unique IDs. */
-function sliderInstance(node: ComponentNode, instanceKey: string): ComponentNode {
-  const ids = new Map<string, string>();
-  const collect = (child: ComponentNode) => {
-    ids.set(child.id, `${child.id}--${instanceKey}`);
-    if (isStructuralNode(child)) child.children.forEach(collect);
-  };
-  collect(node);
-  const copy = (child: ComponentNode): ComponentNode => {
-    const result = { ...child, id: ids.get(child.id)! };
-    if (isStructuralNode(result)) result.children = result.children.map(copy);
-    if (result.type === "menu-toggle") result.targetId = ids.get(result.targetId) ?? result.targetId;
-    if ((result.type === "link" || result.type === "button") && result.href?.startsWith("#")) {
-      const target = ids.get(result.href.slice(1));
-      if (target) result.href = `#${target}`;
-    }
-    return result;
-  };
-  return copy(node);
-}
-
-
 
 function sizeOverrideStyles(override: SizeOverride): CSSProperties {
   return {
@@ -398,12 +450,15 @@ function renderTriggerChildren(slot: StructuralNode, context: RendererContext, s
       "data-selected": context.selectedNodeId === child.id ? "true" : undefined,
       onClick: (event: MouseEvent<HTMLElement>) => { event.preventDefault(); event.stopPropagation(); context.onSelect?.(child.id); },
     } : {};
-    if (child.type === "heading" || child.type === "text") {
-      const className = withBaseline(nodeClassNames(child, context.breakpoint), child.style?.typography, child.type === "heading" ? HEADING_BASE_CLASSES : TEXT_BASE_CLASSES);
-      return <span key={child.id} className={className} style={pageTextPaintStyle(child, context.site)} {...canvasProps}>{child.text}</span>;
+    const conditional = conditionalColorPresentation(bindNode(child, context.item), context.item);
+    const painted = conditional.node;
+    const site = conditional.textOverride && context.site ? { ...context.site, pageComponentColors: false } : context.site;
+    if (painted.type === "heading" || painted.type === "text") {
+      const className = withBaseline(nodeClassNames(painted, context.breakpoint), painted.style?.typography, painted.type === "heading" ? HEADING_BASE_CLASSES : TEXT_BASE_CLASSES);
+      return <span key={child.id} className={className} style={combineNodeStyles(painted, { ...pageTextPaintStyle(painted, site), ...conditional.styles })} {...canvasProps}>{painted.text}</span>;
     }
-    if (child.type === "image") return <span key={child.id} {...canvasProps}><VisualImage className={nodeClassNames(child, context.breakpoint)} src={child.src} alt={child.alt} priority={context.priorityImageId === child.id} /></span>;
-    if (child.type === "divider") return <span key={child.id} className="ve-disclosure__divider" aria-hidden={context.mode === "preview" ? "true" : undefined} {...canvasProps} />;
+    if (painted.type === "image") return <span key={child.id} {...canvasProps}><VisualImage className={nodeClassNames(painted, context.breakpoint)} style={combineNodeStyles(painted, conditional.styles)} src={painted.src} alt={painted.alt} priority={context.priorityImageId === child.id} /></span>;
+    if (painted.type === "divider") return <span key={child.id} className="ve-disclosure__divider" style={combineNodeStyles(painted, conditional.styles)} aria-hidden={context.mode === "preview" ? "true" : undefined} {...canvasProps} />;
     return <span key={child.id}>{renderNode(child, context)}</span>;
   });
 }

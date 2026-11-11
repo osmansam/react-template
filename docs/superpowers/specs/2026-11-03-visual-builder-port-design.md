@@ -1,3 +1,5 @@
+> Superseded on 2026-11-03 by the user’s architecture correction: authoring lives in Tenant Panel; react-template only renders saved content. See `docs/visual-builder-port.md`.
+
 # Visual builder port into react-template
 
 Date: 2026-11-03

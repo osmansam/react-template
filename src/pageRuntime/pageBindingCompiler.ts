@@ -1,4 +1,4 @@
-import type { ComponentBlock, PageModel, RuntimeValueType } from "../types/page";
+import type { ComponentBlock, PageModel, RuntimeValueType, ParameterBinding } from "../types/page";
 import type {
   CompiledComponentParameters,
   CompiledParameterResolver,
@@ -16,6 +16,7 @@ const RUNTIME_VALUE_TYPES = new Set<RuntimeValueType>([
   "dateRange",
   "stringArray",
   "numberArray",
+  "record",
 ]);
 const KNOWN_SOURCES = new Set([
   "static",
@@ -60,7 +61,7 @@ const collectPageFilters = (page: PageModel): Map<string, PageFilterRuntimeDefin
       if (
         isRecord(filter) &&
         typeof filter.id === "string" &&
-        RUNTIME_VALUE_TYPES.has(filter.type)
+        filter.type !== "record" && RUNTIME_VALUE_TYPES.has(filter.type)
       ) {
         result.set(filter.id, {
           type: filter.type,
@@ -277,6 +278,7 @@ const collectComponents = (
 export const compileComponentParameters = (
   page: PageModel,
   componentId: string,
+  providedBindings?: Record<string, ParameterBinding>,
 ): CompiledComponentParameters => {
   const result: CompiledComponentParameters = {
     componentId,
@@ -290,7 +292,7 @@ export const compileComponentParameters = (
   result.errors.push(...collected.errors);
   const consumer = components.get(componentId);
 
-  if (!consumer) {
+  if (!consumer && providedBindings === undefined) {
     result.errors.push(
       error(
         "missing_consumer_component",
@@ -302,10 +304,10 @@ export const compileComponentParameters = (
   }
 
   const bindings = createDictionary<unknown>();
-  Object.entries(consumer.dataBinding?.params ?? {}).forEach(([parameter, value]) => {
+  Object.entries(consumer?.dataBinding?.params ?? {}).forEach(([parameter, value]) => {
     bindings[parameter] = { source: "static", value };
   });
-  Object.assign(bindings, consumer.dataBinding?.parameters ?? {});
+  Object.assign(bindings, providedBindings ?? consumer?.dataBinding?.parameters ?? {});
 
   const dependencyKeys = new Set<string>();
 

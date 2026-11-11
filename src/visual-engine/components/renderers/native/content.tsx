@@ -79,6 +79,7 @@ export const contentRenderers = {
     const icon = ButtonIcon ? <ButtonIcon width={18} height={18} aria-hidden="true" focusable="false" /> : null;
     const editing = isInlineEditing(node, context);
     const label = <>{context.backgrounds}<span className={[node.style?.background?.length ? "relative z-10" : "", ButtonIcon ? "inline-flex items-center gap-2" : ""].filter(Boolean).join(" ") || undefined} style={pageTextPaintStyle(node, context.site)}>{node.iconPosition !== "end" && icon}{editing ? <InlineEditableText nodeId={node.id} value={node.label} onCommit={context.onInlineTextCommit!} onCancel={context.onInlineTextCancel!} /> : node.label}{node.iconPosition === "end" && icon}</span></>;
+    if (node.action) return context.hostActionState?.hidden ? null : <button className={className} type="button" aria-label={node.accessibleLabel} disabled={context.mode === "preview" && (!context.onHostAction || context.hostActionState?.disabled)} title={context.hostActionState?.reason || (context.mode === "preview" && !context.onHostAction ? "Actions run on the published page." : undefined)} style={context.combineNodeStyles(node)} onClick={context.mode === "preview" ? context.onHostAction : undefined}>{label}</button>;
     return node.submit === true
       ? <button className={className} type="submit" aria-label={node.accessibleLabel} style={context.combineNodeStyles(node)}>{label}</button>
       : href === undefined

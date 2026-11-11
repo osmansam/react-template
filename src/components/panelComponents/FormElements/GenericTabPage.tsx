@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { PageRequestConsumerProvider, useConnectedDataBinding, usePageRequestConsumer } from "../../../pageRuntime/requests/ConsumerProvider";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { IconType } from "react-icons";
 // import { GiGreatPyramid } from "react-icons/gi";
 import { useGeneralContext } from "../../../context/General.context";
@@ -14,6 +15,8 @@ import UnifiedTabPanel from "../TabPanel/UnifiedTabPanel";
 import GenericPaginatedPage from "./GenericPaginatedPage";
 import GenericUnpaginatedPage from "./GenericUnpaginatedPage";
 import { buildTabInstanceKey } from "./tabInstanceKey";
+
+const VisualBlock = lazy(() => import("../../../visualBuilder/VisualBlock"));
 
 type TabConfig = {
   schemaName: string;
@@ -50,52 +53,13 @@ const humanize = (key: string) =>
     .trim()
     .replace(/^./, (c) => c.toUpperCase());
 
-const PaginatedTabContent = ({
-  tab,
-  instanceKey,
-  label,
-}: {
-  tab: TabConfig;
-  instanceKey: string;
-  label: string;
-}) => {
-  const renderPage = (
-    resolvedParams = tab.resolvedParams,
-    sourceRevision = tab.sourceRevision,
-  ) => (
-    <GenericPaginatedPage
-      key={instanceKey}
-      schemaName={tab.schemaName}
-      includeFields={tab.includeFields}
-      excludeFields={tab.excludeFields}
-      actionsEnabled={tab.actionsEnabled ?? true}
-      constantFilter={tab.constantFilter}
-      customTitle={tab.customTitle || label}
-      tableConfig={tab.tableConfig}
-      dataBinding={tab.dataBinding}
-      componentId={tab.componentId}
-      outputs={tab.outputs}
-      resolvedParams={resolvedParams}
-      sourceRevision={sourceRevision}
-    />
-  );
-
-  return tab.component ? (
-    <ComponentRequestBoundary
-      component={tab.component}
-      sourceRevision={tab.sourceRevision ?? ""}
-    >
-      {({ values, sourceRevisionFor }) =>
-        renderPage(
-          values,
-          sourceRevisionFor(tab.dataBinding?.schemaName || tab.schemaName),
-        )
-      }
-    </ComponentRequestBoundary>
-  ) : (
-    renderPage()
-  );
+const ConnectedTabTable = ({ tab, instanceKey, label, resolvedParams = tab.resolvedParams, sourceRevision = tab.sourceRevision }: { tab: TabConfig; instanceKey: string; label: string; resolvedParams?: Record<string, unknown>; sourceRevision?: string }) => {
+  const binding = useConnectedDataBinding(tab.dataBinding || { kind: "schema", schemaName: tab.schemaName });
+  const connected = usePageRequestConsumer()?.connections.has("data");
+  const Page = tab.isPaginated === false && !connected ? GenericUnpaginatedPage : GenericPaginatedPage;
+  return <Page key={instanceKey} schemaName={binding?.schemaName || tab.schemaName} includeFields={tab.includeFields} excludeFields={tab.excludeFields} actionsEnabled={tab.actionsEnabled ?? true} constantFilter={tab.constantFilter} customTitle={tab.customTitle || label} tableConfig={tab.tableConfig} dataBinding={binding} componentId={tab.componentId} outputs={tab.outputs} resolvedParams={resolvedParams} sourceRevision={sourceRevision} />;
 };
+const PaginatedTabContent = ({ tab, instanceKey, label }: { tab: TabConfig; instanceKey: string; label: string }) => tab.component ? <ComponentRequestBoundary component={tab.component} sourceRevision={tab.sourceRevision ?? ""}>{({ values, sourceRevisionFor }) => <ConnectedTabTable tab={tab} instanceKey={instanceKey} label={label} resolvedParams={values} sourceRevision={sourceRevisionFor(tab.schemaName)} />}</ComponentRequestBoundary> : <ConnectedTabTable tab={tab} instanceKey={instanceKey} label={label} />;
 
 export default function GenericTabPage({
   tabs,
@@ -107,7 +71,6 @@ export default function GenericTabPage({
     () =>
       tabs.map((t, idx) => {
         const label = t.label ?? humanize(t.schemaName);
-        const isPaginated = t.isPaginated ?? true; // Default to true
         const instanceKey = buildTabInstanceKey({ ...t, label }, idx);
 
         // Get icon from iconName string or use the icon prop
@@ -124,24 +87,7 @@ export default function GenericTabPage({
           label,
           icon: iconElement,
           isDisabled: false,
-          content: isPaginated ? (
-            <PaginatedTabContent
-              key={instanceKey}
-              tab={t}
-              instanceKey={instanceKey}
-              label={label}
-            />
-          ) : (
-            <GenericUnpaginatedPage
-              key={instanceKey}
-              schemaName={t.schemaName}
-              includeFields={t.includeFields}
-              excludeFields={t.excludeFields}
-              actionsEnabled={t.actionsEnabled ?? true}
-              customTitle={t.customTitle || label}
-              tableConfig={t.tableConfig}
-            />
-          ),
+          content: t.component ? <PageRequestConsumerProvider component={t.component}>{t.component.type === "custom" && t.component.props?.visualBuilder !== undefined ? <Suspense fallback={<p role="status">Loading visual section…</p>}><VisualBlock component={t.component} /></Suspense> : <PaginatedTabContent key={instanceKey} tab={t} instanceKey={instanceKey} label={label} />}</PageRequestConsumerProvider> : <ConnectedTabTable tab={t} instanceKey={instanceKey} label={label} />,
         };
       }),
     [tabs],

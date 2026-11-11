@@ -1,3 +1,5 @@
+import type { SelectFilterBinding } from "./selectFilters";
+import type { PageRequestDefinition, PageRequestConnection } from "./pageRequests";
 /**
  * Types matching the Go backend PageModel structure
  */
@@ -17,7 +19,8 @@ export type RuntimeValueType =
   | "monthYear"
   | "dateRange"
   | "stringArray"
-  | "numberArray";
+  | "numberArray"
+  | "record";
 
 export interface PageVariableDefinition {
   id: string;
@@ -61,6 +64,7 @@ export type ComponentOutputSource =
   | {
       kind: "tableSelectedIds";
     }
+  | { kind: "tableSelectedRecord" }
   | {
       kind: "tableSearch";
     }
@@ -348,6 +352,7 @@ export interface TableActionFormFieldConfig {
   sourceDataFields?: string[];
   optionDisplay?: SelectOptionDisplayConfig;
   sourceRequestFilters?: Record<string, unknown>;
+  sourceFilterBindings?: SelectFilterBinding[];
   sourceFilterCondition?: string;
   invalidateKeys?: string[];
   defaultValue?: string | number | boolean | string[] | number[];
@@ -709,6 +714,7 @@ export interface TabContent {
 export type TabPanelTab = TabContent;
 
 export interface ComponentBlock {
+  requestBindings?: Record<string, PageRequestConnection>;
   id: string;
   stateKey?: string;
   type: ComponentType;
@@ -769,6 +775,7 @@ export interface PageSection {
 }
 
 export interface PageModel {
+  requests?: PageRequestDefinition[];
   id?: string;
   _id?: string;
   parentPageId?: string;

@@ -1,7 +1,8 @@
+import { pageRequestInvalidationPredicate } from "../pageRuntime/requests/invalidation";
 // useWebSocket.ts
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { shouldInvalidateDynamicQuery } from "../utils/dynamicQueryKeys";
+import { shouldInvalidateDynamicQuery, shouldInvalidateVisualCollectionQuery } from "../utils/dynamicQueryKeys";
 
 type WSInvalidateEvent =
   | { type: "invalidate"; schema: string; userId?: string; ts?: number }
@@ -138,7 +139,9 @@ export function useWebSocket() {
           console.log("WS invalidating queries for schema:", msg.schema);
           await queryClient.invalidateQueries({
             predicate: (query) =>
-              shouldInvalidateDynamicQuery(query.queryKey, msg.schema),
+              shouldInvalidateDynamicQuery(query.queryKey, msg.schema)
+              || shouldInvalidateVisualCollectionQuery(query, msg.schema, tenantProject)
+              || pageRequestInvalidationPredicate(tenantProject, msg.schema)(query),
             refetchType: "active",
           });
 

@@ -210,6 +210,7 @@ const UnifiedTabPanel: React.FC<Props> = ({
     // Toggle button'ı her zaman en başa ekle (sağda ilk eleman olacak)
     return filters ? [toggleButton, ...filters] : [toggleButton];
   }, [
+    injectOrientationToggleToFilters,
     allowOrientationToggle,
     isLargeScreen,
     tabOrientation,

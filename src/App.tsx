@@ -11,7 +11,6 @@ import { UserContextProvider, useUserContext } from "./context/User.context";
 import { baseQueryOptions } from "./config/queryClient";
 import { useWebSocket } from "./hooks/useWebSocket";
 import RouterContainer from "./navigation/routes";
-import { isVisualBuilderRoute } from "./visualBuilder/routes";
 import { BrandingProvider } from "./context/Branding.context";
 
 function AppContent() {
@@ -54,8 +53,6 @@ function AppContent() {
 }
 
 function App() {
-  const location = useLocation();
-  if (isVisualBuilderRoute(location.pathname)) return <RouterContainer />;
   return (
     <div className="App">
       <UserContextProvider>

@@ -1,9 +1,10 @@
+import type { ConditionalColorRule } from "./conditionalColors";
 import type { AnimationSpec } from "./animation";
-import type { ChildLayoutSpec, ResponsiveSpec } from "./responsive";
+import type { BreakpointValue, ChildLayoutSpec, ResponsiveSpec } from "./responsive";
 import type { SpacingToken, StyleSpec } from "./styles";
 import type { MediaLayoutSpec } from "./mediaLayout";
 import type { ColorValue } from "./paint";
-import type { EffectAttachment } from "./effects";
+import type { EffectAttachment, JsonObject } from "./effects";
 import type { OzmishowIconId } from "./icons";
 import type { DesignPresetId } from "./designPresets";
 import type { DesignStyleOptions } from "./designStyle";
@@ -107,6 +108,8 @@ export interface NodeBase {
 
   bindings?: NodeBindings;
 
+  conditionalColors?: ConditionalColorRule[];
+
   /** Optional destination when this node is an immediate infinite-slider child. */
   slideLink?: SlideLink;
 }
@@ -196,9 +199,12 @@ export interface InfiniteSliderNode extends NodeBase {
   children: ComponentNode[];
 }
 
+export const COLLECTION_FILTER_OPERATORS = ["eq", "in", "gt", "gte", "lt", "lte"] as const;
+export type CollectionFilterOperator = typeof COLLECTION_FILTER_OPERATORS[number];
+
 export interface CollectionFilter {
   field: string;
-  operator: "eq" | "in";
+  operator: CollectionFilterOperator;
   value: string | number | boolean | null | Array<string | number | boolean | null>;
 }
 export interface CollectionSort {
@@ -206,16 +212,24 @@ export interface CollectionSort {
   direction: "asc" | "desc";
 }
 export interface AutoTableCollectionSource {
+  requestSlot?: string;
   kind: "autotable";
   schemaName: string;
   filters?: CollectionFilter[];
   sort?: CollectionSort[];
   limit: number;
 }
+export interface RepeaterItemsLayout {
+  columns: BreakpointValue<number>;
+  gap: BreakpointValue<number>;
+  alignment: "stretch" | "start" | "center" | "end";
+}
 export interface RepeaterNode extends NodeBase {
   type: "repeater";
   source: AutoTableCollectionSource;
   itemAlias: string;
+  /** Absent on legacy documents: repeated instances follow their parent layout. */
+  itemsLayout?: RepeaterItemsLayout;
   children: ComponentNode[];
 }
 
@@ -348,6 +362,7 @@ export interface ImageComparisonNode extends NodeBase {
   objectFit: ImageObjectFit;
 }
 
+export interface HostActionSpec { name: string; config: JsonObject }
 export interface ButtonNode extends NodeBase {
   type: "button";
 
@@ -360,6 +375,7 @@ export interface ButtonNode extends NodeBase {
   openInNewTab?: boolean;
   accessibleLabel?: string;
   submit?: boolean;
+  action?: HostActionSpec;
 }
 
 export type IconPosition = "start" | "end";

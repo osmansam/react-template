@@ -20,7 +20,6 @@ import {
 } from "../utils/projectSessionStorage";
 
 const GoogleCallback = lazy(() => import("../pages/GoogleCallback"));
-const VisualBuilderPage = lazy(() => import("../visualBuilder/VisualBuilderPage"));
 const Login = lazy(() => import("../pages/Login"));
 
 interface RouteConfig {
@@ -106,7 +105,6 @@ const RouterContainer = () => {
       <Routes>
         {/* Tenant/Project scoped routes - ALL routes including login */}
         <Route path="/t/:tenant/p/:project">
-          <Route path="_builder" element={<VisualBuilderPage />} />
           <Route path="login" element={<Login />} />
           <Route path="auth/google/callback" element={<GoogleCallback />} />
 

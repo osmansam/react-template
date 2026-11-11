@@ -1,13 +1,18 @@
 import { useQueries } from "@tanstack/react-query";
 import {
-  GenericInputType,
   FormElementsState,
+  GenericInputType,
   InputTypes,
   OptionType,
 } from "../components/panelComponents/shared/types";
+import { usePageSelectionOptions } from "../pageRuntime/requests/selectionOptions";
 import { TableFilterPanelInputConfig } from "../types/page";
 import { get } from "./api";
 import { evaluateRowCondition } from "./genericPageHelpers";
+import {
+  hasDependentSelectFilters,
+  referencedSelectRecordFields,
+} from "./selectFilters";
 import { getSelectionQueryConfig } from "./selectionQuery";
 
 type GenericItem = Record<string, unknown> & { _id: string };
@@ -37,30 +42,46 @@ const isDefaultFilterMarker = (field: TableFilterPanelInputConfig) =>
 export const useFilterPanelSelectionData = (
   inputs: TableFilterPanelInputConfig[] = [],
 ): FilterSelectDataMap => {
+  const pageOptions = usePageSelectionOptions();
   const schemaSelectFields = inputs.filter(
     (field) =>
       field.type === "select" &&
-      field.optionsSource === "schema" &&
-      field.sourceSchemaName,
+      !hasDependentSelectFilters(field) &&
+      ((field.optionsSource === "schema" && field.sourceSchemaName) ||
+        pageOptions.connected(`filterOptions:${field.id || field.formKey}`)),
   );
 
   const queryResults = useQueries({
     queries: schemaSelectFields.map((field) => {
       const fieldName = getSelectionFieldName(field);
+      const valueField = field.sourceValueField || "_id";
+      const dataFields = Array.from(
+        new Set([
+          ...(field.sourceDataFields || []),
+          ...referencedSelectRecordFields(inputs, field.formKey),
+        ]),
+      ).filter((name) => name !== fieldName && name !== valueField);
       const { path, queryKey } = getSelectionQueryConfig({
         schemaName: field.sourceSchemaName || "",
         fieldName,
+        valueField,
+        dataFields,
         filterParams: field.sourceRequestFilters,
       });
-      return {
-        queryKey,
-        queryFn: () =>
-          get<Array<Record<string, unknown>>>({
-            path,
-          }),
-        enabled: Boolean(field.sourceSchemaName && fieldName),
-        staleTime: Infinity,
-      };
+      return pageOptions(
+        `filterOptions:${field.id || field.formKey}`,
+        path,
+        {
+          queryKey,
+          queryFn: () =>
+            get<Array<Record<string, unknown>>>({
+              path,
+            }),
+          enabled: Boolean(field.sourceSchemaName && fieldName),
+          staleTime: Infinity,
+        },
+        { dataFields },
+      );
     }),
   });
 
@@ -101,7 +122,11 @@ const getFilterOptions = (
   selectDataMap: FilterSelectDataMap,
 ): OptionType[] => {
   if (field.type !== "select") return [];
-  if (field.optionsSource !== "schema") return parseStaticOptions(field);
+  if (
+    field.optionsSource !== "schema" &&
+    !selectDataMap.has(`filterPanel:${field.formKey}`)
+  )
+    return parseStaticOptions(field);
 
   const valueField = field.sourceValueField || "_id";
   const labelField = field.sourceLabelField || valueField;
@@ -133,38 +158,65 @@ export const buildConfiguredFilterInputs = (
       const fallback = fallbackInputs.find(
         (input) => input.formKey === field.formKey,
       );
-      return [{
-        ...(fallback || {}),
-        type: filterInputTypeMap[field.type] || InputTypes.TEXT,
-        formKey: field.formKey,
-        label: field.label || fallback?.label || field.formKey,
-        placeholder:
-          field.placeholder ||
-          fallback?.placeholder ||
-          field.label ||
-          field.formKey,
-        required: field.required ?? fallback?.required ?? false,
-        requiredCondition: field.requiredCondition,
-        disabledCondition: field.disabledCondition,
-        isDisabled: field.isDisabled ?? fallback?.isDisabled,
-        isMultiple: field.isMultiple ?? fallback?.isMultiple,
-        isNumberButtonsActive:
-          field.isNumberButtonsActive ?? fallback?.isNumberButtonsActive,
-        options: getFilterOptions(field, selectDataMap),
-        sourceRequestFilters: field.sourceRequestFilters,
-        sourceFilterCondition: field.sourceFilterCondition,
-        invalidateKeys: field.invalidateKeys?.map((key) => ({
-          key,
-          defaultValue: "",
-        })),
-        min: field.min ?? fallback?.min,
-        max: field.max ?? fallback?.max,
-        minLength: field.minLength ?? fallback?.minLength,
-        maxLength: field.maxLength ?? fallback?.maxLength,
-        pattern: field.pattern ?? fallback?.pattern,
-        validationMessage:
-          field.validationMessage ?? fallback?.validationMessage,
-      }];
+      return [
+        {
+          ...(fallback || {}),
+          type: filterInputTypeMap[field.type] || InputTypes.TEXT,
+          formKey: field.formKey,
+          label: field.label || fallback?.label || field.formKey,
+          placeholder:
+            field.placeholder ||
+            fallback?.placeholder ||
+            field.label ||
+            field.formKey,
+          required: field.required ?? fallback?.required ?? false,
+          requiredCondition: field.requiredCondition,
+          disabledCondition: field.disabledCondition,
+          isDisabled: field.isDisabled ?? fallback?.isDisabled,
+          isMultiple: field.isMultiple ?? fallback?.isMultiple,
+          isNumberButtonsActive:
+            field.isNumberButtonsActive ?? fallback?.isNumberButtonsActive,
+          options: getFilterOptions(field, selectDataMap),
+          optionsSource: field.optionsSource ?? fallback?.optionsSource,
+          sourceSchemaName:
+            field.sourceSchemaName ?? fallback?.sourceSchemaName,
+          sourceValueField:
+            field.sourceValueField ?? fallback?.sourceValueField,
+          sourceLabelField:
+            field.sourceLabelField ?? fallback?.sourceLabelField,
+          sourceDataFields:
+            field.type === "select"
+              ? Array.from(
+                  new Set([
+                    ...(field.sourceDataFields || []),
+                    ...(fallback?.sourceDataFields || []),
+                    ...referencedSelectRecordFields(fields, field.formKey),
+                  ]),
+                )
+              : (field.sourceDataFields ?? fallback?.sourceDataFields),
+          optionDisplay: field.optionDisplay ?? fallback?.optionDisplay,
+          sourceRequestFilters:
+            field.sourceRequestFilters ?? fallback?.sourceRequestFilters,
+          sourceFilterBindings:
+            field.sourceFilterBindings ?? fallback?.sourceFilterBindings,
+          selectionRequestSlot:
+            field.type === "select"
+              ? `filterOptions:${field.id || field.formKey}`
+              : fallback?.selectionRequestSlot,
+          sourceFilterCondition: field.sourceFilterCondition,
+          invalidateKeys: field.invalidateKeys?.map((key) => ({
+            key,
+            defaultValue: "",
+          })),
+          min: field.min ?? fallback?.min,
+          max: field.max ?? fallback?.max,
+          minLength: field.minLength ?? fallback?.minLength,
+          maxLength: field.maxLength ?? fallback?.maxLength,
+          pattern: field.pattern ?? fallback?.pattern,
+          validationMessage:
+            field.validationMessage ?? fallback?.validationMessage,
+        },
+      ];
     });
 };
 

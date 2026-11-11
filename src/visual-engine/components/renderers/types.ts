@@ -21,6 +21,8 @@ export interface SemanticRendererContext {
   readonly site?: VisualSiteContext;
   readonly themeMode?: ThemeMode;
   readonly currentNode: ComponentNode;
+  onHostAction?(): void;
+  readonly hostActionState?: { hidden?: boolean; disabled?: boolean; reason?: string };
   /** True when this node is the current canvas selection. */
   readonly canvasSelected?: boolean;
   readonly selectedNodeId?: string;

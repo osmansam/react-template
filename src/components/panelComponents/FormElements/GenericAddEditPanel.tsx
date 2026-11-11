@@ -9,12 +9,17 @@ import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
 import { useGeneralContext } from "../../../context/General.context";
 import { FormElementsState, NO_IMAGE_URL, OptionType } from "../../../types";
 import { UpdatePayload } from "../../../utils/api";
-import { evaluateRowCondition } from "../../../utils/genericPageHelpers";
 import { prepareFormEditValues } from "../../../utils/formEditValues";
+import { evaluateRowCondition } from "../../../utils/genericPageHelpers";
+import {
+  clearDependentSelectValues,
+  hasDependentSelectFilters,
+} from "../../../utils/selectFilters";
 import {
   validateField,
   ValidationRules,
 } from "../../../utils/validationHelper";
+import { useDependentSelectInputs } from "../../forms/useDependentSelectInputs";
 import { H6 } from "../Typography";
 import {
   FormKeyType,
@@ -30,7 +35,6 @@ import SelectInput from "./SelectInput";
 import TabInput from "./TabInput";
 import TabInputScreen from "./TabInputScreen";
 import TextInput from "./TextInput";
-
 
 const resolveOptionFilterCondition = (
   condition: string | undefined,
@@ -61,7 +65,10 @@ const getFilteredOptions = (
   return options.filter((option) => {
     const sourceItem = option.sourceItem;
     if (!sourceItem) return true;
-    return evaluateRowCondition(sourceItem as Record<string, unknown> & { _id: string }, resolvedCondition);
+    return evaluateRowCondition(
+      sourceItem as Record<string, unknown> & { _id: string },
+      resolvedCondition,
+    );
   });
 };
 
@@ -77,10 +84,10 @@ const evaluateFormCondition = (
 ) =>
   Boolean(
     condition?.trim() &&
-      evaluateRowCondition(
-        formElements as Record<string, unknown> & { _id: string },
-        normalizeCondition(condition),
-      ),
+    evaluateRowCondition(
+      formElements as Record<string, unknown> & { _id: string },
+      normalizeCondition(condition),
+    ),
   );
 
 type Props<T> = {
@@ -92,7 +99,7 @@ type Props<T> = {
   nonImageInputsClassName?: string;
   onOpenTriggerTabInputFormKey?: string;
   generalClassName?: string;
-  submitItem: (item: T | UpdatePayload<T>) => void;
+  submitItem: (item: T | UpdatePayload<T>) => void | Promise<void>;
   setForm?: (item: T) => void;
   handleUpdate?: () => void;
   submitFunction?: () => void;
@@ -184,10 +191,6 @@ const GenericAddEditPanel = <T,>({
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const modalRef = useRef<HTMLDivElement>(null);
-  const imageInputs = inputs.filter((input) => input.type === InputTypes.IMAGE);
-  const nonImageInputs = inputs.filter(
-    (input) => input.type !== InputTypes.IMAGE
-  );
   const formKeysSignature = JSON.stringify(formKeys);
   const constantValuesSignature = JSON.stringify(constantValues ?? null);
   const itemToEditSignature = JSON.stringify(itemToEdit ?? null);
@@ -248,7 +251,7 @@ const GenericAddEditPanel = <T,>({
       };
     }
     return mergedInitialState;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     constantValuesSignature,
     formKeysSignature,
@@ -257,6 +260,31 @@ const GenericAddEditPanel = <T,>({
     mergedInitialState,
   ]);
   const [formElements, setFormElements] = useState(buildInitialFormElements);
+  const resolvedInputs = useDependentSelectInputs(inputs, formElements, {
+    enabled: isOpen,
+    defaultSlotPrefix: "actionOptions",
+    initialRecord:
+      (itemToEdit?.updates as Record<string, unknown> | undefined) ||
+      constantValues,
+  });
+  const imageInputs = resolvedInputs.filter(
+    (input) => input.type === InputTypes.IMAGE,
+  );
+  const nonImageInputs = resolvedInputs.filter(
+    (input) => input.type !== InputTypes.IMAGE,
+  );
+  const hasBlockedDependentSelect = useMemo(
+    () =>
+      nonImageInputs.some((input) => {
+        const isConditionDisabled = evaluateFormCondition(
+          input.disabledCondition,
+          formElements,
+        );
+        if (input.isDisabled || isConditionDisabled) return false;
+        return Boolean(input.selectionStatus);
+      }),
+    [nonImageInputs, formElements],
+  );
   useEffect(() => {
     if (isOpen) {
       setFormElements(buildInitialFormElements());
@@ -317,14 +345,14 @@ const GenericAddEditPanel = <T,>({
       const error = validateField(value, rules, fieldType);
       return error;
     },
-    [formKeys]
+    [formKeys],
   );
   const allRequiredFilled = useMemo(() => {
-    return inputs.every((input) => {
+    return resolvedInputs.every((input) => {
       if (!input.required) return true;
       return !isValueEmpty(formElements[input.formKey]);
     });
-  }, [inputs, formElements, isValueEmpty]);
+  }, [resolvedInputs, formElements, isValueEmpty]);
 
   useEffect(() => {
     setForm?.(formElements as T);
@@ -352,9 +380,14 @@ const GenericAddEditPanel = <T,>({
         setFormElements((prev) => ({ ...prev, [input.formKey]: file }));
       }
     },
-    []
+    [],
   );
-  const finalSubmitFunction = () => {
+  const submittingRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const finalSubmitFunction = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
     try {
       // Convert form elements to proper types based on formKeys
       const convertedFormElements = { ...formElements };
@@ -411,7 +444,7 @@ const GenericAddEditPanel = <T,>({
               .filter((item) => !isNaN(item));
           } else if (Array.isArray(value)) {
             convertedFormElements[formKey.key] = value.map((item) =>
-              typeof item === "string" ? parseInt(item, 10) : item
+              typeof item === "string" ? parseInt(item, 10) : item,
             );
           } else {
             convertedFormElements[formKey.key] = [];
@@ -427,7 +460,7 @@ const GenericAddEditPanel = <T,>({
               .filter((item) => !isNaN(item));
           } else if (Array.isArray(value)) {
             convertedFormElements[formKey.key] = value.map((item) =>
-              typeof item === "string" ? parseFloat(item) : item
+              typeof item === "string" ? parseFloat(item) : item,
             );
           } else {
             convertedFormElements[formKey.key] = [];
@@ -435,23 +468,29 @@ const GenericAddEditPanel = <T,>({
         }
       });
       if (isEditMode && itemToEdit) {
-        submitItem({ id: itemToEdit.id, updates: convertedFormElements as T });
+        await submitItem({
+          id: itemToEdit.id,
+          updates: convertedFormElements as T,
+        });
       } else if (isEditMode && handleUpdate) {
-        handleUpdate();
+        await handleUpdate();
       } else {
         if (submitFunction) {
-          submitFunction();
+          await submitFunction();
         } else {
-          submitItem(convertedFormElements as T);
+          await submitItem(convertedFormElements as T);
         }
       }
-      additionalSubmitFunction?.();
+      await additionalSubmitFunction?.();
       setFormElements(mergedInitialState);
       setResetTextInput(!resetTextInput);
       setAttemptedSubmit(false);
       isCreateCloseActive && close?.();
     } catch (error) {
       console.error("Failed to execute submit item:", error);
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
   const handleSubmit = () => {
@@ -464,18 +503,21 @@ const GenericAddEditPanel = <T,>({
   };
 
   const handleInputClear = (input: GenericInputType) => {
-    setFormElements((prev) => ({
-      ...prev,
-      [input.formKey]: initialState[input.formKey],
-    }));
-    if (input.invalidateKeys) {
-      input.invalidateKeys.forEach((key) => {
-        setFormElements((prev) => ({
-          ...prev,
-          [key.key]: initialState[key.key] ?? "",
-        }));
+    setFormElements((prev) => {
+      const next = clearDependentSelectValues(resolvedInputs, prev, {
+        ...prev,
+        [input.formKey]:
+          input.type === InputTypes.SELECT && input.isMultiple
+            ? []
+            : (initialState[input.formKey] ?? ""),
       });
-    }
+      if (input.invalidateKeys) {
+        input.invalidateKeys.forEach((key) => {
+          next[key.key] = initialState[key.key] ?? "";
+        });
+      }
+      return next;
+    });
   };
   const handleCancelButtonClick = () => {
     additionalCancelFunction?.();
@@ -484,9 +526,14 @@ const GenericAddEditPanel = <T,>({
   const handleCreateButtonClick = () => {
     setAttemptedSubmit(true);
 
+    if (hasBlockedDependentSelect) {
+      toast.error(t("Please fix the errors in the form"));
+      return;
+    }
+
     // Validate all fields
     const errors: Record<string, string> = {};
-    inputs.forEach((input) => {
+    resolvedInputs.forEach((input) => {
       const value = formElements[input.formKey];
       const error = validateFieldValue(input, value);
       if (error) {
@@ -506,7 +553,7 @@ const GenericAddEditPanel = <T,>({
       toast.error(t("Please fill all required fields"));
       return;
     } else if (allRequiredFilled) {
-      const phoneValidationFailed = inputs
+      const phoneValidationFailed = resolvedInputs
         .filter((input) => input.additionalType === "phone")
         .some((input) => {
           const inputValue = formElements[input.formKey];
@@ -537,7 +584,7 @@ const GenericAddEditPanel = <T,>({
   };
   const renderGenericAddEditModal = () => {
     const hasValidationErrors = Object.values(fieldErrors).some(
-      (error) => !!error
+      (error) => !!error,
     );
 
     if (isTabInputScreenOpen) {
@@ -646,10 +693,22 @@ const GenericAddEditPanel = <T,>({
                 );
                 const isInputRequired = input.required || isConditionRequired;
                 const handleChange = (key: string) => (value: string) => {
-                  const changedInput = inputs.find(
-                    (input) => input.formKey === key
+                  const changedInput = resolvedInputs.find(
+                    (input) => input.formKey === key,
                   );
-                  setFormElements((prev) => ({ ...prev, [key]: value }));
+                  setFormElements((prev) => {
+                    const next = clearDependentSelectValues(
+                      resolvedInputs,
+                      prev,
+                      { ...prev, [key]: value },
+                    );
+                    if (changedInput?.invalidateKeys) {
+                      changedInput.invalidateKeys.forEach((invKey) => {
+                        next[invKey.key] = initialState[invKey.key] ?? "";
+                      });
+                    }
+                    return next;
+                  });
 
                   // Validate the field
                   if (changedInput) {
@@ -659,15 +718,6 @@ const GenericAddEditPanel = <T,>({
                       [key]: error || "",
                     }));
                   }
-
-                  if (changedInput?.invalidateKeys) {
-                    changedInput.invalidateKeys.forEach((key) => {
-                      setFormElements((prev) => ({
-                        ...prev,
-                        [key.key]: initialState[key.key] ?? "",
-                      }));
-                    });
-                  }
                 };
                 const handleChangeForSelect =
                   (key: string) =>
@@ -675,35 +725,39 @@ const GenericAddEditPanel = <T,>({
                     selectedValue:
                       | SingleValue<OptionType>
                       | MultiValue<OptionType>,
-                    actionMeta: ActionMeta<OptionType>
+                    actionMeta: ActionMeta<OptionType>,
                   ) => {
+                    const changedInput = resolvedInputs.find(
+                      (input) => input.formKey === key,
+                    );
                     if (
                       actionMeta?.action === "select-option" ||
                       actionMeta?.action === "remove-value" ||
                       actionMeta?.action === "clear"
                     ) {
-                      if (Array.isArray(selectedValue)) {
-                        const values = selectedValue.map(
-                          (option) => option.value
+                      const nextValue = Array.isArray(selectedValue)
+                        ? selectedValue.map((option) => option.value)
+                        : selectedValue
+                          ? (selectedValue as OptionType)?.value
+                          : "";
+                      setFormElements((prev) => {
+                        const next = clearDependentSelectValues(
+                          resolvedInputs,
+                          prev,
+                          { ...prev, [key]: nextValue },
                         );
-                        setFormElements((prev) => ({ ...prev, [key]: values }));
-                      } else if (selectedValue) {
+                        if (changedInput?.invalidateKeys) {
+                          changedInput.invalidateKeys.forEach((invKey) => {
+                            next[invKey.key] = initialState[invKey.key] ?? "";
+                          });
+                        }
+                        return next;
+                      });
+                    } else if (changedInput?.invalidateKeys) {
+                      changedInput.invalidateKeys.forEach((invKey) => {
                         setFormElements((prev) => ({
                           ...prev,
-                          [key]: (selectedValue as OptionType)?.value,
-                        }));
-                      } else {
-                        setFormElements((prev) => ({ ...prev, [key]: "" }));
-                      }
-                    }
-                    const changedInput = inputs.find(
-                      (input) => input.formKey === key
-                    );
-                    if (changedInput?.invalidateKeys) {
-                      changedInput.invalidateKeys.forEach((key) => {
-                        setFormElements((prev) => ({
-                          ...prev,
-                          [key.key]: initialState[key.key] ?? "",
+                          [invKey.key]: initialState[invKey.key] ?? "",
                         }));
                       });
                     }
@@ -711,7 +765,9 @@ const GenericAddEditPanel = <T,>({
                 if (
                   input.type === InputTypes.SELECT &&
                   !input?.required &&
-                  input?.options?.length === 0
+                  input?.options?.length === 0 &&
+                  !hasDependentSelectFilters(input) &&
+                  !input.selectionStatus
                 ) {
                   return null;
                 }
@@ -725,302 +781,298 @@ const GenericAddEditPanel = <T,>({
                   isInputRequired &&
                   isValueEmpty(formElements[input.formKey]);
                 return (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      key={input.formKey}
-                      className="flex flex-col gap-1"
-                    >
-                      {input.type === InputTypes.DATE && (
-                        <DateInput
-                          key={input.formKey + resetTextInput}
-                          value={value}
-                          label={
-                            isInputRequired && input.label
-                              ? input.label
-                              : input.label ?? ""
-                          }
-                          placeholder={input.placeholder ?? ""}
-                          onChange={(val) =>
-                            handleChange(input.formKey)(val ?? "")
-                          }
-                          isArrowsEnabled={input.isArrowsEnabled ?? false}
-                          requiredField={isInputRequired}
-                          isOnClearActive={input?.isOnClearActive ?? true}
-                          isDateInitiallyOpen={
-                            input.isDateInitiallyOpen ?? false
-                          }
-                          isTopFlexRow={input.isTopFlexRow ?? false}
-                          disabled={isInputDisabled}
-                          isReadOnly={input.isReadOnly ?? false}
-                          onClear={() => {
-                            handleInputClear(input);
-                          }}
-                        />
-                      )}
-                      {(input.type === InputTypes.TEXT ||
-                        input.type === InputTypes.NUMBER ||
-                        input.type === InputTypes.TIME ||
-                        input.type === InputTypes.COLOR ||
-                        input.type === InputTypes.CHECKBOX ||
-                        input.type === InputTypes.PASSWORD) && (
-                        <TextInput
-                          key={input.formKey + resetTextInput}
-                          type={input.type}
-                          value={value}
-                          label={
-                            isInputRequired && input.label
-                              ? input.label
-                              : input.label ?? ""
-                          }
-                          placeholder={input.placeholder ?? ""}
-                          onChange={handleChange(input.formKey)}
-                          requiredField={isInputRequired}
-                          isOnClearActive={input?.isOnClearActive ?? true}
-                          isNumberButtonsActive={
-                            input?.isNumberButtonsActive ?? false
-                          }
-                          isDateInitiallyOpen={
-                            input.isDateInitiallyOpen ?? false
-                          }
-                          isTopFlexRow={input.isTopFlexRow ?? false}
-                          minNumber={input?.min ?? input?.minNumber ?? 0}
-                          maxNumber={input?.max}
-                          isDebounce={input?.isDebounce ?? false}
-                          disabled={isInputDisabled}
-                          isReadOnly={input.isReadOnly ?? false}
-                          isMinNumber={input?.isMinNumber ?? true}
-                          error={fieldErrors[input.formKey]}
-                          onClear={() => {
-                            handleInputClear(input);
-                          }}
-                        />
-                      )}
-                      {input.type === InputTypes.HOUR && (
-                        <HourInput
-                          key={input.formKey}
-                          value={value}
-                          label={
-                            isInputRequired && input.label
-                              ? input.label
-                              : input.label ?? ""
-                          }
-                          onChange={handleChange(input.formKey)}
-                          requiredField={isInputRequired}
-                          isReadOnly={
-                            input.isReadOnly || isInputDisabled || false
-                          }
-                        />
-                      )}
-                      {input.type === InputTypes.MONTHYEAR && (
-                        <MonthYearInput
-                          key={input.formKey}
-                          value={value}
-                          label={
-                            isInputRequired && input.label
-                              ? input.label
-                              : input.label ?? ""
-                          }
-                          onChange={handleChange(input.formKey)}
-                          requiredField={isInputRequired}
-                          isReadOnly={
-                            input.isReadOnly || isInputDisabled || false
-                          }
-                        />
-                      )}
-                      {input.type === InputTypes.SELECT && (
-                        <SelectInput
-                          key={
-                            input.isMultiple
-                              ? input.formKey
-                              : input.formKey + formElements[input.formKey]
-                          }
-                          value={
-                            (input.isMultiple
-                              ? inputOptions.filter((option) =>
-                                  formElements[input.formKey]?.includes(
-                                    option.value
-                                  )
-                                )
-                              : inputOptions.find(
-                                  (option) =>
-                                    option?.value ===
-                                    formElements[input.formKey]
-                                )) ?? null
-                          }
-                          label={
-                            isInputRequired && input.label
-                              ? input.label
-                              : input.label ?? ""
-                          }
-                          suggestedOption={input?.suggestedOption}
-                          isSortDisabled={input.isSortDisabled ?? false}
-                          isAutoFill={input?.isAutoFill}
-                          options={inputOptions}
-                          placeholder={input.placeholder ?? ""}
-                          isMultiple={input.isMultiple ?? false}
-                          requiredField={isInputRequired}
-                          onChange={handleChangeForSelect(input.formKey)}
-                          isTopFlexRow={input.isTopFlexRow ?? false}
-                          onChangeTrigger={
-                            input?.onChangeTrigger
-                              ? (value) => {
-                                  if (Array.isArray(value)) {
-                                    input.onChangeTrigger?.(
-                                      value.map((v) => v.value)
-                                    );
-                                  } else if (value && !Array.isArray(value)) {
-                                    input.onChangeTrigger?.(
-                                      (value as OptionType).value
-                                    );
-                                  } else {
-                                    input.onChangeTrigger?.(null);
-                                  }
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    key={input.formKey}
+                    className="flex flex-col gap-1"
+                  >
+                    {input.type === InputTypes.DATE && (
+                      <DateInput
+                        key={input.formKey + resetTextInput}
+                        value={value}
+                        label={
+                          isInputRequired && input.label
+                            ? input.label
+                            : (input.label ?? "")
+                        }
+                        placeholder={input.placeholder ?? ""}
+                        onChange={(val) =>
+                          handleChange(input.formKey)(val ?? "")
+                        }
+                        isArrowsEnabled={input.isArrowsEnabled ?? false}
+                        requiredField={isInputRequired}
+                        isOnClearActive={input?.isOnClearActive ?? true}
+                        isDateInitiallyOpen={input.isDateInitiallyOpen ?? false}
+                        isTopFlexRow={input.isTopFlexRow ?? false}
+                        disabled={isInputDisabled}
+                        isReadOnly={input.isReadOnly ?? false}
+                        onClear={() => {
+                          handleInputClear(input);
+                        }}
+                      />
+                    )}
+                    {(input.type === InputTypes.TEXT ||
+                      input.type === InputTypes.NUMBER ||
+                      input.type === InputTypes.TIME ||
+                      input.type === InputTypes.COLOR ||
+                      input.type === InputTypes.CHECKBOX ||
+                      input.type === InputTypes.PASSWORD) && (
+                      <TextInput
+                        key={input.formKey + resetTextInput}
+                        type={input.type}
+                        value={value}
+                        label={
+                          isInputRequired && input.label
+                            ? input.label
+                            : (input.label ?? "")
+                        }
+                        placeholder={input.placeholder ?? ""}
+                        onChange={handleChange(input.formKey)}
+                        requiredField={isInputRequired}
+                        isOnClearActive={input?.isOnClearActive ?? true}
+                        isNumberButtonsActive={
+                          input?.isNumberButtonsActive ?? false
+                        }
+                        isDateInitiallyOpen={input.isDateInitiallyOpen ?? false}
+                        isTopFlexRow={input.isTopFlexRow ?? false}
+                        minNumber={input?.min ?? input?.minNumber ?? 0}
+                        maxNumber={input?.max}
+                        isDebounce={input?.isDebounce ?? false}
+                        disabled={isInputDisabled}
+                        isReadOnly={input.isReadOnly ?? false}
+                        isMinNumber={input?.isMinNumber ?? true}
+                        error={fieldErrors[input.formKey]}
+                        onClear={() => {
+                          handleInputClear(input);
+                        }}
+                      />
+                    )}
+                    {input.type === InputTypes.HOUR && (
+                      <HourInput
+                        key={input.formKey}
+                        value={value}
+                        label={
+                          isInputRequired && input.label
+                            ? input.label
+                            : (input.label ?? "")
+                        }
+                        onChange={handleChange(input.formKey)}
+                        requiredField={isInputRequired}
+                        isReadOnly={
+                          input.isReadOnly || isInputDisabled || false
+                        }
+                      />
+                    )}
+                    {input.type === InputTypes.MONTHYEAR && (
+                      <MonthYearInput
+                        key={input.formKey}
+                        value={value}
+                        label={
+                          isInputRequired && input.label
+                            ? input.label
+                            : (input.label ?? "")
+                        }
+                        onChange={handleChange(input.formKey)}
+                        requiredField={isInputRequired}
+                        isReadOnly={
+                          input.isReadOnly || isInputDisabled || false
+                        }
+                      />
+                    )}
+                    {input.type === InputTypes.SELECT && (
+                      <SelectInput
+                        key={
+                          input.isMultiple
+                            ? input.formKey
+                            : input.formKey + formElements[input.formKey]
+                        }
+                        value={
+                          (input.isMultiple
+                            ? inputOptions.filter((option) =>
+                                formElements[input.formKey]?.includes(
+                                  option.value,
+                                ),
+                              )
+                            : inputOptions.find(
+                                (option) =>
+                                  option?.value === formElements[input.formKey],
+                              )) ?? null
+                        }
+                        label={
+                          isInputRequired && input.label
+                            ? input.label
+                            : (input.label ?? "")
+                        }
+                        suggestedOption={input?.suggestedOption}
+                        isSortDisabled={input.isSortDisabled ?? false}
+                        isAutoFill={input?.isAutoFill}
+                        options={inputOptions}
+                        placeholder={input.placeholder ?? ""}
+                        isMultiple={input.isMultiple ?? false}
+                        requiredField={isInputRequired}
+                        onChange={handleChangeForSelect(input.formKey)}
+                        isTopFlexRow={input.isTopFlexRow ?? false}
+                        onChangeTrigger={
+                          input?.onChangeTrigger
+                            ? (value) => {
+                                if (Array.isArray(value)) {
+                                  input.onChangeTrigger?.(
+                                    value.map((v) => v.value),
+                                  );
+                                } else if (value && !Array.isArray(value)) {
+                                  input.onChangeTrigger?.(
+                                    (value as OptionType).value,
+                                  );
+                                } else {
+                                  input.onChangeTrigger?.(null);
                                 }
-                              : undefined
-                          }
-                          isOnClearActive={input?.isOnClearActive ?? true}
-                          isReadOnly={
-                            input.isReadOnly || isInputDisabled || false
-                          }
-                          onClear={() => {
-                            handleInputClear(input);
-                          }}
-                        />
-                      )}
-                      {input.type === InputTypes.TAB && (
-                        <TabInput
-                          key={input.formKey + formElements[input.formKey]}
-                          value={
-                            inputOptions.find(
-                              (option) =>
-                                option?.value === formElements[input.formKey]
-                            ) ?? null
-                          }
-                          label={
-                            isInputRequired && input.label
-                              ? input.label
-                              : input.label ?? ""
-                          }
-                          suggestedOption={input?.suggestedOption || null}
-                          formKey={input.formKey}
-                          options={inputOptions}
-                          placeholder={input.placeholder ?? ""}
-                          invalidateKeys={input.invalidateKeys}
-                          requiredField={isInputRequired}
-                          setFormElements={setFormElements}
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          setForm={setForm as any}
-                          formElements={formElements}
-                          isTopFlexRow={input.isTopFlexRow ?? false}
-                          isReadOnly={
-                            input.isReadOnly || isInputDisabled || false
-                          }
-                          onClear={() => {
-                            handleInputClear(input);
-                          }}
-                        />
-                      )}
-                      {input.type === InputTypes.TEXTAREA && (
-                        <div
-                          key={input.formKey}
-                          className="flex flex-col gap-2 relative"
-                        >
-                          <div className="flex items-center">
-                            <H6>{input.label}</H6>
-                            {isInputRequired && (
-                              <>
-                                <span className="text-red-400">*</span>
-                                <span className="text-xs text-gray-400">
-                                  ({t("required")})
-                                </span>
-                              </>
-                            )}
-                            {input?.options && input?.options?.length > 0 && (
-                              <GenericButton
-                                variant="icon"
-                                size="sm"
-                                className="ml-2 p-1"
-                                onClick={() =>
-                                  setOpenFor((prev) =>
-                                    prev === input.formKey
-                                      ? null
-                                      : input.formKey
-                                  )
-                                }
-                              >
-                                <FaChevronDown size={16} />
-                              </GenericButton>
-                            )}
-                          </div>
-
-                          {openFor === input.formKey && (
+                              }
+                            : undefined
+                        }
+                        isOnClearActive={input?.isOnClearActive ?? true}
+                        isReadOnly={
+                          input.isReadOnly || isInputDisabled || false
+                        }
+                        selectionStatus={input.selectionStatus}
+                        selectionMessage={input.selectionMessage}
+                        retrySelection={input.retrySelection}
+                        onClear={() => {
+                          handleInputClear(input);
+                        }}
+                      />
+                    )}
+                    {input.type === InputTypes.TAB && (
+                      <TabInput
+                        key={input.formKey + formElements[input.formKey]}
+                        value={
+                          inputOptions.find(
+                            (option) =>
+                              option?.value === formElements[input.formKey],
+                          ) ?? null
+                        }
+                        label={
+                          isInputRequired && input.label
+                            ? input.label
+                            : (input.label ?? "")
+                        }
+                        suggestedOption={input?.suggestedOption || null}
+                        formKey={input.formKey}
+                        options={inputOptions}
+                        placeholder={input.placeholder ?? ""}
+                        invalidateKeys={input.invalidateKeys}
+                        requiredField={isInputRequired}
+                        setFormElements={setFormElements}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        setForm={setForm as any}
+                        formElements={formElements}
+                        isTopFlexRow={input.isTopFlexRow ?? false}
+                        isReadOnly={
+                          input.isReadOnly || isInputDisabled || false
+                        }
+                        onClear={() => {
+                          handleInputClear(input);
+                        }}
+                      />
+                    )}
+                    {input.type === InputTypes.TEXTAREA && (
+                      <div
+                        key={input.formKey}
+                        className="flex flex-col gap-2 relative"
+                      >
+                        <div className="flex items-center">
+                          <H6>{input.label}</H6>
+                          {isInputRequired && (
                             <>
-                              {/* backdrop */}
-                              <div
-                                className="fixed inset-0 z-10"
-                                onClick={() => setOpenFor(null)}
-                              />
-
-                              {/* dropdown */}
-                              <ul className="absolute z-20 mt-1 w-full bg-white border rounded shadow-md max-h-40 overflow-auto">
-                                {/* full-width cancel row */}
-                                <li
-                                  className="px-3 py-2 text-red-500 cursor-pointer hover:bg-gray-100"
-                                  onMouseDown={() => setOpenFor(null)}
-                                >
-                                  {t("Close Selection")}
-                                </li>
-
-                                {input.options!.map((opt) => (
-                                  <li
-                                    key={opt.value}
-                                    onMouseDown={() => {
-                                      handleChange(input.formKey)(
-                                        opt.value as string
-                                      );
-                                      setOpenFor(null);
-                                    }}
-                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                  >
-                                    {opt.label}
-                                  </li>
-                                ))}
-                              </ul>
+                              <span className="text-red-400">*</span>
+                              <span className="text-xs text-gray-400">
+                                ({t("required")})
+                              </span>
                             </>
                           )}
-
-                          <div className="relative">
-                            <textarea
-                              value={formElements[input.formKey]}
-                              onChange={(e) =>
-                                handleChange(input.formKey)(e.target.value)
+                          {input?.options && input?.options?.length > 0 && (
+                            <GenericButton
+                              variant="icon"
+                              size="sm"
+                              className="ml-2 p-1"
+                              onClick={() =>
+                                setOpenFor((prev) =>
+                                  prev === input.formKey ? null : input.formKey,
+                                )
                               }
-                              placeholder={input.placeholder}
-                              disabled={
-                                input.isReadOnly || isInputDisabled || false
-                              }
-                              className={`border text-base border-gray-300 rounded-md p-2 w-full ${input.inputClassName}`}
-                            />
-                            {formElements[input.formKey] && (
-                              <GenericButton
-                                variant="icon"
-                                size="sm"
-                                className="absolute top-2 right-2 text-gray-500 hover:text-red-600 p-0"
-                                onClick={() => handleChange(input.formKey)("")}
-                              >
-                                <IoIosClose size={28} />
-                              </GenericButton>
-                            )}
-                          </div>
+                            >
+                              <FaChevronDown size={16} />
+                            </GenericButton>
+                          )}
                         </div>
-                      )}
-                      {showError && (
-                        <span className="text-xs text-red-600">
-                          {t("This field is required")}
-                        </span>
-                      )}
-                    </div>
-                  );
+
+                        {openFor === input.formKey && (
+                          <>
+                            {/* backdrop */}
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setOpenFor(null)}
+                            />
+
+                            {/* dropdown */}
+                            <ul className="absolute z-20 mt-1 w-full bg-white border rounded shadow-md max-h-40 overflow-auto">
+                              {/* full-width cancel row */}
+                              <li
+                                className="px-3 py-2 text-red-500 cursor-pointer hover:bg-gray-100"
+                                onMouseDown={() => setOpenFor(null)}
+                              >
+                                {t("Close Selection")}
+                              </li>
+
+                              {input.options!.map((opt) => (
+                                <li
+                                  key={opt.value}
+                                  onMouseDown={() => {
+                                    handleChange(input.formKey)(
+                                      opt.value as string,
+                                    );
+                                    setOpenFor(null);
+                                  }}
+                                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  {opt.label}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+
+                        <div className="relative">
+                          <textarea
+                            value={formElements[input.formKey]}
+                            onChange={(e) =>
+                              handleChange(input.formKey)(e.target.value)
+                            }
+                            placeholder={input.placeholder}
+                            disabled={
+                              input.isReadOnly || isInputDisabled || false
+                            }
+                            className={`border text-base border-gray-300 rounded-md p-2 w-full ${input.inputClassName}`}
+                          />
+                          {formElements[input.formKey] && (
+                            <GenericButton
+                              variant="icon"
+                              size="sm"
+                              className="absolute top-2 right-2 text-gray-500 hover:text-red-600 p-0"
+                              onClick={() => handleChange(input.formKey)("")}
+                            >
+                              <IoIosClose size={28} />
+                            </GenericButton>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {showError && (
+                      <span className="text-xs text-red-600">
+                        {t("This field is required")}
+                      </span>
+                    )}
+                  </div>
+                );
               })}
             </div>
           </div>
@@ -1096,12 +1148,15 @@ const GenericAddEditPanel = <T,>({
               <GenericButton
                 variant={
                   hasValidationErrors ||
+                  hasBlockedDependentSelect ||
                   (!allRequiredFilled && !optionalCreateButtonActive)
                     ? "secondary"
                     : "primary"
                 }
                 disabled={
+                  isSubmitting ||
                   hasValidationErrors ||
+                  hasBlockedDependentSelect ||
                   (!allRequiredFilled && !optionalCreateButtonActive)
                 }
                 size="md"
@@ -1116,8 +1171,8 @@ const GenericAddEditPanel = <T,>({
                 {buttonName
                   ? buttonName
                   : isEditMode
-                  ? t("Update")
-                  : t("Create")}
+                    ? t("Update")
+                    : t("Create")}
               </GenericButton>
             )}
           </div>
@@ -1190,7 +1245,7 @@ const GenericAddEditPanel = <T,>({
         />
       )}
     </div>,
-    document.body
+    document.body,
   );
 };
 

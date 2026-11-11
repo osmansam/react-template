@@ -13,6 +13,7 @@ import {
   installRuntimeTranslations,
 } from "./runtimeTranslations";
 
+const EMPTY_LOCALES: string[] = [];
 const RTL = new Set(["ar", "fa", "he", "ur"]);
 
 export function LanguageSelector() {
@@ -24,7 +25,7 @@ export function LanguageSelector() {
     queryFn: getRuntimeLocaleSettings,
     enabled: Boolean(tenant && project),
   });
-  const enabled = settings.data?.enabledLocales || [];
+  const enabled = settings.data?.enabledLocales || EMPTY_LOCALES;
   const initial = useMemo(() => settings.data
     ? resolveProjectLocale(enabled, localStorage.getItem(storageKey), settings.data.defaultLocale, settings.data.sourceLocale)
     : "", [settings.data, enabled, storageKey]);

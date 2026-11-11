@@ -1,3 +1,9 @@
+import { usePageReadKey } from "../../../pageRuntime/requests/usePageRead";
+import { legacyRead } from "../../../pageRuntime/requests/legacyAdapters";
+import { usePageSelectionOptions } from "../../../pageRuntime/requests/selectionOptions";
+import { useTableRequestOverrides } from "../../../pageRuntime/requests/tableOverrides";
+import { legacyValues } from "../../../pageRuntime/requests/legacyAdapters";
+import { useTableRecordSelection } from "../../../pageRuntime/useTableRecordSelection";
 import { useQueries } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -46,11 +52,16 @@ import {
   isDisplayablePrimitive,
   normalizeContainer,
   normalizeField,
+  isComputedField,
   tailwindBgToStyle,
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
 import { formatPopulatedArrayValue } from "../../../utils/populatedArrayDisplay";
 import { formatTableDate } from "../../../utils/tableDateFormat";
+import {
+  hasDependentSelectFilters,
+  referencedSelectRecordFields,
+} from "../../../utils/selectFilters";
 import { getSelectionQueryConfig } from "../../../utils/selectionQuery";
 import { renderTableColumnTemplate } from "../../../utils/tableColumnTemplate";
 import { getTableActionRowState } from "../../../utils/tableActions";
@@ -117,37 +128,53 @@ const getSelectionFieldName = (field: TableActionFormFieldConfig) =>
 const useActionFormSelectionData = (
   actions: TableActionConfig[] = [],
 ): ActionSelectDataMap => {
+  const pageOptions = usePageSelectionOptions();
   const schemaSelectFields = actions.flatMap((action, actionIndex) =>
     (action.formFields || [])
       .filter(
         (field) =>
           field.type === "select" &&
-          field.optionsSource === "schema" &&
-          field.sourceSchemaName,
+          !hasDependentSelectFilters(field) &&
+          ((field.optionsSource === "schema" && field.sourceSchemaName) || pageOptions.connected(`actionOptions:${getActionId(action, actionIndex)}:${field.formKey}`)),
       )
       .map((field) => ({
+        action,
         actionId: getActionId(action, actionIndex),
         field,
       })),
   );
 
   const queryResults = useQueries({
-    queries: schemaSelectFields.map(({ field }) => {
+    queries: schemaSelectFields.map(({ action, field, actionId }) => {
       const fieldName = getSelectionFieldName(field);
+      const valueField = field.sourceValueField || "_id";
+      const dataFields = Array.from(
+        new Set([
+          ...(field.sourceDataFields || []),
+          ...referencedSelectRecordFields(action.formFields || [], field.formKey),
+        ]),
+      ).filter((name) => name !== fieldName && name !== valueField);
       const { path, queryKey } = getSelectionQueryConfig({
         schemaName: field.sourceSchemaName || "",
         fieldName,
+        valueField,
+        dataFields,
         filterParams: field.sourceRequestFilters,
       });
-      return {
-        queryKey,
-        queryFn: () =>
-          get<GenericItem[]>({
-            path,
-          }),
-        enabled: Boolean(field.sourceSchemaName && fieldName),
-        staleTime: Infinity,
-      };
+      return pageOptions(
+        `actionOptions:${actionId}:${field.formKey}`,
+        path,
+        {
+          queryKey,
+          queryFn: () =>
+            get<GenericItem[]>({
+              path,
+            }),
+          enabled: Boolean(field.sourceSchemaName && fieldName),
+          staleTime: Infinity,
+        },
+        { dataFields },
+      );
     }),
   });
 
@@ -239,7 +266,8 @@ const buildActionInputs = (
   selectDataMap: ActionSelectDataMap,
 ): GenericInputType[] => {
   if (action.formFields !== undefined) {
-    return action.formFields.map((field) => {
+    const allFields = action.formFields;
+    return allFields.map((field) => {
       const fallback = fallbackInputs.find(
         (input) => input.formKey === field.formKey,
       );
@@ -265,7 +293,28 @@ const buildActionInputs = (
           field,
           selectDataMap,
         ),
-        sourceRequestFilters: field.sourceRequestFilters,
+        optionsSource: field.optionsSource ?? fallback?.optionsSource,
+        sourceSchemaName: field.sourceSchemaName ?? fallback?.sourceSchemaName,
+        sourceValueField: field.sourceValueField ?? fallback?.sourceValueField,
+        sourceLabelField: field.sourceLabelField ?? fallback?.sourceLabelField,
+        sourceDataFields:
+          field.type === "select"
+            ? Array.from(
+                new Set([
+                  ...(field.sourceDataFields || fallback?.sourceDataFields || []),
+                  ...referencedSelectRecordFields(allFields, field.formKey),
+                ]),
+              )
+            : (field.sourceDataFields ?? fallback?.sourceDataFields),
+        optionDisplay: field.optionDisplay ?? fallback?.optionDisplay,
+        sourceRequestFilters:
+          field.sourceRequestFilters ?? fallback?.sourceRequestFilters,
+        sourceFilterBindings:
+          field.sourceFilterBindings ?? fallback?.sourceFilterBindings,
+        selectionRequestSlot:
+          field.type === "select"
+            ? `actionOptions:${actionId}:${field.formKey}`
+            : fallback?.selectionRequestSlot,
         sourceFilterCondition: field.sourceFilterCondition,
         invalidateKeys: field.invalidateKeys?.map((key) => ({
           key,
@@ -461,11 +510,14 @@ export default function GenericUnpaginatedPage({
       resolvedParams,
     ],
   );
+  const pageRequestOverrides = useTableRequestOverrides(legacyValues(requestFilters), legacyValues({ ...tableConfig?.constantFilters, ...constantFilter }));
   const items = useGetDynamicItems<GenericItem>(
     schemaName,
     requestFilters as FormElementsState,
     sourceRevision,
+    pageRequestOverrides,
   );
+  const activePageQueryKey = usePageReadKey("data", legacyRead({ transport: "list", schemaName }, legacyValues(requestFilters)), pageRequestOverrides);
   const rawContainers = useGetContainers();
 
   const container: ContainerModel | undefined = useMemo(() => {
@@ -537,7 +589,7 @@ export default function GenericUnpaginatedPage({
     deleteDynamicItem,
     deleteMultipleDynamicItem,
     updateMultipleDynamicItem,
-  } = useDynamicCrud<GenericItem>(schemaName, hasImageField);
+  } = useDynamicCrud<GenericItem>(schemaName, hasImageField, activePageQueryKey ? [...activePageQueryKey] : undefined);
 
   const displayFields: Field[] = useMemo(() => {
     if (!container?.fields) return [];
@@ -1091,7 +1143,6 @@ export default function GenericUnpaginatedPage({
       updateDynamicItem,
       selectionDataMap,
       lookupSelectionDataMap,
-      t,
       tableConfig,
       tableToggleState,
       configuredTableToggles,
@@ -1124,7 +1175,7 @@ export default function GenericUnpaginatedPage({
     const ins = displayFields
       .map((f) => {
         // Skip fields with equation
-        if (f.equation) return null;
+        if (isComputedField(f)) return null;
 
         const m = fieldToInput(f);
         const label = t(getFieldLabel(f));
@@ -1152,6 +1203,10 @@ export default function GenericUnpaginatedPage({
             placeholder: t(displayLabel),
             required: isRequired,
             isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
+            optionsSource: "schema" as const,
+            sourceSchemaName: f.objectSchemaName,
+            sourceValueField: "_id",
+            sourceLabelField: f.populationSettings.inputSelectionField,
             options: selectionData.map((item) => ({
               value: String(item._id || ""),
               label: String(
@@ -1159,6 +1214,7 @@ export default function GenericUnpaginatedPage({
                   item._id ||
                   "",
               ),
+              sourceItem: item,
             })),
             invalidateKeys:
               f.frontend?.invalidateKeys?.map((key) => ({
@@ -1232,7 +1288,7 @@ export default function GenericUnpaginatedPage({
 
     const fks = displayFields
       .map((f) => {
-        if (f.equation) return null;
+        if (isComputedField(f)) return null;
         const m = fieldToInput(f);
         return { key: f.name, type: m.formKeyType };
       })
@@ -1349,7 +1405,10 @@ export default function GenericUnpaginatedPage({
     (bulkEditActionConfig && bulkEditActionConfig.enabled !== false) ||
       (bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false),
   );
-  const configuredBulkEditFields = bulkEditActionConfig?.formFields || [];
+  const configuredBulkEditFields = useMemo(
+    () => bulkEditActionConfig?.formFields || [],
+    [bulkEditActionConfig?.formFields],
+  );
   const bulkActionSelectionDataMap = useActionFormSelectionData(
     bulkEditActionConfig ? [bulkEditActionConfig] : [],
   );
@@ -1661,7 +1720,7 @@ export default function GenericUnpaginatedPage({
     isEditOpen,
     isCustomActionOpen,
     activeCustomAction,
-    deleteDynamicItem,
+    deleteTableRow,
     updateDynamicItem,
     executeWorkflow,
     handleSubmitItem,
@@ -1696,7 +1755,7 @@ export default function GenericUnpaginatedPage({
           return (
             fieldType !== Types.Image &&
             fieldType !== Types.Image &&
-            !f.equation
+            !isComputedField(f)
           );
         })
         .map((f) => ({
@@ -1799,6 +1858,10 @@ export default function GenericUnpaginatedPage({
             required: false,
             isDisabled: !isBulkStepTwo,
             isMultiple: fieldType === "objectidarray", // Enable multi-select for objectIdArray
+            optionsSource: "schema" as const,
+            sourceSchemaName: f.objectSchemaName,
+            sourceValueField: "_id",
+            sourceLabelField: f.populationSettings.inputSelectionField,
             options: selectionData.map((item) => ({
               value: String(item._id || ""),
               label: String(
@@ -1806,6 +1869,7 @@ export default function GenericUnpaginatedPage({
                   item._id ||
                   "",
               ),
+              sourceItem: item,
             })),
           };
         }
@@ -1868,6 +1932,7 @@ export default function GenericUnpaginatedPage({
     configuredBulkEditFields,
     bulkEditActionConfig,
     bulkActionSelectionDataMap,
+    selectionDataMap,
   ]);
 
   // Memoize handlers to prevent recreating selection actions
@@ -2134,6 +2199,10 @@ export default function GenericUnpaginatedPage({
             placeholder: t(displayLabel),
             required: false,
             isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
+            optionsSource: "schema" as const,
+            sourceSchemaName: f.objectSchemaName,
+            sourceValueField: "_id",
+            sourceLabelField: f.populationSettings.inputSelectionField,
             options: selectionData.map((item) => ({
               value: String(item._id || ""),
               label: String(
@@ -2141,6 +2210,7 @@ export default function GenericUnpaginatedPage({
                   item._id ||
                   "",
               ),
+              sourceItem: item,
             })),
           };
         }
@@ -2336,21 +2406,12 @@ export default function GenericUnpaginatedPage({
     ],
   );
 
+  const sourceRows = useMemo(() => applyTableArraySource(normalizeConfiguredTableRows(items || [], tableConfig), tableConfig), [items, tableConfig]);
   const rows = useMemo(() => {
-    const sourceRows = applyTableArraySource(
-      normalizeConfiguredTableRows(items || [], tableConfig),
-      tableConfig,
-    );
-    const nestedRows = applyTableNestedRows(
-      sourceRows,
-      tableConfig,
-      t,
-      lookupSelectionDataMap,
-    );
-    return tableDragState.enabled
-      ? sortRowsByOrderField(nestedRows, tableDragState.orderField)
-      : nestedRows;
-  }, [items, tableConfig, t, lookupSelectionDataMap, tableDragState]);
+    const nestedRows = applyTableNestedRows(sourceRows, tableConfig, t, lookupSelectionDataMap);
+    return tableDragState.enabled ? sortRowsByOrderField(nestedRows, tableDragState.orderField) : nestedRows;
+  }, [sourceRows, tableConfig, t, lookupSelectionDataMap, tableDragState]);
+
   const filtersById = useMemo(() => {
     const normalized: Record<string, unknown> = {};
     (configuredFilterInputs || []).forEach((filter) => {
@@ -2364,13 +2425,16 @@ export default function GenericUnpaginatedPage({
     () => resolveSelectedRowIds(selectedRows, isSelectionInitialized),
     [isSelectionInitialized, selectedRows],
   );
+  const hasRecordOutput = outputs?.some(output => output.source.kind === "tableSelectedRecord") === true;
+  const { selectedRecord, activeRecordId, activateRecord, reportVisibleRowIds } = useTableRecordSelection(sourceRows, hasRecordOutput);
   const tableOutputState = useMemo<TableOutputState>(
     () => ({
       filters: filtersById,
       search: String(filterFormElements.search ?? ""),
       selectedIds,
+      selectedRecord,
     }),
-    [filterFormElements.search, filtersById, selectedIds],
+    [filterFormElements.search, filtersById, selectedIds, selectedRecord],
   );
   const handleRowDrag = useCallback(
     (draggedRow: GenericItem, targetRow: GenericItem) => {
@@ -2439,6 +2503,9 @@ export default function GenericUnpaginatedPage({
           isSearch={isTableSearchEnabled(tableConfig)}
           selectionActions={selectionActions}
           isSelectionEnabled={isBulkSelectionEnabled}
+          onVisibleRowIdsChange={hasRecordOutput ? reportVisibleRowIds : undefined}
+          activeRecordId={hasRecordOutput ? activeRecordId : undefined}
+          onRecordActivate={hasRecordOutput ? activateRecord : undefined}
           isExcel={!hasImageField}
           onExcelUpload={!hasImageField ? createMultipleDynamicItem : undefined}
           onExcelExport={

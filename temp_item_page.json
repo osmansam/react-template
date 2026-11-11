@@ -1,0 +1,694 @@
+{
+ "_id": "6aeb59a65e1c9ae9ec8cb984",
+ "filters": [],
+ "icon": "MdInventory2",
+ "isAuthenticated": true,
+ "isAuthorized": false,
+ "isGroupOnly": false,
+ "isOnSidebar": true,
+ "name": "Item",
+ "requests": [],
+ "sections": [
+  {
+   "component": {
+    "dataBinding": {
+     "kind": "schema",
+     "parameters": {
+      "item": {
+       "componentId": "cmp_0fae1ca6bc9d4b2fbfbe22b43aae93f4",
+       "outputId": "out_79547efbe3e6424599755bc30453b0ea",
+       "source": "componentOutput"
+      }
+     }
+    },
+    "id": "cmp_15c8562a8a6641a5b0ca0f2316f95958",
+    "props": {
+     "visualBuilder": {
+      "document": {
+       "id": "cmp_cea07fe8c7a14400a3c7390cd164ff6e",
+       "kind": "section",
+       "name": "Untitled design",
+       "root": {
+        "children": [
+         {
+          "children": [
+           {
+            "id": "cmp_d61c7172fc0d4551b56199e5c38659c8",
+            "level": 2,
+            "style": {
+             "typography": {
+              "family": "noto-serif",
+              "leading": "tight",
+              "size": "30px",
+              "tracking": "normal",
+              "weight": "normal"
+             }
+            },
+            "text": "{{item.name}}",
+            "type": "heading"
+           },
+           {
+            "id": "cmp_91c2be1c7f974418945a34bebf676096",
+            "style": {
+             "color": {
+              "text": "text-muted"
+             },
+             "sizing": {
+              "maxWidth": "2xl"
+             },
+             "typography": {
+              "family": "geist",
+              "leading": "relaxed",
+              "size": "15px",
+              "tracking": "normal",
+              "weight": "normal"
+             }
+            },
+            "text": "{{item.price}} hope it works",
+            "type": "text"
+           },
+           {
+            "alt": "Placeholder image",
+            "id": "99d8086d-6e40-4b52-8aae-92531aeffe72",
+            "src": "/visual-builder/placeholder.svg",
+            "style": {
+             "border": {
+              "radius": "lg",
+              "shadow": "sm"
+             },
+             "sizing": {
+              "fit": "cover",
+              "width": "full"
+             }
+            },
+            "type": "image"
+           },
+           {
+            "alignment": "center",
+            "children": [
+             {
+              "action": {
+               "config": {
+                "action": {
+                 "formFields": [
+                  {
+                   "formKey": "name",
+                   "formKeyType": "string",
+                   "label": "name",
+                   "required": true,
+                   "type": "text"
+                  },
+                  {
+                   "formKey": "price",
+                   "formKeyType": "number",
+                   "label": "price",
+                   "type": "number"
+                  }
+                 ],
+                 "kind": "edit",
+                 "modalType": "form"
+                },
+                "schemaName": "item",
+                "valueBindings": {}
+               },
+               "name": "record"
+              },
+              "id": "26ae2eb7-94f9-4064-832e-82e3bb1386f4",
+              "label": "Edit",
+              "style": {
+               "border": {
+                "color": "border",
+                "radius": "full",
+                "shadow": "sm",
+                "width": "hairline"
+               },
+               "color": {
+                "background": "primary",
+                "text": "primary-foreground"
+               },
+               "typography": {
+                "family": "geist",
+                "leading": "normal",
+                "size": "13px",
+                "tracking": "normal",
+                "weight": "normal"
+               }
+              },
+              "type": "button"
+             },
+             {
+              "href": "/",
+              "id": "ae6ba4ef-b182-43e7-b2ac-5fd95faec997",
+              "label": "Button",
+              "style": {
+               "border": {
+                "color": "border",
+                "radius": "full",
+                "shadow": "sm",
+                "width": "hairline"
+               },
+               "color": {
+                "background": "primary",
+                "text": "primary-foreground"
+               },
+               "typography": {
+                "family": "geist",
+                "leading": "normal",
+                "size": "13px",
+                "tracking": "normal",
+                "weight": "normal"
+               }
+              },
+              "type": "button"
+             }
+            ],
+            "direction": "row",
+            "distribution": "start",
+            "gap": "md",
+            "id": "3538825b-db12-475f-b76e-87de9755b053",
+            "style": {
+             "typography": {
+              "family": "geist"
+             }
+            },
+            "type": "flex",
+            "wrap": true
+           }
+          ],
+          "conditionalColors": [
+           {
+            "colors": {
+             "background": {
+              "kind": "token",
+              "value": "secondary"
+             }
+            },
+            "id": "8b17094b-06ad-4027-b623-d7e050e63c1d",
+            "operator": "lt",
+            "path": [
+             "price"
+            ],
+            "value": 100
+           }
+          ],
+          "element": "article",
+          "id": "cmp_a63ef82b5fd04e48b24a44d468c52fcf",
+          "style": {
+           "background": [
+            {
+             "color": {
+              "kind": "custom",
+              "value": "#ffffff"
+             },
+             "kind": "solid"
+            }
+           ],
+           "border": {
+            "color": "border",
+            "radius": "xl",
+            "shadow": "sm",
+            "width": "hairline"
+           },
+           "color": {
+            "background": "surface",
+            "text": "text"
+           },
+           "custom": {
+            "width": "292px"
+           },
+           "spacing": {
+            "gap": "sm",
+            "padding": "lg"
+           },
+           "typography": {
+            "family": "geist"
+           }
+          },
+          "type": "card"
+         }
+        ],
+        "designPreset": "editorial",
+        "designStyle": {},
+        "id": "cmp_5581c37f4fba4191905961de67f441da",
+        "style": {
+         "color": {
+          "background": "background",
+          "text": "text"
+         },
+         "typography": {
+          "family": "geist",
+          "leading": "relaxed",
+          "size": "15px",
+          "tracking": "normal",
+          "weight": "normal"
+         }
+        },
+        "type": "section"
+       },
+       "version": 2
+      },
+      "theme": {
+       "defaultMode": "system",
+       "gradients": {
+        "dark": {
+         "gradient-hero": {
+          "angle": 135,
+          "kind": "linear-gradient",
+          "stops": [
+           {
+            "color": {
+             "kind": "token",
+             "value": "background"
+            },
+            "position": 0
+           },
+           {
+            "color": {
+             "kind": "token",
+             "value": "primary-deep"
+            },
+            "position": 100
+           }
+          ]
+         },
+         "gradient-primary": {
+          "angle": 135,
+          "kind": "linear-gradient",
+          "stops": [
+           {
+            "color": {
+             "kind": "token",
+             "value": "primary"
+            },
+            "position": 0
+           },
+           {
+            "color": {
+             "kind": "token",
+             "value": "accent"
+            },
+            "position": 100
+           }
+          ]
+         },
+         "gradient-surface": {
+          "angle": 180,
+          "kind": "linear-gradient",
+          "stops": [
+           {
+            "color": {
+             "kind": "token",
+             "value": "surface"
+            },
+            "position": 0
+           },
+           {
+            "color": {
+             "kind": "token",
+             "value": "surface-muted"
+            },
+            "position": 100
+           }
+          ]
+         }
+        },
+        "light": {
+         "gradient-hero": {
+          "angle": 135,
+          "kind": "linear-gradient",
+          "stops": [
+           {
+            "color": {
+             "kind": "token",
+             "value": "background"
+            },
+            "position": 0
+           },
+           {
+            "color": {
+             "kind": "token",
+             "value": "primary-deep"
+            },
+            "position": 100
+           }
+          ]
+         },
+         "gradient-primary": {
+          "angle": 135,
+          "kind": "linear-gradient",
+          "stops": [
+           {
+            "color": {
+             "kind": "token",
+             "value": "primary"
+            },
+            "position": 0
+           },
+           {
+            "color": {
+             "kind": "token",
+             "value": "primary-deep"
+            },
+            "position": 100
+           }
+          ]
+         },
+         "gradient-surface": {
+          "angle": 180,
+          "kind": "linear-gradient",
+          "stops": [
+           {
+            "color": {
+             "kind": "token",
+             "value": "surface"
+            },
+            "position": 0
+           },
+           {
+            "color": {
+             "kind": "token",
+             "value": "surface-muted"
+            },
+            "position": 100
+           }
+          ]
+         }
+        }
+       },
+       "palettes": {
+        "dark": {
+         "accent": "#fbbf24",
+         "accent-foreground": "#1c1917",
+         "accent-soft": "#78350f",
+         "background": "#09090b",
+         "border": "#3f3f46",
+         "danger": "#f87171",
+         "input": "#27272a",
+         "inverse": "#09090b",
+         "inverse-muted": "#27272a",
+         "primary": "#2dd4bf",
+         "primary-deep": "#0d9488",
+         "primary-foreground": "#0f172a",
+         "primary-soft": "#134e4a",
+         "ring": "#2dd4bf",
+         "secondary": "#27272a",
+         "secondary-foreground": "#fafafa",
+         "success": "#4ade80",
+         "surface": "#18181b",
+         "surface-muted": "#27272a",
+         "surface-sunken": "#09090b",
+         "text": "#fafafa",
+         "text-muted": "#a1a1aa",
+         "text-subtle": "#71717a",
+         "warning": "#fbbf24"
+        },
+        "light": {
+         "accent": "#f59e0b",
+         "accent-foreground": "#1c1917",
+         "accent-soft": "#fef3c7",
+         "background": "#ffffff",
+         "border": "#cbd5e1",
+         "danger": "#dc2626",
+         "input": "#e2e8f0",
+         "inverse": "#ffffff",
+         "inverse-muted": "#cbd5e1",
+         "primary": "#0f766e",
+         "primary-deep": "#115e59",
+         "primary-foreground": "#ffffff",
+         "primary-soft": "#ccfbf1",
+         "ring": "#0f766e",
+         "secondary": "#e2e8f0",
+         "secondary-foreground": "#0f172a",
+         "success": "#16a34a",
+         "surface": "#ffffff",
+         "surface-muted": "#f1f5f9",
+         "surface-sunken": "#f8fafc",
+         "text": "#020617",
+         "text-muted": "#475569",
+         "text-subtle": "#94a3b8",
+         "warning": "#d97706"
+        }
+       },
+       "version": 1
+      }
+     }
+    },
+    "title": "Untitled design",
+    "type": "custom"
+   },
+   "id": "d89d7272-3af9-4f4b-b9d1-ad8db6f5fd58",
+   "type": "component"
+  },
+  {
+   "cells": [
+    {
+     "column": 1,
+     "components": [
+      {
+       "dataBinding": {
+        "kind": "schema",
+        "schemaName": "item"
+       },
+       "id": "cmp_0fae1ca6bc9d4b2fbfbe22b43aae93f4",
+       "order": 1,
+       "outputs": [
+        {
+         "id": "out_79547efbe3e6424599755bc30453b0ea",
+         "key": "selectedRecord",
+         "source": {
+          "kind": "tableSelectedRecord"
+         },
+         "type": "record"
+        }
+       ],
+       "stateKey": "item",
+       "table": {
+        "actions": [
+         {
+          "enabled": true,
+          "formFields": [
+           {
+            "formKey": "name",
+            "formKeyType": "string",
+            "label": "name",
+            "optionsSource": "static",
+            "placeholder": "name",
+            "sourceValueField": "_id",
+            "staticOptionsJson": "[]",
+            "type": "text"
+           },
+           {
+            "formKey": "price",
+            "formKeyType": "number",
+            "label": "price",
+            "optionsSource": "static",
+            "placeholder": "price",
+            "sourceValueField": "_id",
+            "staticOptionsJson": "[]",
+            "type": "number"
+           }
+          ],
+          "icon": "FiEdit",
+          "id": "default-edit",
+          "key": "default-edit",
+          "kind": "edit",
+          "label": "Edit",
+          "modalType": "form",
+          "order": 1,
+          "submit": {}
+         },
+         {
+          "confirmText": "GeneralDeleteMessage",
+          "enabled": true,
+          "icon": "HiOutlineTrash",
+          "id": "default-delete",
+          "key": "default-delete",
+          "kind": "delete",
+          "label": "Delete",
+          "modalType": "confirm",
+          "order": 2,
+          "submit": {}
+         }
+        ],
+        "addButton": {
+         "buttonName": "Create",
+         "enabled": true,
+         "formFields": [
+          {
+           "formKey": "name",
+           "formKeyType": "string",
+           "label": "name",
+           "optionsSource": "static",
+           "placeholder": "name",
+           "sourceValueField": "_id",
+           "staticOptionsJson": "[]",
+           "type": "text"
+          },
+          {
+           "formKey": "price",
+           "formKeyType": "number",
+           "label": "price",
+           "optionsSource": "static",
+           "placeholder": "price",
+           "sourceValueField": "_id",
+           "staticOptionsJson": "[]",
+           "type": "number"
+          }
+         ],
+         "icon": "FiPlus",
+         "id": "default-create",
+         "key": "default-create",
+         "kind": "create",
+         "label": "Add",
+         "modalType": "form",
+         "order": 1,
+         "submit": {}
+        },
+        "bulkActions": {
+         "delete": {
+          "confirmText": "Are you sure you want to delete the selected items?",
+          "confirmTitle": "Delete Selected",
+          "enabled": true,
+          "icon": "HiOutlineTrash",
+          "id": "bulk-delete",
+          "key": "bulk-delete",
+          "kind": "delete",
+          "label": "Delete Selected",
+          "modalType": "confirm",
+          "order": 2,
+          "submit": {}
+         },
+         "edit": {
+          "buttonName": "Edit",
+          "enabled": true,
+          "formFields": [
+           {
+            "formKey": "name",
+            "formKeyType": "string",
+            "label": "name",
+            "optionsSource": "static",
+            "placeholder": "name",
+            "sourceValueField": "_id",
+            "staticOptionsJson": "[]",
+            "type": "text"
+           },
+           {
+            "formKey": "price",
+            "formKeyType": "number",
+            "label": "price",
+            "optionsSource": "static",
+            "placeholder": "price",
+            "sourceValueField": "_id",
+            "staticOptionsJson": "[]",
+            "type": "number"
+           },
+           {
+            "formKey": "createdAt",
+            "formKeyType": "date",
+            "label": "createdAt",
+            "optionsSource": "static",
+            "placeholder": "createdAt",
+            "sourceValueField": "_id",
+            "staticOptionsJson": "[]",
+            "type": "date"
+           },
+           {
+            "formKey": "updatedAt",
+            "formKeyType": "date",
+            "label": "updatedAt",
+            "optionsSource": "static",
+            "placeholder": "updatedAt",
+            "sourceValueField": "_id",
+            "staticOptionsJson": "[]",
+            "type": "date"
+           }
+          ],
+          "icon": "FiEdit",
+          "id": "bulk-edit",
+          "key": "bulk-edit",
+          "kind": "update",
+          "label": "Edit Selected",
+          "modalType": "form",
+          "order": 1,
+          "submit": {}
+         }
+        },
+        "columns": [
+         {
+          "field": "name"
+         },
+         {
+          "field": "price"
+         },
+         {
+          "field": "createdAt"
+         },
+         {
+          "field": "updatedAt"
+         }
+        ],
+        "dataMode": "paginated",
+        "filterPanel": {
+         "inputs": [
+          {
+           "formKey": "name",
+           "formKeyType": "string",
+           "id": "tfl_6821fa425eb54d3fa3d3f11665617ce2",
+           "label": "name",
+           "optionsSource": "static",
+           "placeholder": "name",
+           "sourceValueField": "_id",
+           "staticOptionsJson": "[]",
+           "type": "text"
+          },
+          {
+           "formKey": "price",
+           "formKeyType": "number",
+           "id": "tfl_dfe0ff0dd78946d484685ab49dd1a6fc",
+           "label": "price",
+           "optionsSource": "static",
+           "placeholder": "price",
+           "sourceValueField": "_id",
+           "staticOptionsJson": "[]",
+           "type": "number"
+          },
+          {
+           "formKey": "createdAt",
+           "formKeyType": "date",
+           "id": "tfl_7f4dd323dce344f58126911f0e71f89c",
+           "label": "createdAt",
+           "optionsSource": "static",
+           "placeholder": "createdAt",
+           "sourceValueField": "_id",
+           "staticOptionsJson": "[]",
+           "type": "date"
+          },
+          {
+           "formKey": "updatedAt",
+           "formKeyType": "date",
+           "id": "tfl_a155fe78667949cc9ccdadb8bb769644",
+           "label": "updatedAt",
+           "optionsSource": "static",
+           "placeholder": "updatedAt",
+           "sourceValueField": "_id",
+           "staticOptionsJson": "[]",
+           "type": "date"
+          }
+         ]
+        }
+       },
+       "title": "Item",
+       "type": "table"
+      }
+     ],
+     "id": "cell-1793808811586",
+     "row": 1
+    }
+   ],
+   "columns": 1,
+   "gap": 16,
+   "order": 1
+  }
+ ],
+ "slug": "item"
+}

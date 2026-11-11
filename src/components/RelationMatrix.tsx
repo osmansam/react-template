@@ -1,5 +1,7 @@
+import { usePageRequestConsumer } from "../pageRuntime/requests/ConsumerProvider";
+import { pageRequestInvalidationPredicate } from "../pageRuntime/requests/invalidation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { IoCheckmark, IoCloseOutline } from "react-icons/io5";
 import { CheckSwitch } from "../common/CheckSwitch";
@@ -36,6 +38,7 @@ import type {
 } from "./panelComponents/shared/types";
 
 type RecordItem = Record<string, unknown>;
+const EMPTY_ROWS: RecordItem[] = [];
 
 const valueLabel = (value: unknown): string => {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -48,13 +51,18 @@ const valueLabel = (value: unknown): string => {
 };
 
 export default function RelationMatrix({
-  config,
+  config: inlineConfig,
   title,
 }: {
   config: RelationMatrixConfig;
   title?: string;
 }) {
   const queryClient = useQueryClient();
+  const consumer = usePageRequestConsumer();
+  const requestScope = consumer?.scope;
+  const rowSource = consumer?.connections.get("rows")?.definition.source;
+  const columnSource = consumer?.connections.get("columns")?.definition.source;
+  const config = useMemo(() => ({ ...inlineConfig, rowSchemaName: rowSource?.schemaName || inlineConfig.rowSchemaName, columnSchemaName: columnSource?.schemaName || inlineConfig.columnSchemaName }), [inlineConfig, rowSource?.schemaName, columnSource?.schemaName]);
   const toggles = (config.toggles || []).filter(
     (toggle) => toggle.id !== "show-relations",
   );
@@ -89,15 +97,17 @@ export default function RelationMatrix({
       requests.row.limit,
       requests.row.schemaName,
       requests.row.filters,
+      "rows",
     )
-      ?.items || [];
+      ?.items || EMPTY_ROWS;
   const columns =
     useGetPaginatedItems<RecordItem>(
       requests.column.page,
       requests.column.limit,
       requests.column.schemaName,
       requests.column.filters,
-    )?.items || [];
+      "columns",
+    )?.items || EMPTY_ROWS;
   const editable = isBooleanColumnEditable(
     config.editToggle,
     toggleState,
@@ -108,7 +118,7 @@ export default function RelationMatrix({
     [columns, config],
   );
 
-  const changeMembership = async (
+  const changeMembership = useCallback(async (
     row: RecordItem,
     column: RecordItem,
     nextChecked: boolean,
@@ -137,7 +147,7 @@ export default function RelationMatrix({
           ),
       );
       await queryClient.invalidateQueries({
-        queryKey: ["dynamic", config.columnSchemaName],
+        ...(requestScope ? { predicate: pageRequestInvalidationPredicate(requestScope, config.columnSchemaName) } : { queryKey: ["dynamic", config.columnSchemaName] }),
       });
       setOverrides((current) => {
         const next = { ...current };
@@ -158,7 +168,7 @@ export default function RelationMatrix({
         return next;
       });
     }
-  };
+  }, [config, pending, queryClient, requestScope]);
 
   const tableColumns = descriptors.columns as ColumnType[];
   const rowKeys = useMemo<RowKeyType<RecordItem>[]>(
@@ -211,7 +221,7 @@ export default function RelationMatrix({
         };
       }),
     ],
-    [columns, config, editable, overrides, pending],
+    [changeMembership, columns, config, editable, overrides, pending],
   );
   const filters = useMemo<FilterType[]>(
     () =>

@@ -71,6 +71,17 @@ const DynamicFormField = ({ input, formElements, error, onChange }: Props) => {
         placeholder={placeholder}
         isMultiple={input.isMultiple || false}
         requiredField={input.required}
+        isAutoFill={
+          (input.isAutoFill ?? true) &&
+          (value === undefined ||
+            value === null ||
+            value === "" ||
+            (Array.isArray(value) && value.length === 0))
+        }
+        isReadOnly={input.isReadOnly}
+        selectionStatus={input.selectionStatus}
+        selectionMessage={input.selectionMessage}
+        retrySelection={input.retrySelection}
         onChange={(
           selected: SingleValue<OptionType> | MultiValue<OptionType>,
         ) => {

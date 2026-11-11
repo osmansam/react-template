@@ -4,6 +4,8 @@ import { IoIosClose } from "react-icons/io";
 import { ActionMeta, MultiValue, SingleValue } from "react-select";
 import { useGeneralContext } from "../../../context/General.context";
 import { FormElementsState, FormElementValue } from "../../../types";
+import { clearDependentSelectValues } from "../../../utils/selectFilters";
+import { useDependentSelectInputs } from "../../forms/useDependentSelectInputs";
 import { OptionType } from "../../panelComponents/shared/types";
 import DateInput from "../FormElements/DateInput";
 import { GenericButton } from "../FormElements/GenericButton";
@@ -100,6 +102,9 @@ const FilterPanel = ({
   const { setCurrentPage } = useGeneralContext();
   const [tempFormElements, setTempFormElements] =
     useState<FormElementsState>(formElements);
+  const resolvedInputs = useDependentSelectInputs(inputs, tempFormElements, {
+    defaultSlotPrefix: "filterOptions",
+  });
 
   // Sync tempFormElements with formElements when not in apply button mode
   useEffect(() => {
@@ -113,8 +118,8 @@ const FilterPanel = ({
   };
   const handleClearAllFilters = () => {
     const clearedFormElements: FormElementsState = {};
-    inputs.forEach((input) => {
-      clearedFormElements[input.formKey] = "";
+    resolvedInputs.forEach((input) => {
+      clearedFormElements[input.formKey] = input.isMultiple ? [] : "";
     });
 
     setFormElements(clearedFormElements);
@@ -294,30 +299,31 @@ const FilterPanel = ({
           </GenericButton>
         )}
       </div>
-      {inputs.map((input) => {
+      {resolvedInputs.map((input) => {
         const value = tempFormElements[input.formKey] ?? "";
         const handleChange = (key: string) => (value: FormElementValue) => {
-          const changedInput = inputs.find((input) => input.formKey === key);
-          if (changedInput?.invalidateKeys) {
-            changedInput.invalidateKeys.forEach((key) => {
-              if (isApplyButtonActive) {
-                setTempFormElements((prev) => ({
-                  ...prev,
-                  [key.key]: key.defaultValue,
-                }));
-              } else {
-                setFormElements((prev) => ({
-                  ...prev,
-                  [key.key]: key.defaultValue,
-                }));
-              }
+          const changedInput = resolvedInputs.find(
+            (candidate) => candidate.formKey === key,
+          );
+          const applyChange = (prev: FormElementsState) => {
+            const next = clearDependentSelectValues(resolvedInputs, prev, {
+              ...prev,
+              [key]: value,
             });
-          }
+            if (changedInput?.invalidateKeys) {
+              changedInput.invalidateKeys.forEach((invKey) => {
+                next[invKey.key] = invKey.defaultValue;
+              });
+            }
+            return next;
+          };
 
-          isApplyButtonActive
-            ? setTempFormElements((prev) => ({ ...prev, [key]: value }))
-            : setFormElements((prev) => ({ ...prev, [key]: value }));
-          setCurrentPage(1);
+          if (isApplyButtonActive) {
+            setTempFormElements(applyChange);
+          } else {
+            setFormElements(applyChange);
+            setCurrentPage(1);
+          }
         };
 
         const handleChangeForSelect =
@@ -326,49 +332,46 @@ const FilterPanel = ({
             selectedValue: SingleValue<OptionType> | MultiValue<OptionType>,
             actionMeta: ActionMeta<OptionType>,
           ) => {
+            const changedInput = resolvedInputs.find(
+              (candidate) => candidate.formKey === key,
+            );
             if (
               actionMeta.action === "select-option" ||
               actionMeta.action === "remove-value" ||
               actionMeta.action === "clear"
             ) {
-              if (Array.isArray(selectedValue)) {
-                const values = selectedValue.map((option) => option.value);
-                isApplyButtonActive
-                  ? setTempFormElements((prev) => ({ ...prev, [key]: values }))
-                  : setFormElements((prev) => ({ ...prev, [key]: values }));
-              } else if (selectedValue) {
-                isApplyButtonActive
-                  ? setTempFormElements((prev) => ({
-                      ...prev,
-                      [key]: (selectedValue as OptionType)?.value,
-                    }))
-                  : setFormElements((prev) => ({
-                      ...prev,
-                      [key]: (selectedValue as OptionType)?.value,
-                    }));
+              const nextValue = Array.isArray(selectedValue)
+                ? selectedValue.map((option) => option.value)
+                : selectedValue
+                  ? (selectedValue as OptionType)?.value
+                  : "";
+              const applyChange = (prev: FormElementsState) => {
+                const next = clearDependentSelectValues(resolvedInputs, prev, {
+                  ...prev,
+                  [key]: nextValue,
+                });
+                if (changedInput?.invalidateKeys) {
+                  changedInput.invalidateKeys.forEach((invKey) => {
+                    next[invKey.key] = invKey.defaultValue;
+                  });
+                }
+                return next;
+              };
+              if (isApplyButtonActive) {
+                setTempFormElements(applyChange);
               } else {
-                isApplyButtonActive
-                  ? setTempFormElements((prev) => ({
-                      ...prev,
-                      [key]: "",
-                    }))
-                  : setFormElements((prev) => ({
-                      ...prev,
-                      [key]: "",
-                    }));
+                setFormElements(applyChange);
               }
-            }
-            const changedInput = inputs.find((input) => input.formKey === key);
-            if (changedInput?.invalidateKeys) {
-              changedInput.invalidateKeys.forEach((key) => {
+            } else if (changedInput?.invalidateKeys) {
+              changedInput.invalidateKeys.forEach((invKey) => {
                 isApplyButtonActive
                   ? setTempFormElements((prev) => ({
                       ...prev,
-                      [key.key]: key.defaultValue,
+                      [invKey.key]: invKey.defaultValue,
                     }))
                   : setFormElements((prev) => ({
                       ...prev,
-                      [key.key]: key.defaultValue,
+                      [invKey.key]: invKey.defaultValue,
                     }));
               });
             }
@@ -384,7 +387,9 @@ const FilterPanel = ({
               }
               changedInput.additionalOnChange(valueForCallback);
             }
-            setCurrentPage(1);
+            if (!isApplyButtonActive) {
+              setCurrentPage(1);
+            }
           };
         if (input.isDisabled) return null;
         return (
@@ -419,17 +424,7 @@ const FilterPanel = ({
                 isDatePicker={input.isDatePicker ?? false}
                 isOnClearActive={input?.isOnClearActive}
                 isDebounce={input?.isDebounce ?? false}
-                onClear={() =>
-                  isApplyButtonActive
-                    ? setTempFormElements((prev) => ({
-                        ...prev,
-                        [input.formKey]: "",
-                      }))
-                    : setFormElements((prev) => ({
-                        ...prev,
-                        [input.formKey]: "",
-                      }))
-                }
+                onClear={() => handleChange(input.formKey)("")}
               />
             )}
             {input.type === InputTypes.DATE && (
@@ -479,18 +474,25 @@ const FilterPanel = ({
                 options={input.options ?? []}
                 placeholder={input.placeholder ?? ""}
                 isMultiple={input.isMultiple ?? false}
+                isAutoFill={input.isAutoFill ?? false}
+                selectionStatus={input.selectionStatus}
+                selectionMessage={input.selectionMessage}
+                retrySelection={input.retrySelection}
                 onChange={handleChangeForSelect(input.formKey)}
                 isOnClearActive={input?.isOnClearActive ?? true}
                 onClear={() => {
-                  isApplyButtonActive
-                    ? setTempFormElements((prev) => ({
-                        ...prev,
-                        [input.formKey]: input.isMultiple ? [] : "",
-                      }))
-                    : setFormElements((prev) => ({
-                        ...prev,
-                        [input.formKey]: input.isMultiple ? [] : "",
-                      }));
+                  const emptyValue = input.isMultiple ? [] : "";
+                  const applyClear = (prev: FormElementsState) =>
+                    clearDependentSelectValues(resolvedInputs, prev, {
+                      ...prev,
+                      [input.formKey]: emptyValue,
+                    });
+                  if (isApplyButtonActive) {
+                    setTempFormElements(applyClear);
+                  } else {
+                    setFormElements(applyClear);
+                    setCurrentPage(1);
+                  }
                 }}
               />
             )}

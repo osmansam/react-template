@@ -401,7 +401,7 @@ describe("getTableLinkConfig", () => {
             },
           ],
         },
-        { name: "customerEmail", type: "string" } as any,
+        { name: "customerEmail", type: "string" },
       ),
     ).toEqual({
       linkTemplate: "mailto:{{value}}",

@@ -1,5 +1,3 @@
-import { isVisualBuilderRoute } from "../visualBuilder/routes";
-
 export function isAuthPublicRoute(pathname: string) {
   return (
     pathname.endsWith("/login") ||
@@ -10,7 +8,7 @@ export function isAuthPublicRoute(pathname: string) {
 }
 
 export function shouldLoadDynamicPages(pathname: string, isLoggedIn: boolean) {
-  return !isVisualBuilderRoute(pathname) && !isAuthPublicRoute(pathname) && isLoggedIn;
+  return !isAuthPublicRoute(pathname) && isLoggedIn;
 }
 
 export function getDynamicPagesAuthFailureRedirect(

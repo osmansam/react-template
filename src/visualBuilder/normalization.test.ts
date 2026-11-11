@@ -14,3 +14,9 @@ describe("authored visual JSON", () => {
     expect(result.data[0].name).toBe("Inventory");
   });
 });
+
+
+it("preserves request slot identities while normalizing connection metadata", async () => {
+ const response = await axiosClient.get("/page", { adapter: async config => ({ config, status: 200, statusText: "OK", headers: new AxiosHeaders(), data: { Name: "Catalog", Sections: [{ Component: { ID: "visual", Type: "custom", RequestBindings: { "collection:Catalog_Rows": { RequestId: "Products_MAIN" }, "dataset:dataset_15476fa8": { RequestId: "old" } } } }] } }) });
+ expect(response.data.sections[0].component.requestBindings).toEqual({ "collection:Catalog_Rows": { requestId: "Products_MAIN" }, "dataset:dataset_15476fa8": { requestId: "old" } });
+});

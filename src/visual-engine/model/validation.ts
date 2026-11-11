@@ -1,9 +1,11 @@
 import { componentRegistry } from "../components/core";
+import { isConditionalColorRules, supportsConditionalColors } from "./conditionalColors";
+import { isHostAction } from "./hostActions";
 import { sidebarTriggerHasName } from "./sidebar";
 import { FONT_FAMILIES } from "./styles";
 import { isDesignPresetId } from "./designPresets";
 import { parseDesignStyleOptions } from "./designStyle";
-import { IMAGE_COMPARISON_ASPECT_RATIOS } from "./nodes";
+import { COLLECTION_FILTER_OPERATORS, type CollectionFilterOperator, IMAGE_COMPARISON_ASPECT_RATIOS } from "./nodes";
 import type { CustomDimensionSpec } from "./styles";
 import { ANIMATION_EASINGS, ANIMATION_LIMITS, ANIMATION_PRESETS, ANIMATION_TRIGGERS, type AnimationSpec } from "./animation";
 import { NODE_DEFINITIONS } from "./capabilities";
@@ -45,6 +47,7 @@ import type {
   NodeBase,
   NodeType,
   RepeaterNode,
+  RepeaterItemsLayout,
   CardNode,
   OverlayNode,
   FormNode,
@@ -200,7 +203,7 @@ const bindingProperties = {
   quote: ["quote", "author", "role", "avatarSrc", "avatarAlt"],
 } as const;
 const unsafePathSegments = new Set(["__proto__", "prototype", "constructor"]);
-const nodeBaseKeys = ["id", "type", "style", "responsive", "layout", "animation", "effects", "bindings", "slideLink"] as const;
+const nodeBaseKeys = ["id", "type", "style", "responsive", "layout", "animation", "effects", "bindings", "conditionalColors", "slideLink"] as const;
 const extendedNodeKeys: Partial<Record<NodeType, readonly string[]>> = {
   "image-comparison": ["beforeSrc", "afterSrc", "beforeAlt", "afterAlt", "beforeLabel", "afterLabel", "accessibleLabel", "position", "showLabels", "aspectRatio", "objectFit"],
   "expandable-card": ["accessibleLabel", "closeLabel", "children"],
@@ -401,6 +404,7 @@ function parseNode(input: unknown, path: string, parentType: NodeType | null, is
         type: "repeater",
         source: parseCollectionSource(input.source, `${path}.source`, issues),
         itemAlias: parseIdentifier(input.itemAlias, `${path}.itemAlias`, "repeater.alias_invalid", issues),
+        ...(input.itemsLayout === undefined ? {} : { itemsLayout: parseRepeaterItemsLayout(input.itemsLayout, `${path}.itemsLayout`, issues) }),
         children: parseChildren(input.children, path, "repeater", issues) as RepeaterNode["children"],
       } satisfies RepeaterNode;
     case "card": {
@@ -483,6 +487,8 @@ function parseNode(input: unknown, path: string, parentType: NodeType | null, is
       } satisfies ImageComparisonNode;
     }
     case "button": {
+      if (input.action !== undefined && !isHostAction(input.action)) issues.push(issue(`${path}.action`, "button.action_invalid", "Button action must contain a name and bounded safe JSON configuration"));
+      if (input.action !== undefined && input.submit === true) issues.push(issue(`${path}.action`, "button.action_submit_invalid", "An action button cannot also submit a native form"));
       const href = parseOptionalUrl(input.href, `${path}.href`, issues);
       const iconId = parseOptionalIconId(input.iconId, `${path}.iconId`, issues);
       const iconPosition = input.iconPosition === undefined ? undefined : input.iconPosition === "start" || input.iconPosition === "end" ? input.iconPosition : undefined;
@@ -502,6 +508,7 @@ function parseNode(input: unknown, path: string, parentType: NodeType | null, is
         ...(input.openInNewTab === undefined ? {} : { openInNewTab: input.openInNewTab === true }),
         ...(accessibleLabel === undefined ? {} : { accessibleLabel }),
         ...(input.submit === undefined ? {} : { submit: input.submit === true }),
+        ...(isHostAction(input.action) ? { action: { name: input.action.name, config: cloneJsonObject(input.action.config) } } : {}),
       } satisfies ButtonNode;
     }
     case "icon": {
@@ -837,6 +844,8 @@ function parseNodeBase(input: Record<string, unknown>, path: string, parentType:
   const effects = parseEffectAttachments(input.effects, `${path}.effects`, issues);
   const bindings = parseBindings(input.bindings, input.type as NodeType, `${path}.bindings`, issues);
   const slideLink = parseSlideLink(input.slideLink, `${path}.slideLink`, issues);
+  const conditionalColors = input.conditionalColors === undefined ? undefined : isConditionalColorRules(input.conditionalColors) && supportsConditionalColors(input.type as NodeType) ? structuredClone(input.conditionalColors) : undefined;
+  if (input.conditionalColors !== undefined && conditionalColors === undefined) issues.push(issue(`${path}.conditionalColors`, "conditional_colors.invalid", "Use up to 20 valid color rules on a styled component, with safe field paths, typed values and solid colors."));
   return {
     id: input.id,
     ...(style === undefined ? {} : { style }),
@@ -846,6 +855,7 @@ function parseNodeBase(input: Record<string, unknown>, path: string, parentType:
     ...(effects === undefined ? {} : { effects }),
     ...(bindings === undefined ? {} : { bindings }),
     ...(slideLink === undefined ? {} : { slideLink }),
+    ...(conditionalColors === undefined ? {} : { conditionalColors }),
   };
 }
 
@@ -957,6 +967,12 @@ function parseScrollSequenceFrames(input: unknown, path: string, issues: Validat
   return frames;
 }
 
+function parseRequestSlot(input: unknown, path: string, issues: ValidationIssue[]): string {
+  if (typeof input === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(input)) return input;
+  issues.push(issue(path, "repeater.request_slot_invalid", "Choose a valid collection slot"));
+  return "invalid";
+}
+
 function parseIdentifier(input: unknown, path: string, code: string, issues: ValidationIssue[]): string {
   if (typeof input === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(input)) return input;
   issues.push(issue(path, code, "Value must be a safe identifier"));
@@ -1009,7 +1025,7 @@ function parseCollectionSource(input: unknown, path: string, issues: ValidationI
     issues.push(issue(path, "repeater.source_object_required", "Repeater source must be an object"));
     return { kind: "autotable", schemaName: "invalid", limit: 1 };
   }
-  rejectUnknownKeys(input, ["kind", "schemaName", "filters", "sort", "limit"], path, "repeater.source_key_unknown", issues);
+  rejectUnknownKeys(input, ["kind", "schemaName", "filters", "sort", "limit", "requestSlot"], path, "repeater.source_key_unknown", issues);
   if (input.kind !== "autotable") issues.push(issue(`${path}.kind`, "repeater.source_kind_invalid", "Only AutoTable collection sources are supported"));
   const schemaName = parseIdentifier(input.schemaName, `${path}.schemaName`, "repeater.schema_invalid", issues);
   const limit = typeof input.limit === "number" && Number.isInteger(input.limit) && input.limit >= 1 && input.limit <= 100
@@ -1018,7 +1034,7 @@ function parseCollectionSource(input: unknown, path: string, issues: ValidationI
   if (limit !== input.limit) issues.push(issue(`${path}.limit`, "repeater.limit_invalid", "Repeater limit must be an integer from 1 through 100"));
   const filters = parseCollectionFilters(input.filters, `${path}.filters`, issues);
   const sort = parseCollectionSort(input.sort, `${path}.sort`, issues);
-  return { kind: "autotable", schemaName, limit, ...(filters ? { filters } : {}), ...(sort ? { sort } : {}) };
+  return { kind: "autotable", schemaName, limit, ...(input.requestSlot === undefined ? {} : { requestSlot: parseRequestSlot(input.requestSlot, `${path}.requestSlot`, issues) }), ...(filters ? { filters } : {}), ...(sort ? { sort } : {}) };
 }
 
 function parseCollectionFilters(input: unknown, path: string, issues: ValidationIssue[]): RepeaterNode["source"]["filters"] {
@@ -1035,9 +1051,10 @@ function parseCollectionFilters(input: unknown, path: string, issues: Validation
     }
     rejectUnknownKeys(entry, ["field", "operator", "value"], entryPath, "repeater.filter_key_unknown", issues);
     const field = parseIdentifier(entry.field, `${entryPath}.field`, "repeater.filter_field_invalid", issues);
-    const operator = entry.operator === "in" ? entry.operator : "eq";
-    if (entry.operator !== "eq" && entry.operator !== "in") issues.push(issue(`${entryPath}.operator`, "repeater.filter_operator_invalid", "Filter operator is not supported"));
-    const scalar = (value: unknown) => value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+    const supported = COLLECTION_FILTER_OPERATORS.includes(entry.operator as CollectionFilterOperator);
+    const operator: CollectionFilterOperator = supported ? entry.operator as CollectionFilterOperator : "eq";
+    if (!supported) issues.push(issue(`${entryPath}.operator`, "repeater.filter_operator_invalid", "Filter operator is not supported"));
+    const scalar = (value: unknown) => value === null || typeof value === "string" || (typeof value === "number" && Number.isFinite(value)) || typeof value === "boolean";
     const validValue = operator === "in" ? Array.isArray(entry.value) && entry.value.length <= 50 && entry.value.every(scalar) : scalar(entry.value);
     if (!validValue) issues.push(issue(`${entryPath}.value`, "repeater.filter_value_invalid", "Filter value must be a JSON scalar or bounded scalar array"));
     return { field, operator, value: validValue ? entry.value as never : null };
@@ -1510,6 +1527,35 @@ function parseStyleGroup(
     parsed[key] = value;
   }
   return parsed;
+}
+
+function parseRepeaterItemsLayout(input: unknown, path: string, issues: ValidationIssue[]): RepeaterItemsLayout | undefined {
+  if (!isRecord(input)) {
+    issues.push(issue(path, "repeater.items_layout_invalid", "Repeated items layout must be an object"));
+    return undefined;
+  }
+  rejectUnknownKeys(input, ["columns", "gap", "alignment"], path, "repeater.items_layout_key_unknown", issues);
+  const numbers = (key: "columns" | "gap", min: number, max: number): BreakpointValue<number> => {
+    const map = input[key];
+    const result = { mobile: min, tablet: min, desktop: min };
+    if (!isRecord(map)) {
+      issues.push(issue(`${path}.${key}`, "repeater.items_layout_map_invalid", "Mobile, tablet and desktop settings are required"));
+      return result;
+    }
+    rejectUnknownKeys(map, breakpoints, `${path}.${key}`, "repeater.items_layout_breakpoint_unknown", issues);
+    for (const breakpoint of breakpoints) {
+      const value = map[breakpoint];
+      if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+        issues.push(issue(`${path}.${key}.${breakpoint}`, "repeater.items_layout_number_invalid", `${key} must be an integer from ${min} through ${max}`));
+      } else result[breakpoint] = value;
+    }
+    return result;
+  };
+  const alignment = input.alignment;
+  if (alignment !== "stretch" && alignment !== "start" && alignment !== "center" && alignment !== "end") {
+    issues.push(issue(`${path}.alignment`, "repeater.items_layout_alignment_invalid", "Item alignment must be stretch, start, center or end"));
+  }
+  return { columns: numbers("columns", 1, 6), gap: numbers("gap", 0, 128), alignment: alignment === "start" || alignment === "center" || alignment === "end" ? alignment : "stretch" };
 }
 
 function parseResponsive(input: unknown, path: string, issues: ValidationIssue[]): ResponsiveSpec | undefined {

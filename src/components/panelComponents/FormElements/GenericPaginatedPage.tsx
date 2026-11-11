@@ -1,6 +1,15 @@
+import { tableRequestConfig } from "../../../pageRuntime/requests/tableConfig";
+import { usePageRequestConsumer } from "../../../pageRuntime/requests/ConsumerProvider";
+import { pageRequestControls } from "../../../utils/pageRequests";
+import { usePageReadKey } from "../../../pageRuntime/requests/usePageRead";
+import { legacyRead } from "../../../pageRuntime/requests/legacyAdapters";
+import { usePageSelectionOptions } from "../../../pageRuntime/requests/selectionOptions";
+import { useTableRequestDefaults, useTableRequestOverrides } from "../../../pageRuntime/requests/tableOverrides";
+import { legacyValues } from "../../../pageRuntime/requests/legacyAdapters";
+import { useTableRecordSelection } from "../../../pageRuntime/useTableRecordSelection";
 // pages/GenericPaginatedPage.tsx
 import { useQueries } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IoCheckmark, IoCloseOutline } from "react-icons/io5";
 import { CheckSwitch } from "../../../common/CheckSwitch";
@@ -56,11 +65,16 @@ import {
   isDisplayablePrimitive,
   normalizeContainer,
   normalizeField,
+  isComputedField,
   tailwindBgToStyle,
 } from "../../../utils/genericPageHelpers";
 import { getIconByName } from "../../../utils/menuIcons";
 import { formatPopulatedArrayValue } from "../../../utils/populatedArrayDisplay";
 import { formatTableDate } from "../../../utils/tableDateFormat";
+import {
+  hasDependentSelectFilters,
+  referencedSelectRecordFields,
+} from "../../../utils/selectFilters";
 import { getSelectionQueryConfig } from "../../../utils/selectionQuery";
 import { renderTableColumnTemplate } from "../../../utils/tableColumnTemplate";
 import {
@@ -129,37 +143,53 @@ const getSelectionFieldName = (field: TableActionFormFieldConfig) =>
 const useActionFormSelectionData = (
   actions: TableActionConfig[] = [],
 ): ActionSelectDataMap => {
+  const pageOptions = usePageSelectionOptions();
   const schemaSelectFields = actions.flatMap((action, actionIndex) =>
     (action.formFields || [])
       .filter(
         (field) =>
           field.type === "select" &&
-          field.optionsSource === "schema" &&
-          field.sourceSchemaName,
+          !hasDependentSelectFilters(field) &&
+          ((field.optionsSource === "schema" && field.sourceSchemaName) || pageOptions.connected(`actionOptions:${getActionId(action, actionIndex)}:${field.formKey}`)),
       )
       .map((field) => ({
+        action,
         actionId: getActionId(action, actionIndex),
         field,
       })),
   );
 
   const queryResults = useQueries({
-    queries: schemaSelectFields.map(({ field }) => {
+    queries: schemaSelectFields.map(({ action, field, actionId }) => {
       const fieldName = getSelectionFieldName(field);
+      const valueField = field.sourceValueField || "_id";
+      const dataFields = Array.from(
+        new Set([
+          ...(field.sourceDataFields || []),
+          ...referencedSelectRecordFields(action.formFields || [], field.formKey),
+        ]),
+      ).filter((name) => name !== fieldName && name !== valueField);
       const { path, queryKey } = getSelectionQueryConfig({
         schemaName: field.sourceSchemaName || "",
         fieldName,
+        valueField,
+        dataFields,
         filterParams: field.sourceRequestFilters,
       });
-      return {
-        queryKey,
-        queryFn: () =>
-          get<GenericItem[]>({
-            path,
-          }),
-        enabled: Boolean(field.sourceSchemaName && fieldName),
-        staleTime: Infinity,
-      };
+      return pageOptions(
+        `actionOptions:${actionId}:${field.formKey}`,
+        path,
+        {
+          queryKey,
+          queryFn: () =>
+            get<GenericItem[]>({
+              path,
+            }),
+          enabled: Boolean(field.sourceSchemaName && fieldName),
+          staleTime: Infinity,
+        },
+        { dataFields },
+      );
     }),
   });
 
@@ -251,7 +281,8 @@ const buildActionInputs = (
   selectDataMap: ActionSelectDataMap,
 ): GenericInputType[] => {
   if (action.formFields !== undefined) {
-    return action.formFields.map((field) => {
+    const allFields = action.formFields;
+    return allFields.map((field) => {
       const fallback = fallbackInputs.find(
         (input) => input.formKey === field.formKey,
       );
@@ -277,7 +308,28 @@ const buildActionInputs = (
           field,
           selectDataMap,
         ),
-        sourceRequestFilters: field.sourceRequestFilters,
+        optionsSource: field.optionsSource ?? fallback?.optionsSource,
+        sourceSchemaName: field.sourceSchemaName ?? fallback?.sourceSchemaName,
+        sourceValueField: field.sourceValueField ?? fallback?.sourceValueField,
+        sourceLabelField: field.sourceLabelField ?? fallback?.sourceLabelField,
+        sourceDataFields:
+          field.type === "select"
+            ? Array.from(
+                new Set([
+                  ...(field.sourceDataFields || fallback?.sourceDataFields || []),
+                  ...referencedSelectRecordFields(allFields, field.formKey),
+                ]),
+              )
+            : (field.sourceDataFields ?? fallback?.sourceDataFields),
+        optionDisplay: field.optionDisplay ?? fallback?.optionDisplay,
+        sourceRequestFilters:
+          field.sourceRequestFilters ?? fallback?.sourceRequestFilters,
+        sourceFilterBindings:
+          field.sourceFilterBindings ?? fallback?.sourceFilterBindings,
+        selectionRequestSlot:
+          field.type === "select"
+            ? `actionOptions:${actionId}:${field.formKey}`
+            : fallback?.selectionRequestSlot,
         sourceFilterCondition: field.sourceFilterCondition,
         invalidateKeys: field.invalidateKeys?.map((key) => ({
           key,
@@ -400,7 +452,13 @@ export default function GenericPaginatedPage({
   sourceRevision = "",
 }: Props) {
   const { t } = useTranslation();
-  const { rowsPerPage } = useGeneralContext();
+  const { rowsPerPage: generalRowsPerPage } = useGeneralContext();
+  const pageRequestDefaults = useTableRequestDefaults();
+  const requestSource = usePageRequestConsumer()?.connections.get("data")?.definition.source;
+  const requestControls = requestSource ? pageRequestControls(requestSource) : ["page", "limit", "sort", "asc", "search"];
+  const [requestResetKey, setRequestResetKey] = useState(0);
+  const [localPageSize, setLocalPageSize] = useState<number>();
+  const rowsPerPage = pageRequestDefaults ? localPageSize ?? pageRequestDefaults.controls?.limit ?? generalRowsPerPage : generalRowsPerPage;
   const { user } = useUserContext();
   const configuredTableToggles = useMemo(
     () => tableConfig?.toggles || [],
@@ -413,7 +471,7 @@ export default function GenericPaginatedPage({
     setTableToggleState(createTableToggleState(configuredTableToggles));
   }, [configuredTableToggles]);
   const rawContainers = useGetContainers();
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(pageRequestDefaults?.controls?.page ?? 1);
   console.log(tableConfig);
   // Local selection state for this table instance
   const [selectedRows, setSelectedRows] = useState<GenericItem[]>([]);
@@ -451,9 +509,9 @@ export default function GenericPaginatedPage({
 
   const [filterPanelFormElements, setFilterPanelFormElements] =
     useState<FormElementsState>({
-      search: "",
-      sort: "",
-      asc: 1,
+      asc: pageRequestDefaults?.controls?.asc ?? 1,
+      sort: pageRequestDefaults?.controls?.sort || "",
+      search: pageRequestDefaults?.controls?.search || "",
     });
 
   const [showFilters, setShowFilters] = useState(false);
@@ -506,17 +564,7 @@ export default function GenericPaginatedPage({
     () => resolveSelectedRowIds(selectedRows, isSelectionInitialized),
     [isSelectionInitialized, selectedRows],
   );
-  const tableOutputState = useMemo<TableOutputState>(
-    () => ({
-      filters: filtersById,
-      search:
-        typeof filterPanelFormElements.search === "string"
-          ? filterPanelFormElements.search
-          : String(filterPanelFormElements.search ?? ""),
-      selectedIds,
-    }),
-    [filterPanelFormElements.search, filtersById, selectedIds],
-  );
+
   const filterSelectionDataMap = useFilterPanelSelectionData(
     configuredFilterInputs,
   );
@@ -564,6 +612,8 @@ export default function GenericPaginatedPage({
     tableToggleState,
   ]);
 
+  const pageRequestOverrides = useTableRequestOverrides(legacyValues(mergedFilters, {}, { page: currentPage, limit: rowsPerPage, sort: String(mergedFilters.sort || "") || null, search: String(mergedFilters.search || "") || null }), legacyValues({ ...tableConfig?.constantFilters, ...constantFilter }), requestResetKey);
+
   const tableSourceQueryKey = useMemo(
     () =>
       getTableSourceQueryKey(
@@ -584,6 +634,8 @@ export default function GenericPaginatedPage({
     ],
   );
 
+  const activePageQueryKey = usePageReadKey("data", legacyRead({ transport: "table-source", kind: tableBinding.kind || "schema", schemaName, pipelineName: tableBinding.pipelineName, workflowName: tableBinding.workflowName }, legacyValues(mergedFilters, { ...tableBinding.params, ...resolvedParams }, { page: currentPage, limit: rowsPerPage }, tableBinding.fields)), pageRequestOverrides);
+
   const {
     createDynamicItem,
     createMultipleDynamicItem,
@@ -593,7 +645,7 @@ export default function GenericPaginatedPage({
     deleteMultipleDynamicItem,
     updateMultipleDynamicItem,
   } = useDynamicCrud<GenericItem>(schemaName, hasImageField, [
-    ...tableSourceQueryKey,
+    ...(activePageQueryKey || tableSourceQueryKey),
   ]);
   const bulkEditActionConfig = tableConfig?.bulkActions?.edit;
   const bulkDeleteActionConfig = tableConfig?.bulkActions?.delete;
@@ -1245,7 +1297,7 @@ export default function GenericPaginatedPage({
     const ins = displayFields
       .map((f) => {
         // Skip fields with equation
-        if (f.equation) return null;
+        if (isComputedField(f)) return null;
 
         const m = fieldToInput(f);
         const label = t(getFieldLabel(f));
@@ -1273,6 +1325,10 @@ export default function GenericPaginatedPage({
             placeholder: t(displayLabel),
             required: isRequired,
             isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
+            optionsSource: "schema" as const,
+            sourceSchemaName: f.objectSchemaName,
+            sourceValueField: "_id",
+            sourceLabelField: f.populationSettings.inputSelectionField,
             options: selectionData.map((item) => ({
               value: String(item._id || ""),
               label: String(
@@ -1280,6 +1336,7 @@ export default function GenericPaginatedPage({
                   item._id ||
                   "",
               ),
+              sourceItem: item,
             })),
             invalidateKeys:
               f.frontend?.invalidateKeys?.map((key) => ({
@@ -1353,7 +1410,7 @@ export default function GenericPaginatedPage({
 
     const fks = displayFields
       .map((f) => {
-        if (f.equation) return null;
+        if (isComputedField(f)) return null;
         const m = fieldToInput(f);
         return { key: f.name, type: m.formKeyType };
       })
@@ -1370,24 +1427,12 @@ export default function GenericPaginatedPage({
     mergedFilters,
     resolvedParams,
     effectiveSourceRevision,
+    true,
+    pageRequestOverrides,
   );
 
-  const rows = useMemo(
-    () =>
-      applyTableNestedRows(
-        applyTableArraySource(
-          normalizeConfiguredTableRows(
-            (itemsPayload?.items || []) as GenericItem[],
-            tableConfig,
-          ),
-          tableConfig,
-        ),
-        tableConfig,
-        t,
-        lookupSelectionDataMap,
-      ),
-    [itemsPayload?.items, tableConfig, t, lookupSelectionDataMap],
-  );
+  const sourceRows = useMemo(() => applyTableArraySource(normalizeConfiguredTableRows((itemsPayload?.items || []) as GenericItem[], tableConfig), tableConfig), [itemsPayload?.items, tableConfig]);
+  const rows = useMemo(() => applyTableNestedRows(sourceRows, tableConfig, t, lookupSelectionDataMap), [sourceRows, tableConfig, t, lookupSelectionDataMap]);
   const tableDragState = useMemo(
     () =>
       resolveTableDragState(
@@ -1400,6 +1445,20 @@ export default function GenericPaginatedPage({
       tableConfig?.constantSort?.sort,
       tableConfig?.drag,
     ],
+  );
+  const hasRecordOutput = outputs?.some(output => output.source.kind === "tableSelectedRecord") === true;
+  const { selectedRecord, activeRecordId, activateRecord, reportVisibleRowIds } = useTableRecordSelection(sourceRows, hasRecordOutput);
+  const tableOutputState = useMemo<TableOutputState>(
+    () => ({
+      filters: filtersById,
+      search:
+        typeof filterPanelFormElements.search === "string"
+          ? filterPanelFormElements.search
+          : String(filterPanelFormElements.search ?? ""),
+      selectedIds,
+      selectedRecord,
+    }),
+    [filterPanelFormElements.search, filtersById, selectedIds, selectedRecord],
   );
   const handleRowDrag = useCallback(
     (draggedRow: GenericItem, targetRow: GenericItem) => {
@@ -1491,12 +1550,16 @@ export default function GenericPaginatedPage({
     [container, tableConfig],
   );
 
+  const previousFilterControls = useRef({ values: [filterPanelFormElements.search, filterPanelFormElements.sort, filterPanelFormElements.asc], resetKey: requestResetKey });
   useEffect(() => {
-    setCurrentPage(1);
+    const next = [filterPanelFormElements.search, filterPanelFormElements.sort, filterPanelFormElements.asc];
+    if (previousFilterControls.current.resetKey === requestResetKey && previousFilterControls.current.values.some((value, index) => value !== next[index])) setCurrentPage(1);
+    previousFilterControls.current = { values: next, resetKey: requestResetKey };
   }, [
     filterPanelFormElements.search,
     filterPanelFormElements.sort,
     filterPanelFormElements.asc,
+    requestResetKey,
     setCurrentPage,
   ]);
 
@@ -1528,9 +1591,10 @@ export default function GenericPaginatedPage({
     ),
   ]);
 
-  const addButtonDefaults = configuredAddButtonAction
-    ? getActionDefaultValues(configuredAddButtonAction)
-    : {};
+  const addButtonDefaults = useMemo(
+    () => configuredAddButtonAction ? getActionDefaultValues(configuredAddButtonAction) : {},
+    [configuredAddButtonAction],
+  );
   const addButtonWorkflowSubmit = configuredAddButtonAction?.submit;
   const isAddButtonWorkflowAction = Boolean(
     addButtonWorkflowSubmit?.workflowName &&
@@ -2029,7 +2093,7 @@ export default function GenericPaginatedPage({
     isEditOpen,
     isCustomActionOpen,
     activeCustomAction,
-    deleteDynamicItem,
+    deleteTableRow,
     updateDynamicItem,
     executeWorkflow,
     handleSubmitItem,
@@ -2047,26 +2111,51 @@ export default function GenericPaginatedPage({
   const [isBulkStepTwo, setIsBulkStepTwo] = useState(false);
   const [bulkSelectedKeys, setBulkSelectedKeys] = useState<string[]>([]);
   const [bulkForm, setBulkForm] = useState<Record<string, unknown>>({});
+  const configuredBulkEditFields = useMemo(
+    () => bulkEditActionConfig?.formFields || [],
+    [bulkEditActionConfig?.formFields],
+  );
+  const bulkActionSelectionDataMap = useActionFormSelectionData(
+    bulkEditActionConfig ? [bulkEditActionConfig] : [],
+  );
 
   // Filter out image fields from bulk edit options
   const bulkFieldOptions = useMemo(
-    () =>
-      displayFields
+    () => {
+      if (configuredBulkEditFields.length) {
+        return configuredBulkEditFields
+          .filter((field) => field.formKey)
+          .map((field) => ({
+            value: field.formKey,
+            label: t(field.label || field.formKey),
+          }));
+      }
+      return displayFields
         .filter((f) => {
           const fieldType = (f.type || "").toLowerCase();
           if (fieldType === Types.Image || fieldType === Types.Image)
             return false;
-          return !f.equation;
+          return !isComputedField(f);
         })
         .map((f) => ({
           value: f.name,
           label: t(getFieldLabel(f)),
-        })),
-    [displayFields, t],
+        }));
+    },
+    [configuredBulkEditFields, displayFields, t],
   );
 
   const bulkFormKeys = useMemo(() => {
     if (isBulkStepTwo) {
+      if (configuredBulkEditFields.length) {
+        const action = {
+          ...(bulkEditActionConfig || { kind: "update" }),
+          formFields: configuredBulkEditFields.filter((field) =>
+            bulkSelectedKeys.includes(field.formKey),
+          ),
+        } as TableActionConfig;
+        return buildActionFormKeys(action, []);
+      }
       // Step 2: only the selected fields
       return displayFields
         .filter((f) => bulkSelectedKeys.includes(f.name))
@@ -2078,7 +2167,13 @@ export default function GenericPaginatedPage({
       // Step 1: only the selector
       return [{ key: "bulkSelectedKeys", type: FormKeyTypeEnum.STRING }];
     }
-  }, [displayFields, bulkSelectedKeys, isBulkStepTwo]);
+  }, [
+    bulkEditActionConfig,
+    configuredBulkEditFields,
+    displayFields,
+    bulkSelectedKeys,
+    isBulkStepTwo,
+  ]);
 
   // Generate bulk edit inputs
   const bulkEditInputs = useMemo(() => {
@@ -2094,6 +2189,26 @@ export default function GenericPaginatedPage({
     };
 
     const chosen = new Set(bulkSelectedKeys);
+    if (configuredBulkEditFields.length) {
+      const action = {
+        ...(bulkEditActionConfig || { kind: "update" }),
+        formFields: configuredBulkEditFields.filter((field) =>
+          chosen.has(field.formKey),
+        ),
+      } as TableActionConfig;
+      const valueInputs = buildActionInputs(
+        action,
+        [],
+        getActionId(bulkEditActionConfig || { kind: "update" }, 0),
+        bulkActionSelectionDataMap,
+      ).map((input) => ({
+        ...input,
+        required: false,
+        isDisabled: !isBulkStepTwo,
+      }));
+
+      return [selectInput, ...valueInputs];
+    }
     const valueInputs = displayFields
       .filter((f) => chosen.has(f.name))
       .map((f) => {
@@ -2120,6 +2235,10 @@ export default function GenericPaginatedPage({
             required: false,
             isDisabled: !isBulkStepTwo,
             isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
+            optionsSource: "schema" as const,
+            sourceSchemaName: f.objectSchemaName,
+            sourceValueField: "_id",
+            sourceLabelField: f.populationSettings.inputSelectionField,
             options: selectionData.map((item) => ({
               value: String(item._id || ""),
               label: String(
@@ -2127,6 +2246,7 @@ export default function GenericPaginatedPage({
                   item._id ||
                   "",
               ),
+              sourceItem: item,
             })),
           };
         }
@@ -2186,6 +2306,9 @@ export default function GenericPaginatedPage({
     isBulkStepTwo,
     displayFields,
     bulkSelectedKeys,
+    configuredBulkEditFields,
+    bulkEditActionConfig,
+    bulkActionSelectionDataMap,
     selectionDataMap,
   ]);
 
@@ -2407,6 +2530,10 @@ export default function GenericPaginatedPage({
             placeholder: label,
             required: false,
             isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
+            optionsSource: "schema" as const,
+            sourceSchemaName: f.objectSchemaName,
+            sourceValueField: "_id",
+            sourceLabelField: f.populationSettings.inputSelectionField,
             options: selectionOptions.map((item) => ({
               value: String(item._id || ""),
               label: String(
@@ -2414,6 +2541,7 @@ export default function GenericPaginatedPage({
                   item._id ||
                   "",
               ),
+              sourceItem: item,
             })),
           };
         }
@@ -2706,7 +2834,9 @@ export default function GenericPaginatedPage({
       )}
       {isHeader && <Header />}
       <div className="w-full mx-auto">
+        {pageRequestDefaults && <button type="button" className="mb-2 text-sm text-blue-700 underline" onClick={() => { setRequestResetKey(key => key + 1); setLocalPageSize(undefined); setCurrentPage(pageRequestDefaults.controls?.page ?? 1); setFilterPanelFormElements({ asc: pageRequestDefaults.controls?.asc ?? 1, sort: pageRequestDefaults.controls?.sort || "", search: pageRequestDefaults.controls?.search || "" }); }}>Reset to shared defaults</button>}
         <GenericTable
+          {...(pageRequestDefaults ? { rowsPerPageValue: rowsPerPage, onRowsPerPageChange: (value: number) => { setLocalPageSize(value); setCurrentPage(1); } } : {})}
           searchPlaceholder={tableConfig?.searchPlaceholder}
           rowKeys={rowKeys}
           actions={actions}
@@ -2719,12 +2849,15 @@ export default function GenericPaginatedPage({
           addButton={addButton}
           isCollapsible={tableConfig?.nestedRows?.enabled === true}
           isActionsActive={isActionsActive}
-          isSearch={false}
-          outsideSortProps={outsideSort}
-          {...(pagination && { pagination })}
-          outsideSearchProps={searchEnabled ? outsideSearchProps : undefined}
+          isSearch={!requestControls.includes("search") && searchEnabled}
+          outsideSortProps={requestControls.includes("sort") ? outsideSort : undefined}
+          {...(pagination && tableRequestConfig(undefined, requestSource).mode === "paginated" && { pagination })}
+          outsideSearchProps={searchEnabled && requestControls.includes("search") ? outsideSearchProps : undefined}
           selectionActions={selectionActions}
           isSelectionEnabled={isBulkSelectionEnabled}
+          onVisibleRowIdsChange={hasRecordOutput ? reportVisibleRowIds : undefined}
+          activeRecordId={hasRecordOutput ? activeRecordId : undefined}
+          onRecordActivate={hasRecordOutput ? activateRecord : undefined}
           isExcel={true}
           onExcelUpload={
             schemaActionsEnabled && !hasImageField

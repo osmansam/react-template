@@ -1,3 +1,5 @@
+> Historical verification of the initial port. Authoring was subsequently moved to Tenant Panel on 2026-11-03. Current ownership and workflow are documented in `docs/visual-builder-port.md`; relocation evidence is in Tenant Panel’s `docs/visual-builder-relocation.md`.
+
 # Visual builder port verification
 
 Date: 2026-11-03

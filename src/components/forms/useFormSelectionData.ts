@@ -1,7 +1,12 @@
+import { usePageSelectionOptions } from "../../pageRuntime/requests/selectionOptions";
 import { useQueries } from "@tanstack/react-query";
 import { FormComponentConfig } from "../../types/page";
 import { get } from "../../utils/api";
 import { FormSelectionDataMap } from "../../utils/formConfig";
+import {
+  hasDependentSelectFilters,
+  referencedSelectRecordFields,
+} from "../../utils/selectFilters";
 import { getSelectionQueryConfig } from "../../utils/selectionQuery";
 import { getEffectiveSelectDataFields } from "../../utils/selectOptionConfig";
 
@@ -15,17 +20,24 @@ type SelectionResponse =
 export const useFormSelectionData = (
   form: FormComponentConfig,
 ): FormSelectionDataMap => {
-  const fields = (form.fields || []).filter(
+  const pageOptions = usePageSelectionOptions();
+  const allFields = form.fields || [];
+  const fields = allFields.filter(
     (field) =>
       field.type === "select" &&
-      field.optionsSource === "schema" &&
-      field.sourceSchemaName,
+      !hasDependentSelectFilters(field) &&
+      ((field.optionsSource === "schema" && field.sourceSchemaName) || pageOptions.connected(`options:${field.formKey}`)),
   );
   const queries = useQueries({
     queries: fields.map((field) => {
       const fieldName = field.sourceLabelField || field.sourceValueField || "_id";
       const mappings = (form.objectLists || []).flatMap((list) => list.fieldMappings || []);
-      const dataFields = getEffectiveSelectDataFields(field, mappings).filter((name) => name !== fieldName && name !== (field.sourceValueField || "_id"));
+      const dataFields = Array.from(
+        new Set([
+          ...getEffectiveSelectDataFields(field, mappings),
+          ...referencedSelectRecordFields(allFields, field.formKey),
+        ]),
+      ).filter((name) => name !== fieldName && name !== (field.sourceValueField || "_id"));
       const { path, queryKey } = getSelectionQueryConfig({
         schemaName: field.sourceSchemaName || "",
         fieldName,
@@ -33,15 +45,20 @@ export const useFormSelectionData = (
         dataFields,
         filterParams: field.sourceRequestFilters,
       });
-      return {
-        queryKey,
-        queryFn: () =>
-          get<SelectionResponse>({
-            path,
-          }),
-        enabled: Boolean(field.sourceSchemaName && fieldName),
-        staleTime: Infinity,
-      };
+      return pageOptions(
+        `options:${field.formKey}`,
+        path,
+        {
+          queryKey,
+          queryFn: () =>
+            get<SelectionResponse>({
+              path,
+            }),
+          enabled: Boolean(field.sourceSchemaName && fieldName),
+          staleTime: Infinity,
+        },
+        { dataFields },
+      );
     }),
   });
 

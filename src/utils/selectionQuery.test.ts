@@ -52,6 +52,22 @@ describe("getSelectionQueryConfig", () => {
     });
   });
 
+  it("serializes array filter values as repeated query parameters", () => {
+    const config = getSelectionQueryConfig({
+      schemaName: "count_lists",
+      fieldName: "title",
+      filterParams: {
+        location: ["loc-1", "loc-2"],
+        tier: 0,
+        archived: false,
+      },
+    });
+
+    expect(config.path).toBe(
+      "/dynamic/selection?schemaName=count_lists&fieldName=title&filter.archived=false&filter.location=loc-1&filter.location=loc-2&filter.tier=0",
+    );
+  });
+
   it("serializes stable dependency fields", () => {
     const config = getSelectionQueryConfig({ schemaName: "product", fieldName: "name", dataFields: ["taxRate", "price", "discountRate", "price"] });
     expect(config.path).toBe("/dynamic/selection?schemaName=product&fieldName=name&dataFields=discountRate%2Cprice%2CtaxRate");

@@ -1,5 +1,4 @@
-import { useCallback, useMemo } from "react";
-import { DynamicPageRenderer } from "../components/DynamicPageRenderer";
+import { lazy, useCallback, useMemo } from "react";
 import {
   ComponentBlock,
   PageModel,
@@ -8,6 +7,11 @@ import {
   TabContent,
 } from "../types/page";
 import { useGetAllPages } from "../utils/api/page";
+
+// The route's existing Suspense boundary loads the renderer only when a
+// configured application page is opened, keeping table/editor code off login.
+const DynamicPageRenderer = lazy(() => import("../components/DynamicPageRenderer")
+  .then((module) => ({ default: module.DynamicPageRenderer })));
 
 export interface DynamicRouteTab {
   label: string;

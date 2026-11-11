@@ -5,6 +5,8 @@ import { useTenantProject } from "../../hooks/useTenantProject";
 import { TableActionConfig, TableFilterPanelConfig } from "../../types/page";
 import { axiosClient } from "./axiosClient";
 import { useGet } from "./factory";
+import { getApiErrorMessage } from "./errorMessage";
+import { normalizeContainerResponse, normalizeContainersResponse } from "./containerResponse";
 
 // If you prefer using mongodb's ObjectId type, import it and replace string with ObjectId
 // import { ObjectId } from "mongodb";
@@ -55,6 +57,7 @@ export interface Field {
   frontend?: Frontend;
   populationSettings?: PopulationSettings;
   equation?: string;
+  isComputed?: boolean;
   authorizeRole?: string[];
   isAuthorized?: boolean;
   order?: number;
@@ -114,7 +117,7 @@ export interface WorkflowStep {
   order?: number;
   isActive?: boolean;
   targetSchema?: string;
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
   steps?: WorkflowStep[];
   elseSteps?: WorkflowStep[];
   branches?: { name?: string; steps?: WorkflowStep[] }[];
@@ -182,7 +185,7 @@ export interface Index {
 export interface Condition {
   field: string;
   operator: string; // "=", ">", "<", "in", etc.
-  value: any; // can support "{{user.id}}" etc.
+  value: unknown; // can support "{{user.id}}" etc.
   extractFilter?: boolean;
   roles?: string[];
 }
@@ -283,7 +286,7 @@ export interface UpdatePipelinesPayload {
 // Raw payload types matching Go backend struct tags (PascalCase)
 export interface CreateContainerRawPayload {
   SchemaName: string;
-  Fields: any[]; // Empty array initially
+  Fields: unknown[]; // Empty array initially
   Routes: {
     CreateDynamicModelItem: {
       IsAuthenticated: boolean;
@@ -396,14 +399,14 @@ export interface CreateContainerRawPayload {
     CacheTime: number;
     TriggeredRedisCaches: string[];
   };
-  Pipelines: any[];
-  DynamicFunctions: any[];
-  DynamicApis: any[];
+  Pipelines: unknown[];
+  DynamicFunctions: unknown[];
+  DynamicApis: unknown[];
   IsAuthContainer: boolean;
   IsRegisterActive?: boolean;
   PopulatedRoutes: string[];
-  Indexes: any;
-  RowAccess: any;
+  Indexes: unknown;
+  RowAccess: unknown;
 }
 
 // Helper function to build container API paths
@@ -413,7 +416,7 @@ function buildContainerPath(
   suffix = ""
 ) {
   const basePath = "/container";
-  return suffix ? `` : basePath;
+  return `${basePath}${suffix}`;
 }
 
 // Hook to get current tenant and project context
@@ -429,16 +432,6 @@ function useContainerContext() {
   return { tenantSlug, projectSlug };
 }
 
-// Sort function for containers (by creation date, newest first)
-const containerSortFunction = (
-  a: Partial<ContainerModel>,
-  b: Partial<ContainerModel>
-) => {
-  const dateA = new Date(a.createdAt || 0).getTime();
-  const dateB = new Date(b.createdAt || 0).getTime();
-  return dateB - dateA;
-};
-
 // React Query hooks
 export function useContainers(enabled: boolean = true) {
   const { tenantSlug, projectSlug } = useContainerContext();
@@ -451,35 +444,7 @@ export function useContainers(enabled: boolean = true) {
     enabled
   );
 
-  // The API returns an array of containers directly
-  // Handle the response which might be PascalCase from Go backend
-  const containers = response || [];
-
-  return containers.map((container: any) => ({
-    id: container.ID || container.id,
-    _id: container.ID || container.id,
-    schemaName: container.SchemaName || container.schemaName,
-    fields: container.Fields || container.fields || [],
-    routes: container.Routes || container.routes,
-    redis: container.Redis || container.redis,
-    pipelines: container.Pipelines || container.pipelines || [],
-    dynamicFunctions:
-      container.DynamicFunctions || container.dynamicFunctions || [],
-    dynamicApis: container.DynamicApis || container.dynamicApis || [],
-    isAuthContainer:
-      container.IsAuthContainer ?? container.isAuthContainer ?? false,
-    isRegisterActive:
-      container.IsRegisterActive ?? container.isRegisterActive ?? false,
-    isGoogleLoginActive:
-      container.IsGoogleLoginActive ?? container.isGoogleLoginActive ?? false,
-    populatedRoutes:
-      container.PopulatedRoutes || container.populatedRoutes || [],
-    indexes: container.Indexes || container.indexes,
-    rowAccess: container.RowAccess || container.rowAccess,
-    collectionName: container.CollectionName || container.collectionName,
-    createdAt: container.CreatedAt || container.createdAt,
-    updatedAt: container.UpdatedAt || container.updatedAt,
-  }));
+  return normalizeContainersResponse(response);
 }
 
 export function useContainer(id: string, enabled: boolean = true) {
@@ -487,81 +452,8 @@ export function useContainer(id: string, enabled: boolean = true) {
   const path = buildContainerPath(tenantSlug, projectSlug, `/${id}`);
   const projectSpecificQueryKey = ["container", tenantSlug, projectSlug, id];
 
-  const response = useGet<any>(path, projectSpecificQueryKey, enabled && !!id);
-
-  console.log("useContainer raw response:", { id, response, path });
-
-  // Extract the actual data from the nested structure
-  // The API returns: { data: { data: {...}, message: "...", status: 200 } }
-  const actualData = response?.data?.data || response?.data || response;
-
-  // Normalize the response from PascalCase (Go backend) to camelCase
-  if (!actualData) return undefined;
-
-  // Helper function to normalize field objects recursively
-  const normalizeField = (field: any): any => {
-    if (!field) return field;
-
-    const normalized: any = {
-      name: field.Name || field.name,
-      type: field.Type || field.type,
-      tag: field.Tag || field.tag,
-      objectSchemaName: field.ObjectSchemaName || field.objectSchemaName,
-      enumList: field.EnumList || field.enumList,
-      isForceDelete: field.IsForceDelete ?? field.isForceDelete ?? false,
-      unique: field.Unique ?? field.unique ?? false,
-      isHashed: field.IsHashed ?? field.isHashed ?? false,
-      isLoginCredential:
-        field.IsLoginCredential ?? field.isLoginCredential ?? false,
-      isAuditIdentity: field.IsAuditIdentity ?? field.isAuditIdentity ?? false,
-      isSearchable: field.IsSearchable ?? field.isSearchable ?? false,
-      frontend: field.Frontend || field.frontend,
-      populationSettings: field.PopulationSettings || field.populationSettings,
-      equation: field.Equation || field.equation,
-      authorizeRole: field.AuthorizeRole || field.authorizeRole || [],
-      isAuthorized: field.IsAuthorized ?? field.isAuthorized ?? false,
-      order: field.Order ?? field.order,
-    };
-
-    // Recursively normalize children
-    if (field.Children || field.children) {
-      normalized.children = (field.Children || field.children).map(
-        normalizeField
-      );
-    }
-
-    return normalized;
-  };
-
-  const container: any = actualData;
-  const normalized = {
-    id: container.ID || container.id,
-    _id: container.ID || container.id,
-    schemaName: container.SchemaName || container.schemaName,
-    fields: (container.Fields || container.fields || []).map(normalizeField),
-    routes: container.Routes || container.routes,
-    redis: container.Redis || container.redis,
-    pipelines: container.Pipelines || container.pipelines || [],
-    dynamicFunctions:
-      container.DynamicFunctions || container.dynamicFunctions || [],
-    dynamicApis: container.DynamicApis || container.dynamicApis || [],
-    isAuthContainer:
-      container.IsAuthContainer ?? container.isAuthContainer ?? false,
-    isRegisterActive:
-      container.IsRegisterActive ?? container.isRegisterActive ?? false,
-    isGoogleLoginActive:
-      container.IsGoogleLoginActive ?? container.isGoogleLoginActive ?? false,
-    populatedRoutes:
-      container.PopulatedRoutes || container.populatedRoutes || [],
-    indexes: container.Indexes || container.indexes,
-    rowAccess: container.RowAccess || container.rowAccess,
-    collectionName: container.CollectionName || container.collectionName,
-    createdAt: container.CreatedAt || container.createdAt,
-    updatedAt: container.UpdatedAt || container.updatedAt,
-  } as ContainerModel;
-
-  console.log("useContainer normalized:", normalized);
-  return normalized;
+  const response = useGet<unknown>(path, projectSpecificQueryKey, enabled && !!id);
+  return normalizeContainerResponse(response);
 }
 
 export function useContainerTypes(enabled: boolean = true) {
@@ -608,12 +500,9 @@ export function useCreateContainer() {
       const message = response?.message || "Container created successfully";
       toast.success(t(message));
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Container creation failed:", error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to create container";
+      const errorMessage = getApiErrorMessage(error, "Failed to create container");
       toast.error(t(errorMessage));
     },
   });
@@ -659,12 +548,9 @@ export function useUpdateContainer() {
       const message = response?.message || "Container updated successfully";
       toast.success(t(message));
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Container update failed:", error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to update container";
+      const errorMessage = getApiErrorMessage(error, "Failed to update container");
       toast.error(t(errorMessage));
     },
   });
@@ -702,12 +588,9 @@ export function useDeleteContainer() {
       const message = response?.message || "Container deleted successfully";
       toast.success(t(message));
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Container deletion failed:", error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to delete container";
+      const errorMessage = getApiErrorMessage(error, "Failed to delete container");
       toast.error(t(errorMessage));
     },
   });
@@ -754,12 +637,9 @@ export function useUpdateDynamicFunctions() {
         response?.message || "Dynamic functions updated successfully";
       toast.success(t(message));
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Dynamic functions update failed:", error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to update dynamic functions";
+      const errorMessage = getApiErrorMessage(error, "Failed to update dynamic functions");
       toast.error(t(errorMessage));
     },
   });
@@ -808,12 +688,9 @@ export function useUpdatePipelines() {
       const message = response?.message || "Pipelines updated successfully";
       toast.success(t(message));
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Pipelines update failed:", error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to update pipelines";
+      const errorMessage = getApiErrorMessage(error, "Failed to update pipelines");
       toast.error(t(errorMessage));
     },
   });
@@ -831,7 +708,6 @@ export function useUpdatePipelines() {
 
 // Redis operations
 export function useResetRedis() {
-  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { tenantSlug, projectSlug } = useContainerContext();
 
@@ -846,12 +722,9 @@ export function useResetRedis() {
       const message = response?.message || "Redis cache reset successfully";
       toast.success(t(message));
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Redis reset failed:", error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to reset Redis cache";
+      const errorMessage = getApiErrorMessage(error, "Failed to reset Redis cache");
       toast.error(t(errorMessage));
     },
   });
@@ -864,15 +737,16 @@ export function useResetRedis() {
   };
 }
 
-// Legacy hook for backward compatibility - now uses project-scoped containers
+// Runtime tables consume filtered metadata, never management container definitions.
 export function useGetContainers(enabled: boolean = true) {
-  try {
-    return useContainers(enabled);
-  } catch (error) {
-    // If no tenant/project context, return empty array
-    console.warn("useGetContainers: No tenant/project context available");
-    return [];
-  }
+  const { tenant: tenantSlug, project: projectSlug } = useTenantProject();
+  const hasContext = Boolean(tenantSlug && projectSlug);
+  const response = useGet<unknown>(
+    "/runtime/schemas",
+    ["containers", tenantSlug, projectSlug, "runtime"],
+    enabled && hasContext,
+  );
+  return hasContext ? normalizeContainersResponse(response) : [];
 }
 
 // Utility functions
@@ -999,11 +873,8 @@ export function useUploadExcel() {
         "Excel file uploaded and container created successfully";
       toast.success(t(message));
     },
-    onError: (error: any) => {
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to upload Excel file";
+    onError: (error: unknown) => {
+      const errorMessage = getApiErrorMessage(error, "Failed to upload Excel file");
       toast.error(t(errorMessage));
     },
   });
