@@ -2,7 +2,7 @@ import React from "react";
 import { describe, expect, it } from "vitest";
 import { LinkCell, renderLinkedCellContent } from "./LinkCell";
 
-const field = { name: "customerEmail", type: "string" } as any;
+const field = { name: "customerEmail", type: "string" };
 const row = { customerEmail: "buyer@example.com" };
 const emailLink = {
   linkTemplate: "mailto:{{value}}",

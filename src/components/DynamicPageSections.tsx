@@ -1,3 +1,4 @@
+import { PageRequestConsumerProvider, useConnectedDataBinding, usePageRequestConsumer } from "../pageRuntime/requests/ConsumerProvider";
 import React, { lazy, Suspense, useMemo, useState } from "react";
 import {
   ComponentBlock,
@@ -29,6 +30,7 @@ import DistributionBlocks from "./panelComponents/FormElements/DistributionBlock
 import InfoBlocks from "./panelComponents/FormElements/InfoBlocks";
 import UnifiedTabPanel from "./panelComponents/TabPanel/UnifiedTabPanel";
 
+const VisualBlock = lazy(() => import("../visualBuilder/VisualBlock"));
 const DynamicCalendar = lazy(() => import("./calendar/DynamicCalendar"));
 const DynamicChart = lazy(() => import("./charts/DynamicChart"));
 const DynamicForm = lazy(() => import("./forms/DynamicForm"));
@@ -108,11 +110,16 @@ const RenderReadyComponent: React.FC<{
     sourceRevisionFor,
   }) => {
   const { type, dataBinding, tabs, groupBy, title, props } = component;
-  const resolvedDataBinding = useMemo(
+  const inlineDataBinding = useMemo(
     () => resolveRouteParamValue(dataBinding, routeParams),
     [dataBinding, routeParams],
   );
-  const tableConfig = getTableConfig(component.table, props);
+  const resolvedDataBinding = useConnectedDataBinding(inlineDataBinding);
+  const connected = !!usePageRequestConsumer()?.connections.get("data");
+  const tableConfig = useMemo(
+    () => getTableConfig(component.table, props),
+    [component.table, props],
+  );
   const firstTableTabIndex =
     tabs?.findIndex((tab) => tab.components[0]?.type === "table") ?? -1;
   const tabWithGroupByIndex =
@@ -167,6 +174,7 @@ const RenderReadyComponent: React.FC<{
     resolvedParams,
     sourceRevisionFor(groupBySourceSchema),
     shouldFetchGrouping,
+    "groupOptions",
   );
 
   switch (type) {
@@ -390,7 +398,7 @@ const RenderReadyComponent: React.FC<{
               title,
               height: props?.height as number | undefined,
               width: props?.width as string | undefined,
-              schemaName: resolvedDataBinding.schemaName,
+              schemaName: resolvedDataBinding?.schemaName,
               fieldMappings: props?.fieldMappings as
                 | {
                     id?: string;
@@ -425,7 +433,7 @@ const RenderReadyComponent: React.FC<{
     case "infoBlocks":
       return (
         <InfoBlocks
-          config={props?.infoBlocks as InfoBlocksConfig | undefined}
+          config={connected ? { ...props?.infoBlocks, source: resolvedDataBinding?.kind || "schema" } as InfoBlocksConfig : props?.infoBlocks as InfoBlocksConfig | undefined}
           dataBinding={resolvedDataBinding}
           resolvedParams={resolvedParams}
           sourceRevision={requestSourceRevision}
@@ -438,13 +446,17 @@ const RenderReadyComponent: React.FC<{
         <DistributionBlocks
           title={title}
           config={
-            props?.distributionBlocks as DistributionBlocksConfig | undefined
+            connected ? { ...props?.distributionBlocks, source: resolvedDataBinding?.kind || "schema" } as DistributionBlocksConfig : props?.distributionBlocks as DistributionBlocksConfig | undefined
           }
           dataBinding={resolvedDataBinding}
           resolvedParams={resolvedParams}
           sourceRevision={requestSourceRevision}
         />
       );
+    case "custom":
+      return props?.visualBuilder !== undefined ? (
+        <Suspense fallback={<LoadingPanel message="Loading visual section..." />}><VisualBlock component={component} /></Suspense>
+      ) : <NoticePanel tone="error">Unknown component type: <code>{type}</code></NoticePanel>;
     case "barChart":
     case "lineChart":
     case "pieChart":
@@ -467,7 +479,7 @@ const RenderReadyComponent: React.FC<{
           <NoticePanel tone="error">Invalid chart type: {type}</NoticePanel>
         );
       }
-      const hasBinding = resolvedDataBinding?.schemaName && 
+      const hasBinding = connected || resolvedDataBinding?.schemaName &&
         ((resolvedDataBinding.kind === "pipeline" && resolvedDataBinding.pipelineName) || 
          (resolvedDataBinding.kind === "workflow" && resolvedDataBinding.workflowName));
 
@@ -485,11 +497,11 @@ const RenderReadyComponent: React.FC<{
                 | Record<string, unknown>
                 | undefined,
               dataBinding: {
-                kind: resolvedDataBinding.kind as "pipeline" | "workflow",
-                schemaName: resolvedDataBinding.schemaName,
-                pipelineName: resolvedDataBinding.pipelineName,
-                workflowName: resolvedDataBinding.workflowName,
-                params: resolvedDataBinding.params,
+                kind: resolvedDataBinding?.kind as "pipeline" | "workflow",
+                schemaName: resolvedDataBinding?.schemaName,
+                pipelineName: resolvedDataBinding?.pipelineName,
+                workflowName: resolvedDataBinding?.workflowName,
+                params: resolvedDataBinding?.params,
               },
             }}
           />
@@ -531,7 +543,7 @@ const requestComponentTypes = new Set([
   "circlePackingChart",
 ]);
 
-const RenderComponent: React.FC<{
+const RenderComponentBody: React.FC<{
   component: ComponentBlock;
   routeParams: RouteParams;
 }> = React.memo(({ component, routeParams }) => {
@@ -559,6 +571,8 @@ const RenderComponent: React.FC<{
     </ComponentRequestBoundary>
   );
 });
+
+const RenderComponent: React.FC<{ component: ComponentBlock; routeParams: RouteParams }> = props => <PageRequestConsumerProvider component={props.component}><RenderComponentBody {...props} /></PageRequestConsumerProvider>;
 
 const GridCellView: React.FC<{
   cell: GridCell;

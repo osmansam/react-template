@@ -1,3 +1,4 @@
+import { isRuntimeRecord } from "./recordValue";
 import type { RuntimeValueType } from "../types/page";
 import type {
   CompiledComponentParameters,
@@ -92,6 +93,7 @@ export const matchesRuntimeValueType = (
   value: unknown,
   valueType: RuntimeValueType,
 ): boolean => {
+  if (valueType === "record") return isRuntimeRecord(value);
   if (value === null) {
     return true;
   }

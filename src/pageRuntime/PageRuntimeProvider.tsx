@@ -1,9 +1,11 @@
+import { pageRequestComponents } from "../utils/pageRequests";
 /* eslint-disable react-refresh/only-export-components */
 import React, {
   createContext,
   useContext,
   useEffect,
   useMemo,
+  useId,
   useRef,
   useSyncExternalStore,
 } from "react";
@@ -22,6 +24,7 @@ import type {
 
 interface PageRuntimeContextValue {
   page: PageModel;
+  pageKey: string;
   store: PageRuntimeStore;
   compiledByComponent: Map<string, CompiledComponentParameters>;
 }
@@ -31,13 +34,15 @@ const PageRuntimeContext = createContext<PageRuntimeContextValue | null>(null);
 export const PageRuntimeProvider: React.FC<
   React.PropsWithChildren<{ page: PageModel }>
 > = ({ page, children }) => {
+  const localKey = useId();
   const value = useMemo(
     () => ({
       page,
+      pageKey: page.id || page._id || localKey,
       store: createPageRuntimeStore(page),
       compiledByComponent: new Map<string, CompiledComponentParameters>(),
     }),
-    [page],
+    [page, localKey],
   );
   return (
     <PageRuntimeContext.Provider value={value}>
@@ -45,6 +50,8 @@ export const PageRuntimeProvider: React.FC<
     </PageRuntimeContext.Provider>
   );
 };
+
+export const useOptionalPageRuntime = () => useContext(PageRuntimeContext);
 
 const useRuntimeContext = (): PageRuntimeContextValue => {
   const value = useContext(PageRuntimeContext);
@@ -127,7 +134,8 @@ export function useResolvedComponentParameters(
     () => {
       const cached = context.compiledByComponent.get(componentId);
       if (cached) return cached;
-      const result = compileComponentParameters(page, componentId);
+      const connected = pageRequestComponents(page).find(component => component.id === componentId)?.requestBindings?.data;
+      const result = compileComponentParameters(page, componentId, connected ? {} : undefined);
       context.compiledByComponent.set(componentId, result);
       return result;
     },

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { DataBinding, DistributionBlocksConfig } from "../../../types/page";
+import { DataBinding, DistributionBlocksConfig, DistributionBlockItemConfig } from "../../../types/page";
 import { resolveTemplate } from "../../../utils/templateExpressions";
 import {
   useGetTableSourceItems,
@@ -105,7 +105,7 @@ const DistributionBlocks: React.FC<DistributionBlocksProps> = ({
     };
   }, [payload, source, workflowData]);
 
-  const resolvedItems = useMemo(() => {
+  const resolvedItems = useMemo<Array<DistributionBlockItemConfig & { itemContext?: Record<string, unknown> }>>(() => {
     if (!isDynamic) {
       return (config?.items || []).slice(0, 5);
     }
@@ -116,9 +116,9 @@ const DistributionBlocks: React.FC<DistributionBlocksProps> = ({
         dataList = workflowData;
       } else if (workflowData && typeof workflowData === "object") {
         const arrayField =
-          (workflowData as any).items ||
-          (workflowData as any).data ||
-          (workflowData as any).list;
+          workflowData.items ||
+          workflowData.data ||
+          workflowData.list;
         if (Array.isArray(arrayField)) {
           dataList = arrayField;
         } else {
@@ -166,7 +166,7 @@ const DistributionBlocks: React.FC<DistributionBlocksProps> = ({
         }}
       >
         {resolvedItems.map((item, index) => {
-          const itemContext = (item as any).itemContext || context;
+          const itemContext = item.itemContext || context;
           const color = item.color?.trim() || "#4f46e5";
           return (
             <div
@@ -189,7 +189,7 @@ const DistributionBlocks: React.FC<DistributionBlocksProps> = ({
 
       <div className="space-y-3.5">
         {resolvedItems.map((item, index) => {
-          const itemContext = (item as any).itemContext || context;
+          const itemContext = item.itemContext || context;
           const color = item.color?.trim() || "#4f46e5";
           const resolvedPercent = resolveTemplate(item.percent, itemContext);
           const width = parsePercent(resolvedPercent);

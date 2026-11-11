@@ -1,3 +1,4 @@
+import { usePageSelectionOptions } from "../pageRuntime/requests/selectionOptions";
 import { useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { TableComponentConfig } from "../types/page";
@@ -26,6 +27,7 @@ const getSelectionItems = (
 export const useTableLookupSelectionData = (
   tableConfig: TableComponentConfig | undefined,
 ): TableLookupSelectionDataMap => {
+  const pageOptions = usePageSelectionOptions();
   const lookups = useMemo(
     () => collectTableLookupConfigs(tableConfig),
     [tableConfig],
@@ -39,12 +41,12 @@ export const useTableLookupSelectionData = (
         valueField: lookup.matchField || "_id",
       });
 
-      return {
+      return pageOptions(`lookup:${getTableLookupKey(lookup)}`, path, {
         queryKey,
         queryFn: () => get<SelectionResponse>({ path }),
         enabled: Boolean(lookup.schemaName && lookup.labelField),
         staleTime: Infinity,
-      };
+      });
     }),
   });
 

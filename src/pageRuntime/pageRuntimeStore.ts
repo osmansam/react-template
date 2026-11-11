@@ -4,6 +4,7 @@ import type {
   PageModel,
   RuntimeValueType,
 } from "../types/page";
+import { immutableRecord } from "./recordValue";
 import { matchesRuntimeValueType } from "./pageParameterResolver";
 import type { RuntimeSnapshot, RuntimeValue } from "./types";
 
@@ -168,6 +169,7 @@ const cloneAndFreezeValue = (
   value: unknown,
   type: RuntimeValueType,
 ): unknown => {
+  if (type === "record") return immutableRecord(value as Record<string, unknown>);
   if (value === null) return null;
   if (type === "stringArray" || type === "numberArray") {
     return Object.freeze([...(value as unknown[])]);
@@ -199,6 +201,7 @@ const sameRuntimeValue = (
   type: RuntimeValueType,
 ): boolean => {
   if (Object.is(previous, next)) return true;
+  if (type === "record") return JSON.stringify(previous) === JSON.stringify(next);
   if (
     (type === "stringArray" || type === "numberArray") &&
     Array.isArray(previous) &&
@@ -235,7 +238,7 @@ const validateOutput = (
     candidate.id.length === 0 ||
     typeof candidate.key !== "string" ||
     typeof candidate.type !== "string" ||
-    !["string", "number", "boolean", "date", "monthYear", "dateRange", "stringArray", "numberArray"].includes(
+    !["string", "number", "boolean", "date", "monthYear", "dateRange", "stringArray", "numberArray", "record"].includes(
       candidate.type,
     ) ||
     !isRecord(candidate.source) ||
@@ -245,7 +248,7 @@ const validateOutput = (
   }
   const source = candidate.source;
   if (
-    !["tableFilter", "tableSelectedIds", "tableSearch", "infoBlockSelection"].includes(
+    !["tableFilter", "tableSelectedIds", "tableSelectedRecord", "tableSearch", "infoBlockSelection"].includes(
       source.kind as string,
     ) ||
     (source.kind === "tableFilter" &&
@@ -276,6 +279,7 @@ const validateOutput = (
   ) {
     throw new Error(`A tableSelectedIds output must have an array type.`);
   }
+  if ((source.kind === "tableSelectedRecord") !== (candidate.type === "record")) throw new Error("A selected record output must use type record and a tableSelectedRecord source.");
   return candidate as unknown as ComponentOutputDefinition;
 };
 
@@ -412,6 +416,7 @@ export const createPageRuntimeStore = (page: PageModel): PageRuntimeStore => {
   });
   const pageVariables = dictionary<RuntimeValue>();
   (page.variables ?? []).forEach((variable) => {
+    if (variable.type === "record") throw new Error("Record values are output-only.");
     if (
       !isRecord(variable) ||
       typeof variable.id !== "string" ||
@@ -506,7 +511,7 @@ export const createPageRuntimeStore = (page: PageModel): PageRuntimeStore => {
       if (!type) {
         throw new Error(`Page filter "${filterId}" was not found.`);
       }
-      if (!matchesRuntimeValueType(value, type)) {
+      if (type === "record" || !matchesRuntimeValueType(value, type)) {
         throw new Error(`Page filter "${filterId}" does not match type "${type}".`);
       }
       const previous = snapshot.pageFilters[filterId];

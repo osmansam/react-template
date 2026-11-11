@@ -60,6 +60,9 @@ interface SelectInputProps {
   suggestedOption?: { value: string; label: string }[] | null;
   isSortDisabled?: boolean;
   customControlBackgroundColor?: string;
+  selectionStatus?: "waiting" | "loading" | "error";
+  selectionMessage?: string;
+  retrySelection?: () => void;
 }
 
 const normalizeText = (text: string) => {
@@ -115,12 +118,16 @@ const SelectInput = ({
   isSortDisabled = false,
   suggestedOption,
   customControlBackgroundColor,
+  selectionStatus,
+  selectionMessage,
+  retrySelection,
 }: SelectInputProps) => {
   const [searchInput, setSearchInput] = useState("");
   const [isSearchable, setIsSearchable] = useState(false);
   const [isDownIconClicked, setIsDownIconClicked] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile(768);
+  const isSelectDisabled = isReadOnly || Boolean(selectionStatus);
 
   const sortedOptions = useMemo(() => {
     if (isSortDisabled) return options;
@@ -255,7 +262,7 @@ const SelectInput = ({
   };
 
   useEffect(() => {
-    if (options.length === 1 && !value && isAutoFill) {
+    if (!isSelectDisabled && options.length === 1 && !value && isAutoFill) {
       const actionMeta: ActionMeta<OptionType> = {
         action: "select-option",
         option: options[0],
@@ -263,7 +270,7 @@ const SelectInput = ({
       onChange(options[0], actionMeta);
       onChangeTrigger && onChangeTrigger(options[0], actionMeta);
     }
-  }, [options, value, onChange]);
+  }, [options, value, onChange, isAutoFill, onChangeTrigger, isSelectDisabled]);
 
   return (
     <div
@@ -347,7 +354,8 @@ const SelectInput = ({
                 setIsSearchable(false);
                 setIsDownIconClicked(false);
               }}
-              isDisabled={isReadOnly}
+              isDisabled={isSelectDisabled}
+              aria-label={typeof label === "string" ? label : undefined}
               menuShouldScrollIntoView={true}
               menuPlacement={isMobile ? "bottom" : "auto"}
               menuPosition={isMobile ? "absolute" : "fixed"}
@@ -373,7 +381,8 @@ const SelectInput = ({
                 setIsSearchable(false);
                 setIsDownIconClicked(false);
               }}
-              isDisabled={isReadOnly}
+              isDisabled={isSelectDisabled}
+              aria-label={typeof label === "string" ? label : undefined}
               menuShouldScrollIntoView={true}
               menuPlacement={isMobile ? "bottom" : "auto"}
               menuPosition={isMobile ? "absolute" : "fixed"}
@@ -382,7 +391,7 @@ const SelectInput = ({
             />
           )}
         </div>
-        {!isReadOnly && !isMultiple && isOnClearActive && value && onClear && (
+        {!isSelectDisabled && !isMultiple && isOnClearActive && value && onClear && (
           <GenericButton
             onClick={onClear}
             variant="icon"
@@ -392,6 +401,28 @@ const SelectInput = ({
           </GenericButton>
         )}
       </div>
+      {selectionMessage &&
+        (selectionStatus === "error" ? (
+          <div
+            role="alert"
+            className="flex items-center gap-2 text-xs text-red-600"
+          >
+            <span>{selectionMessage}</span>
+            {retrySelection && (
+              <button
+                type="button"
+                className="underline"
+                onClick={retrySelection}
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        ) : (
+          <p role="status" className="text-xs text-neutral-500">
+            {selectionMessage}
+          </p>
+        ))}
     </div>
   );
 };

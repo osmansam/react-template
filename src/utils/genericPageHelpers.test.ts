@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import * as helpers from "./genericPageHelpers";
 
+it("keeps computed fields out of writable form inputs without exposing formulas", () => {
+  const computed = helpers.normalizeField({ name: "total", type: "number", isComputed: true });
+  expect(computed).toMatchObject({ isComputed: true });
+  expect(helpers.isComputedField(computed)).toBe(true);
+  expect(helpers.isComputedField({ equation: "price * quantity" })).toBe(true);
+  expect(helpers.isComputedField({})).toBe(false);
+});
+
 type Presentation = {
   className: string;
   style: Record<string, unknown>;

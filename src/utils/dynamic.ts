@@ -1,3 +1,10 @@
+import { pageRequestInvalidationPredicate } from "../pageRuntime/requests/invalidation";
+import { usePageRequestConsumer } from "../pageRuntime/requests/ConsumerProvider";
+import type { PageRequestScope } from "../pageRuntime/requests/descriptor";
+import { usePageRead } from "../pageRuntime/requests/usePageRead";
+import { legacyRead, legacyValues } from "../pageRuntime/requests/legacyAdapters";
+import { toDynamicPayload } from "../pageRuntime/requests/adapters";
+import type { PageRequestValues } from "../types/pageRequests";
 import {
   QueryClient,
   useMutation,
@@ -45,10 +52,11 @@ const idempotencyKeys = new Map<string, string>();
 export const invalidateDynamicMutationQueries = (
   queryClient: Pick<QueryClient, "invalidateQueries">,
   schemaName: string,
+  scope?: PageRequestScope,
 ) =>
-  queryClient.invalidateQueries({
-    queryKey: ["dynamic", schemaName],
-  });
+  queryClient.invalidateQueries(scope ? {
+    predicate: query => query.queryKey[0] === "dynamic" && query.queryKey[1] === schemaName || pageRequestInvalidationPredicate(scope, schemaName)(query),
+  } : { queryKey: ["dynamic", schemaName] });
 
 export const shouldInvalidateAfterDynamicUpdate = (error: unknown) =>
   error != null;
@@ -179,12 +187,14 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   schemaName: string,
   hasImageField: boolean = false,
   customQueryKey?: unknown[],
+  refreshSharedRequests = true,
 ) {
   const queryKey = (customQueryKey || listKey(schemaName)) as unknown[];
   const qc = useQueryClient();
+  const requestScope = usePageRequestConsumer()?.scope;
   const { t } = useTranslation();
   const invalidateSchemaQueries = () =>
-    invalidateDynamicMutationQueries(qc, schemaName);
+    invalidateDynamicMutationQueries(qc, schemaName, refreshSharedRequests ? requestScope : undefined);
 
   // Custom create function that handles FormData
   async function createRequest(payload: Partial<T>) {
@@ -327,7 +337,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       setTimeout(() => toast.error(t(errorMessage)), 200);
     },
     onSettled: (_data, error) => {
-      if (shouldInvalidateAfterDynamicUpdate(error)) {
+      if (shouldInvalidateAfterDynamicUpdate(error) || refreshSharedRequests && requestScope) {
         invalidateSchemaQueries();
       }
     },
@@ -570,7 +580,9 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     createMultipleDynamicItem,
     createManyMutation,
     updateDynamicItem,
+    updateMutation,
     deleteDynamicItem,
+    deleteMutation,
     deleteMultipleDynamicItem,
     deleteManyMutation,
     updateMultipleDynamicItem,
@@ -625,6 +637,7 @@ export function useGetDynamicItems<T>(
   schemaName: string,
   filters?: FormElementsState,
   sourceRevision = "",
+  localOverrides?: PageRequestValues,
 ) {
   const parts = [`schemaName=${schemaName}`];
 
@@ -663,7 +676,9 @@ export function useGetDynamicItems<T>(
     filters,
     sourceRevision,
   );
-  return useGet<T[]>(path, queryKey);
+  const shared = usePageRead("data", legacyRead({ transport: "list", schemaName }, legacyValues(filters)), localOverrides);
+  const legacy = useGet<T[]>(path, queryKey, !shared.handled);
+  return (shared.handled ? (Array.isArray(shared.data) ? shared.data : (shared.data as { items?: T[] } | undefined)?.items) : legacy) as T[] | undefined;
 }
 
 export function useGetPaginatedItems<T>(
@@ -671,6 +686,7 @@ export function useGetPaginatedItems<T>(
   limit: number,
   schemaName: string,
   filters: FormElementsState,
+  requestSlot = "data",
 ) {
   const baseQueryUrl = `${BASE}/page`;
   const queryKey = [
@@ -726,7 +742,9 @@ export function useGetPaginatedItems<T>(
   const queryString = parts.filter(Boolean).join("&");
   const url = `${baseQueryUrl}?${queryString}`;
 
-  return useGet<DynamicPayload<T>>(url, queryKey, true);
+  const shared = usePageRead(requestSlot, legacyRead({ transport: "page", schemaName }, legacyValues(filters, {}, { page, limit })), legacyValues(filters));
+  const legacy = useGet<DynamicPayload<T>>(url, queryKey, !shared.handled);
+  return (shared.handled ? toDynamicPayload(shared.data) : legacy) as DynamicPayload<T> | undefined;
 }
 
 export function useGetTableSourceItems<T>(
@@ -737,6 +755,7 @@ export function useGetTableSourceItems<T>(
   resolvedParams?: Record<string, unknown>,
   sourceRevision = "",
   enabled = true,
+  localOverrides?: PageRequestValues,
 ) {
   const schemaName = binding.schemaName || "";
   const baseQueryUrl = `${BASE}/table-source`;
@@ -758,11 +777,9 @@ export function useGetTableSourceItems<T>(
 
   const queryString = serializeQueryEntries(queryEntries);
   const url = `${baseQueryUrl}?${queryString}`;
-  return useGet<DynamicPayload<T>>(
-    url,
-    queryKey,
-    enabled && Boolean(schemaName),
-  );
+  const shared = usePageRead("data", legacyRead({ transport: "table-source", kind: binding.kind || "schema", schemaName, pipelineName: binding.pipelineName, workflowName: binding.workflowName }, legacyValues(filters, { ...binding.params, ...resolvedParams }, { page, limit }, binding.fields)), localOverrides, enabled);
+  const legacy = useGet<DynamicPayload<T>>(url, queryKey, enabled && Boolean(schemaName) && !shared.handled);
+  return (shared.handled ? toDynamicPayload(shared.data) : legacy) as DynamicPayload<T> | undefined;
 }
 
 export function useGetWorkflowData<T>(
@@ -790,6 +807,7 @@ export function useGetWorkflowData<T>(
     canonicalizeRuntimeValue(normalizedRecord),
   ] as const;
 
+  const shared = usePageRead("data", legacyRead({ transport: "workflow", schemaName, workflowName }, { params: normalizedQueryParams as PageRequestValues["params"] }), undefined, enabled);
   const { data } = useQuery({
     queryKey,
     queryFn: async () => {
@@ -806,10 +824,10 @@ export function useGetWorkflowData<T>(
       );
       return response.data;
     },
-    enabled: enabled && Boolean(schemaName && workflowName),
+    enabled: enabled && Boolean(schemaName && workflowName) && !shared.handled,
   });
 
-  return data?.data;
+  return (shared.handled ? shared.data : data?.data) as T | undefined;
 }
 
 // utils/dynamic.ts (or wherever this lives)
@@ -820,6 +838,7 @@ export function useGetSelection<T>(
   resolvedParams?: Record<string, unknown>,
   sourceRevision = "",
   requestEnabled = true,
+  requestSlot = "data",
 ) {
   // Only enable the request if both schemaName and fieldName are provided
   const enabled = requestEnabled && Boolean(schemaName && fieldName);
@@ -833,7 +852,9 @@ export function useGetSelection<T>(
     sourceRevision,
   });
 
-  const data = useGet<T>(path, queryKey, enabled);
+  const shared = usePageRead(requestSlot, legacyRead({ transport: "selection", schemaName, fieldName, valueField }, { params: resolvedParams as PageRequestValues["params"] }), undefined, requestEnabled);
+  const legacy = useGet<T>(path, queryKey, enabled && !shared.handled);
+  const data = shared.handled ? (Array.isArray(shared.data) ? shared.data : (shared.data as { items?: unknown[] } | undefined)?.items) : legacy;
 
   return (data ?? ([] as T)) as T;
 }
@@ -873,7 +894,9 @@ export function useGetPipeline<T>(
 
   const enabled = hasParams;
 
-  const data = useGet<T>(path, queryKey, enabled);
+  const shared = usePageRead("data", legacyRead({ transport: "pipeline", schemaName, pipelineName }, { params: requestParams as PageRequestValues["params"] }), undefined, requestEnabled);
+  const legacy = useGet<T>(path, queryKey, enabled && !shared.handled);
+  const data = shared.handled ? shared.data : legacy;
 
   return (data ?? ([] as T)) as T;
 }

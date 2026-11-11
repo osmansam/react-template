@@ -1,0 +1,31 @@
+name: Verify React runtime
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install declared Yarn version and dependencies
+        run: |
+          corepack enable
+          yarn install --immutable
+      - name: Lint
+        run: yarn lint
+      - name: Test and type-check
+        run: yarn test
+      - name: Build
+        env:
+          VITE_API_URL: https://api.example.com/api/v1
+        run: yarn build

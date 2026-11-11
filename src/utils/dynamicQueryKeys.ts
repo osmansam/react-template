@@ -178,6 +178,8 @@ export function getTableSourceQueryKey(
   resolvedParams?: Record<string, unknown>,
   _sourceRevision = "",
 ) {
+  // Compatibility argument: revisions affect request execution, not cache identity.
+  void _sourceRevision;
   const queryEntries = getTableSourceQueryEntries(
     page,
     limit,
@@ -205,4 +207,15 @@ export function shouldInvalidateDynamicQuery(
     queryKey[0] === "dynamic" &&
     (queryKey[1] === schemaName || queryKey[2] === "table-source")
   );
+}
+
+/** Visual queries retain their actor/request keys; schema metadata connects them to data events. */
+export function shouldInvalidateVisualCollectionQuery(
+  query: { queryKey: readonly unknown[]; meta?: Record<string, unknown> },
+  schemaName: string,
+  scope: { tenant: string; project: string } | null,
+): boolean {
+  return !!scope && query.queryKey[0] === "visual-collection"
+    && query.queryKey[1] === scope.tenant && query.queryKey[2] === scope.project
+    && query.meta?.visualCollectionSchema === schemaName;
 }

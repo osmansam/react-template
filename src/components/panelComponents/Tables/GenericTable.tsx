@@ -1,3 +1,4 @@
+import { resolveSelectedRowIds } from "../../../pageRuntime/tableOutputAdapter";
 import { Tooltip } from "@material-tailwind/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -80,6 +81,8 @@ type Props<T> = {
   imageHolder?: string;
   tooltipLimit?: number;
   rowsPerPageOptions?: number[];
+  rowsPerPageValue?: number;
+  onRowsPerPageChange?: (value: number) => void;
   filters?: FilterType[];
   isRowsPerPage?: boolean;
   rowClassNameFunction?: (row: T) => string;
@@ -95,6 +98,9 @@ type Props<T> = {
   outsideSearchProps?: OutsideSearchProps;
   selectionActions?: ActionType<T>[];
   isSelectionEnabled?: boolean;
+  onVisibleRowIdsChange?: (ids: readonly (string | number)[]) => void;
+  activeRecordId?: string | number;
+  onRecordActivate?: (id: string | number) => void;
   isToolTipEnabled?: boolean;
   isEmtpyExcel?: boolean;
   showOrientationToggle?: boolean;
@@ -139,6 +145,8 @@ const GenericTable = <T,>({
   isRowsPerPage = true,
   isActionsAtFront = false,
   isCollapsibleCheckActive = true,
+  rowsPerPageValue,
+  onRowsPerPageChange,
   rowsPerPageOptions = [
     RowPerPageEnum.FIRST,
     RowPerPageEnum.SECOND,
@@ -151,6 +159,9 @@ const GenericTable = <T,>({
   pagination,
   selectionActions,
   isSelectionEnabled = false,
+  onVisibleRowIdsChange,
+  activeRecordId,
+  onRecordActivate,
   showOrientationToggle,
   onExcelUpload,
   dateFormat = DEFAULT_DATE_FORMAT,
@@ -270,8 +281,8 @@ const GenericTable = <T,>({
   };
 
   const {
-    rowsPerPage,
-    setRowsPerPage,
+    rowsPerPage: generalRowsPerPage,
+    setRowsPerPage: setGeneralRowsPerPage,
     expandedRows,
     searchQuery,
     setSearchQuery,
@@ -287,6 +298,9 @@ const GenericTable = <T,>({
     tabOrientation,
     setTabOrientation,
   } = useGeneralContext();
+
+  const rowsPerPage = rowsPerPageValue ?? generalRowsPerPage;
+  const setRowsPerPage = onRowsPerPageChange || setGeneralRowsPerPage;
 
   // Use local selection state if provided, otherwise fall back to global context
   const selectedRows = (
@@ -497,6 +511,11 @@ const GenericTable = <T,>({
     return sortedRows?.slice(start, end);
   }, [sortedRows, isRowsPerPage, pagination, currentPage, rowsPerPage]);
 
+  const visibleRowIdsKey = JSON.stringify(currentRows.flatMap(row => resolveSelectedRowIds([row], true) ?? []));
+  useEffect(() => {
+    onVisibleRowIdsChange?.(JSON.parse(visibleRowIdsKey) as (string | number)[]);
+  }, [visibleRowIdsKey, rows, onVisibleRowIdsChange]);
+
   const sortRows = (key: string, direction: "ascending" | "descending") => {
     setSortConfigKey({ key, direction });
   };
@@ -603,7 +622,7 @@ const GenericTable = <T,>({
   // };
 
   const renderActionButtons = (row: T, actions: ActionType<T>[]) => (
-    <div className="flex flex-row my-auto h-full gap-3 justify-center items-center">
+    <div data-no-record-activate="" className="flex flex-row my-auto h-full gap-3 justify-center items-center">
       {actions?.map((action, index) => {
         if (action?.isHidden?.(row) || action?.node === null) return null;
         const isDisabled =
@@ -670,10 +689,24 @@ const GenericTable = <T,>({
   const currentRowsContent = currentRows.map((row, rowIndex) => {
     const rowId = `row-${rowIndex}`;
     const isRowExpanded = expandedRows[rowId];
+    const recordId = onRecordActivate ? resolveSelectedRowIds([row], true)?.[0] : undefined;
+    const canActivate = onRecordActivate !== undefined && recordId !== undefined;
+    const isActiveRecord = canActivate && activeRecordId === recordId;
     return (
       <Fragment key={rowId}>
         <tr
           draggable={isDraggable}
+          tabIndex={canActivate ? 0 : undefined}
+          aria-selected={canActivate ? isActiveRecord : undefined}
+          data-table-record-active={canActivate ? String(isActiveRecord) : undefined}
+          onClick={canActivate ? event => {
+            if (event.defaultPrevented || event.target instanceof Element && event.target.closest("button, a, input, select, textarea, label, [role='button'], [role='checkbox'], [role='switch'], [contenteditable], [data-no-record-activate]")) return;
+            onRecordActivate?.(recordId!);
+          } : undefined}
+          onKeyDown={canActivate ? event => {
+            if (event.target !== event.currentTarget || event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault(); onRecordActivate?.(recordId!);
+          } : undefined}
           onDragStart={(e) => handleDragStart(e, row)}
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, row)}
@@ -685,7 +718,7 @@ const GenericTable = <T,>({
           style={rowStyleFunction?.(row)}
         >
           {hasSelectionActions && isSelectionActive && (
-            <td className="w-6 h-6 mx-auto p-1">
+            <td data-no-record-activate="" className="w-6 h-6 mx-auto p-1">
               <div className="flex items-center justify-center">
                 <EnterpriseCheckbox
                   checked={isRowSelected(row)}
@@ -697,7 +730,7 @@ const GenericTable = <T,>({
           {(!isCollapsibleCheckActive ||
             (isCollapsible &&
               row?.collapsible?.collapsibleRows?.length > 0)) && (
-            <td className="text-center">
+            <td data-no-record-activate="" className="text-center">
               <ExpandCollapseIcon
                 isExpanded={isRowExpanded}
                 onClick={() => toggleRowExpansion(rowId)}

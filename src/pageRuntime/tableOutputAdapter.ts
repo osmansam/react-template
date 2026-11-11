@@ -6,6 +6,7 @@ export interface TableOutputState {
   filters: Readonly<Record<string, unknown>>;
   search: string;
   selectedIds?: readonly (string | number)[];
+  selectedRecord?: Record<string, unknown>;
 }
 
 const unavailable = (): RuntimeValue => ({ status: "unavailable" });
@@ -56,6 +57,7 @@ const supportedTypes = new Set<ComponentOutputDefinition["type"]>([
   "dateRange",
   "stringArray",
   "numberArray",
+  "record",
 ]);
 
 export const resolveTableOutput = (
@@ -91,6 +93,8 @@ export const resolveTableOutput = (
         typeof state.search === "string"
         ? availableWhenTypeMatches(state.search.trim(), outputDefinition)
         : unavailable();
+    case "tableSelectedRecord":
+      return outputDefinition.type === "record" && state.selectedRecord !== undefined ? availableWhenTypeMatches(state.selectedRecord, outputDefinition) : unavailable();
     case "tableSelectedIds":
       if (
         (outputDefinition.type !== "stringArray" &&
@@ -107,3 +111,14 @@ export const resolveTableOutput = (
       return unavailable();
   }
 };
+
+/** Resolve by identity against fresh rows, never a stale checkbox snapshot. */
+export function resolveSelectedRecord(selected: readonly unknown[], currentRows: readonly unknown[], initialized: boolean, sourceRows: readonly unknown[] = currentRows): Record<string, unknown> | undefined {
+ const ids = resolveSelectedRowIds(selected, initialized);
+ if (!ids || ids.length !== 1) return undefined;
+ const visibleMatches = currentRows.filter(row => isRecord(row) && Object.hasOwn(row, "_id") && row._id === ids[0]);
+ if (visibleMatches.length !== 1) return undefined;
+ const matches = sourceRows.filter(row => isRecord(row) && Object.hasOwn(row, "_id") && row._id === ids[0]);
+ const record = matches.length === 1 ? matches[0] : undefined;
+ return isRecord(record) && matchesRuntimeValueType(record, "record") ? record : undefined;
+}

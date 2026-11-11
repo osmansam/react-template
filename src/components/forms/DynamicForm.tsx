@@ -35,8 +35,10 @@ import { GenericButton } from "../panelComponents/FormElements/GenericButton";
 import DynamicFormField from "./DynamicFormField";
 import DynamicFormObjectList from "./DynamicFormObjectList";
 import DynamicFormSummary from "./DynamicFormSummary";
+import { useDependentSelectInputs } from "./useDependentSelectInputs";
 import { useFormSelectionData } from "./useFormSelectionData";
-import { usePageRuntimePage } from "../../pageRuntime/PageRuntimeProvider";
+import { useOptionalPageRuntime } from "../../pageRuntime/PageRuntimeProvider";
+import { clearDependentSelectValues } from "../../utils/selectFilters";
 import {
   FormCalculationError,
   recalculateFormState,
@@ -72,12 +74,25 @@ const isEmpty = (value: unknown) =>
 
 const DynamicForm = ({ form, title, componentId }: Props) => {
   const { t } = useTranslation();
-  const runtimePage = usePageRuntimePage();
+  const runtimePage = useOptionalPageRuntime()?.page;
   const selectionDataMap = useFormSelectionData(form);
-  const inputs = useMemo(
+  const [formElements, setFormElements] = useState<FormElementsState>(() =>
+    buildInitialFormState(form),
+  );
+  const baseInputs = useMemo(
     () => buildFormInputs(form, selectionDataMap),
     [form, selectionDataMap],
   );
+  const objectListMappings = useMemo(
+    () =>
+      (form.objectLists || []).flatMap(
+        (objectList) => objectList.fieldMappings || [],
+      ),
+    [form.objectLists],
+  );
+  const inputs = useDependentSelectInputs(baseInputs, formElements, {
+    objectListMappings,
+  });
   const inputMap = useMemo(
     () => new Map(inputs.map((input) => [input.formKey, input])),
     [inputs],
@@ -94,9 +109,6 @@ const DynamicForm = ({ form, title, componentId }: Props) => {
     area: "bottom" as const,
     buttonName: form.submit?.buttonName,
   };
-  const [formElements, setFormElements] = useState<FormElementsState>(() =>
-    buildInitialFormState(form),
-  );
   const [editing, setEditing] = useState<EditingState>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const hasImageField = (form.fields || []).some(
@@ -111,7 +123,10 @@ const DynamicForm = ({ form, title, componentId }: Props) => {
 
   const updateField = (key: string, value: FormElementValue) => {
     setFormElements((current) => {
-      const next = { ...current, [key]: value };
+      const next = clearDependentSelectValues(inputs, current, {
+        ...current,
+        [key]: value,
+      });
       const invalidated = inputMap.get(key)?.invalidateKeys || [];
       invalidated.forEach(({ key: invalidatedKey, defaultValue }) => {
         next[invalidatedKey] = defaultValue;
@@ -126,6 +141,15 @@ const DynamicForm = ({ form, title, componentId }: Props) => {
     fieldKeys.forEach((key) => {
       const field = fieldMap.get(key);
       if (!field) return;
+      const input = inputMap.get(key);
+      const isFieldDisabled =
+        field.isDisabled ||
+        isFormConditionMet(field.disabledCondition, formElements);
+      if (!isFieldDisabled && input?.selectionStatus) {
+        nextErrors[key] =
+          input.selectionMessage || t("Options are not ready");
+        return;
+      }
       const rules: ValidationRules = {
         required:
           !!field.required ||
@@ -188,7 +212,7 @@ const DynamicForm = ({ form, title, componentId }: Props) => {
       (action.clearSourceFields || []).forEach((key) => {
         if (!preserved.has(key)) next[key] = initial[key];
       });
-      return next;
+      return clearDependentSelectValues(inputs, current, next);
     });
   };
 
@@ -298,7 +322,7 @@ const DynamicForm = ({ form, title, componentId }: Props) => {
         record,
         formConfigRef: buildFormConfigReference(
           form,
-          runtimePage.id || runtimePage._id,
+          runtimePage?.id || runtimePage?._id || "",
           componentId,
         ),
       });

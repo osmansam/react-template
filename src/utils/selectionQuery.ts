@@ -35,7 +35,17 @@ const cleanEntries = (params: Record<string, unknown>) => {
 
 const serializeEntries = (entries: readonly (readonly [string, unknown])[]) => {
   const params = new URLSearchParams();
-  entries.forEach(([key, value]) => params.append(key, String(value)));
+  entries.forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item !== undefined && item !== null && item !== "") {
+          params.append(key, String(item));
+        }
+      });
+      return;
+    }
+    params.append(key, String(value));
+  });
   return params.toString();
 };
 

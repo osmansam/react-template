@@ -14,8 +14,12 @@ import {
     FormObjectListDisplayConfig,
     FormObjectListConfig,
 } from "../types/page";
-import { renderOptionTemplate } from "./selectOptionConfig";
+import {
+    getEffectiveSelectDataFields,
+    renderOptionTemplate,
+} from "./selectOptionConfig";
 import { evaluateRowCondition } from "./genericPageHelpers";
+import { referencedSelectRecordFields } from "./selectFilters";
 
 export type EmbeddedFormObject = Record<string, unknown>;
 export type FormSelectionDataMap = Map<
@@ -89,7 +93,7 @@ const getFieldOptions = (
   selectionDataMap: FormSelectionDataMap,
 ): OptionType[] => {
   if (field.type !== "select") return [];
-  if (field.optionsSource !== "schema") return parseStaticOptions(field);
+  if (field.optionsSource !== "schema" && !selectionDataMap.has(field.formKey)) return parseStaticOptions(field);
   const valueField = field.sourceValueField || "_id";
   const labelField = field.sourceLabelField || valueField;
   return (selectionDataMap.get(field.formKey) || []).map((item) => ({
@@ -105,10 +109,14 @@ export const buildFormInputs = (
   form: FormComponentConfig,
   selectionDataMap: FormSelectionDataMap,
 ): GenericInputType[] => {
+  const allFields = form.fields || [];
   const fieldsByKey = new Map(
-    (form.fields || []).map((field) => [field.formKey, field]),
+    allFields.map((field) => [field.formKey, field]),
   );
-  return (form.fields || [])
+  const mappings = (form.objectLists || []).flatMap(
+    (list) => list.fieldMappings || [],
+  );
+  return allFields
     .filter((field) => field.formKey)
     .slice()
     .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
@@ -124,7 +132,24 @@ export const buildFormInputs = (
       isMultiple: field.isMultiple,
       isNumberButtonsActive: field.isNumberButtonsActive,
       options: getFieldOptions(field, selectionDataMap),
+      optionsSource: field.optionsSource,
+      sourceSchemaName: field.sourceSchemaName,
+      sourceValueField: field.sourceValueField,
+      sourceLabelField: field.sourceLabelField,
+      sourceDataFields:
+        field.type === "select"
+          ? Array.from(
+              new Set([
+                ...getEffectiveSelectDataFields(field, mappings),
+                ...referencedSelectRecordFields(allFields, field.formKey),
+              ]),
+            )
+          : field.sourceDataFields,
+      optionDisplay: field.optionDisplay,
       sourceRequestFilters: field.sourceRequestFilters,
+      sourceFilterBindings: field.sourceFilterBindings,
+      selectionRequestSlot:
+        field.type === "select" ? `options:${field.formKey}` : undefined,
       sourceFilterCondition: field.sourceFilterCondition,
       invalidateKeys: field.invalidateKeys?.map((key) => ({
         key,

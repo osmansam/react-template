@@ -3,6 +3,7 @@ import {
   ComponentOutputDefinition,
   DataBinding,
   InfoBlocksConfig,
+  InfoBlockItemConfig,
 } from "../../../types/page";
 import InfoBlockOutputPublisher from "../../../pageRuntime/InfoBlockOutputPublisher";
 import { toggleInfoBlockSelection } from "../../../pageRuntime/infoBlockOutputAdapter";
@@ -105,7 +106,7 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({
     };
   }, [payload, source, workflowData]);
 
-  const resolvedItems = useMemo(() => {
+  const resolvedItems = useMemo<Array<InfoBlockItemConfig & { itemContext?: Record<string, unknown> }>>(() => {
     if (!isDynamic) {
       return (config?.items || []).slice(0, 5);
     }
@@ -116,9 +117,9 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({
         dataList = workflowData;
       } else if (workflowData && typeof workflowData === "object") {
         const arrayField =
-          (workflowData as any).items ||
-          (workflowData as any).data ||
-          (workflowData as any).list;
+          workflowData.items ||
+          workflowData.data ||
+          workflowData.list;
         if (Array.isArray(arrayField)) {
           dataList = arrayField;
         } else {
@@ -170,7 +171,7 @@ const InfoBlocks: React.FC<InfoBlocksProps> = ({
         }}
       >
       {resolvedItems.map((item, index) => {
-        const itemContext = (item as any).itemContext || context;
+        const itemContext = item.itemContext || context;
         const color = item.color?.trim();
         const titleColor = resolveConditionalColor(
           item.titleColorRules,

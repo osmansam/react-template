@@ -1,3 +1,4 @@
+import { usePageSelectionOptions } from "../pageRuntime/requests/selectionOptions";
 import { useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { TableComponentConfig } from "../types/page";
@@ -15,6 +16,7 @@ const getItems = (response: SelectionResponse | undefined) =>
 export const useGeneratedRelationSelectionData = (
   tableConfig: TableComponentConfig | undefined,
 ): Record<string, Array<Record<string, unknown>>> => {
+  const pageOptions = usePageSelectionOptions();
   const groups = useMemo(
     () => tableConfig?.generatedRelationColumns || [],
     [tableConfig?.generatedRelationColumns],
@@ -31,7 +33,7 @@ export const useGeneratedRelationSelectionData = (
         valueField: group.sourceIdField || "_id",
         extraParams: { limit },
       });
-      return {
+      return pageOptions(`relationOptions:${group.id}`, path, {
         queryKey,
         queryFn: () => get<SelectionResponse>({ path }),
         enabled: Boolean(
@@ -41,7 +43,7 @@ export const useGeneratedRelationSelectionData = (
             group.arrayField,
         ),
         staleTime: Infinity,
-      };
+      });
     }),
   });
   return groups.reduce<Record<string, Array<Record<string, unknown>>>>(
