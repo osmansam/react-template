@@ -3,6 +3,7 @@ import { useQueries } from "@tanstack/react-query";
 import { FormComponentConfig } from "../../types/page";
 import { get } from "../../utils/api";
 import { FormSelectionDataMap } from "../../utils/formConfig";
+import { referencedSelectRecordFields } from "../../utils/selectFilters";
 import {
   hasDependentSelectFilters,
   referencedSelectRecordFields,
@@ -25,6 +26,7 @@ export const useFormSelectionData = (
   const fields = allFields.filter(
     (field) =>
       field.type === "select" &&
+      !field.sourceFilterBindings?.length &&
       !hasDependentSelectFilters(field) &&
       ((field.optionsSource === "schema" && field.sourceSchemaName) || pageOptions.connected(`options:${field.formKey}`)),
   );

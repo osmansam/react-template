@@ -177,6 +177,7 @@ export const useDependentSelectInputs = (
 
   const optionsByField = new Map<string, OptionType[]>();
   inputs.forEach((input) => {
+    if (input.type === InputTypes.SELECT && !input.sourceFilterBindings?.length) {
     if (input.type === InputTypes.SELECT && !hasDependentSelectFilters(input)) {
       optionsByField.set(
         input.formKey,
@@ -192,6 +193,7 @@ export const useDependentSelectInputs = (
 
   const managedInputs = inputs.filter((input) => {
     if (input.type !== InputTypes.SELECT) return false;
+    if (input.sourceFilterBindings?.length) return true;
     if (hasDependentSelectFilters(input)) return true;
     const slot =
       input.selectionRequestSlot || `${defaultSlotPrefix}:${input.formKey}`;
@@ -248,6 +250,7 @@ export const useDependentSelectInputs = (
       };
     }
 
+    const resolved = input.sourceFilterBindings?.length
     const isDependent = hasDependentSelectFilters(input);
     const resolved = isDependent
       ? resolveSelectFilters(
@@ -267,6 +270,7 @@ export const useDependentSelectInputs = (
       fieldName,
       valueField,
       dataFields,
+      filterParams: resolved.ready ? resolved.filters : input.sourceRequestFilters,
       filterParams: resolved.ready ? resolved.filters : undefined,
     });
 
@@ -288,6 +292,7 @@ export const useDependentSelectInputs = (
         filters: resolved.ready ? resolved.filters : undefined,
         dataFields,
         ready: canFetch,
+        trackRead: !input.sourceFilterBindings?.length,
         trackRead: !isDependent,
       },
     );
@@ -320,6 +325,12 @@ export const useDependentSelectInputs = (
     let progressed = false;
     managedInputs.forEach((input, index) => {
       if (planByKey.has(input.formKey)) return;
+      const peerManagedDeps = (input.sourceFilterBindings || []).flatMap((rule) =>
+        rule?.value &&
+        (rule.value.source === "field" || rule.value.source === "record") &&
+        managedKeys.has(rule.value.fieldKey)
+          ? [rule.value.fieldKey]
+          : [],
       const peerManagedDeps = getSelectFilterDependencies(input, inputs).filter(
         (depKey) => managedKeys.has(depKey),
       );
@@ -350,6 +361,7 @@ export const useDependentSelectInputs = (
     const plan = planByKey.get(input.formKey);
     if (!plan) return input;
 
+    const isDependent = Boolean(input.sourceFilterBindings?.length);
     const isDependent = hasDependentSelectFilters(input);
     const result = queryResults[plan.index];
 
