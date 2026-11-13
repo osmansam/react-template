@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderHook, waitFor, cleanup, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterAll, afterEach, expect, it, vi } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 import { axiosClient } from "../../utils/api/axiosClient";
 import { useVisualCollections } from "./useVisualCollections";
@@ -11,11 +11,16 @@ import { useWebSocket } from "../../hooks/useWebSocket";
 import { collectionQueryOptions } from "./collectionQuery";
 import { planCollection } from "./collectionPlan";
 import type { ComponentNode } from "../../visual-engine/model";
+vi.hoisted(() => {
+ // useWebSocket captures its API URL at import time, before test setup runs.
+ vi.stubEnv("VITE_API_URL", "https://api.example.test/api/v1");
+});
 const actor = vi.hoisted(() => ({ user: undefined as undefined | { _id: string } }));
 vi.mock("../../context/User.context", () => ({ useUserContext: () => actor }));
 const original = axiosClient.defaults.adapter;
 const root: ComponentNode = { id: "root", type: "section", children: ["a", "b"].map(id => ({ id, type: "repeater", source: { kind: "autotable", schemaName: "products", limit: 5 }, itemAlias: "item", children: [{ id: `${id}-slot`, type: "slot", name: "item", children: [] }] })) };
 afterEach(() => { cleanup(); axiosClient.defaults.adapter = original; actor.user = undefined; localStorage.clear(); vi.unstubAllGlobals(); });
+afterAll(() => { vi.unstubAllEnvs(); });
 it("refreshes all active visual copies after a schema event without touching other projects or schemas", async () => {
  window.history.replaceState(null, "", "/t/acme/p/shop/catalog");
  class Socket {
