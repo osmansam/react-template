@@ -9,7 +9,6 @@ import { usePageSelectionOptions } from "../pageRuntime/requests/selectionOption
 import { TableFilterPanelInputConfig } from "../types/page";
 import { get } from "./api";
 import { evaluateRowCondition } from "./genericPageHelpers";
-import { referencedSelectRecordFields } from "./selectFilters";
 import {
   hasDependentSelectFilters,
   referencedSelectRecordFields,
@@ -47,7 +46,6 @@ export const useFilterPanelSelectionData = (
   const schemaSelectFields = inputs.filter(
     (field) =>
       field.type === "select" &&
-      !field.sourceFilterBindings?.length &&
       !hasDependentSelectFilters(field) &&
       ((field.optionsSource === "schema" && field.sourceSchemaName) ||
         pageOptions.connected(`filterOptions:${field.id || field.formKey}`)),

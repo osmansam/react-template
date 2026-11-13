@@ -58,7 +58,6 @@ import {
 import { getIconByName } from "../../../utils/menuIcons";
 import { formatPopulatedArrayValue } from "../../../utils/populatedArrayDisplay";
 import { formatTableDate } from "../../../utils/tableDateFormat";
-import { referencedSelectRecordFields } from "../../../utils/selectFilters";
 import {
   hasDependentSelectFilters,
   referencedSelectRecordFields,
@@ -135,7 +134,6 @@ const useActionFormSelectionData = (
       .filter(
         (field) =>
           field.type === "select" &&
-          !field.sourceFilterBindings?.length &&
           !hasDependentSelectFilters(field) &&
           ((field.optionsSource === "schema" && field.sourceSchemaName) || pageOptions.connected(`actionOptions:${getActionId(action, actionIndex)}:${field.formKey}`)),
       )
