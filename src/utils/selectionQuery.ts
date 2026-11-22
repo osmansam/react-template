@@ -1,3 +1,5 @@
+import { captureProjectRequest } from "./projectSessionStorage";
+import { currentProjectScope } from "./projectScope";
 type ExtraSelectionParams =
   | Record<string, unknown>
   | readonly (readonly [string, string])[];
@@ -65,16 +67,8 @@ const isEntryArray = (
 ): value is readonly (readonly [string, string])[] => Array.isArray(value);
 
 export const getSelectionScopeFromLocation = () => {
-  if (typeof window === "undefined") return {};
-
-  const parts = window.location.pathname.split("/");
-  const tenantIndex = parts.indexOf("t");
-  const projectIndex = parts.indexOf("p");
-
-  return {
-    tenantSlug: tenantIndex >= 0 ? parts[tenantIndex + 1] || "" : "",
-    projectSlug: projectIndex >= 0 ? parts[projectIndex + 1] || "" : "",
-  };
+  const scope = currentProjectScope();
+  return { tenantSlug: scope?.tenant ?? "", projectSlug: scope?.project ?? "" };
 };
 
 export const getSelectionQueryConfig = ({
@@ -106,6 +100,7 @@ export const getSelectionQueryConfig = ({
   );
 
   return {
+    config: captureProjectRequest(resolvedTenantSlug && resolvedProjectSlug ? { tenant: resolvedTenantSlug, project: resolvedProjectSlug } : null),
     path: `${basePath}/selection?${serializeEntries([
       ...cleanEntries(queryParams),
       ...extraEntries,

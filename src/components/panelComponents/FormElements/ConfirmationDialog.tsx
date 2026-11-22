@@ -26,7 +26,7 @@ export function ConfirmationDialog({
       leaveFrom="transform scale-100 opacity-100"
       leaveTo="transform scale-95 opacity-0"
     >
-      <Dialog onClose={() => close()}>
+      <Dialog onClose={() => close()} className="fixed inset-0 z-[99999]">
         <Dialog.Overlay />
         <div
           id="popup"
@@ -40,7 +40,7 @@ export function ConfirmationDialog({
             <div className="flex items-center justify-center h-full w-full">
               <div className="bg-white rounded-md shadow fixed overflow-y-auto sm:h-auto w-10/12 lg:w-1/5">
                 <div className="bg-gray-100 rounded-tl-md rounded-tr-md px-4 md:px-8 md:py-4 py-7 flex items-center justify-center lg:justify-start">
-                  <p className="text-base font-semibold">{title}</p>
+                  <Dialog.Title as="p" className="text-base font-semibold">{title}</Dialog.Title>
                 </div>
                 <div className="p-4 text-center">
                   {text}

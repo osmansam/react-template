@@ -1,3 +1,4 @@
+import { getStoredValue, setStoredValue } from "../utils/safeStorage";
 import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -72,7 +73,7 @@ const AuditLogs = () => {
 
   // Filter state
   const [showFilters, setShowFilters] = useState(() => {
-    const stored = localStorage.getItem("showAuditFilters");
+    const stored = getStoredValue("showAuditFilters");
     return stored === "true";
   });
 
@@ -80,7 +81,7 @@ const AuditLogs = () => {
     useState<FormElementsState>(initialFilterState);
 
   useEffect(() => {
-    localStorage.setItem("showAuditFilters", String(showFilters));
+    setStoredValue("showAuditFilters", String(showFilters));
   }, [showFilters]);
 
   const auditLogsPayload = useGetPaginatedAuditLogs(

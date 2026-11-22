@@ -1,3 +1,6 @@
+import { ownsProjectRequest } from "./projectSessionStorage";
+import { useTenantProject } from "../hooks/useTenantProject";
+import { currentProjectScope, projectPath, projectQueryKey, type ProjectScope } from "./projectScope";
 import { pageRequestInvalidationPredicate } from "../pageRuntime/requests/invalidation";
 import { usePageRequestConsumer } from "../pageRuntime/requests/ConsumerProvider";
 import type { PageRequestScope } from "../pageRuntime/requests/descriptor";
@@ -26,6 +29,7 @@ import {
   normalizeJsonRequestValue,
   normalizeQueryEntries,
   serializeQueryEntries,
+  shouldInvalidateDynamicQuery,
 } from "./dynamicQueryKeys";
 import { canonicalizeRuntimeValue } from "../pageRuntime/pageParameterResolver";
 import { getSelectionQueryConfig } from "./selectionQuery";
@@ -47,16 +51,18 @@ export interface DynamicExecutionResponse<T> {
 export type TableSourceBinding = DynamicTableSourceBinding;
 
 const BASE = "/dynamic";
-const idempotencyKeys = new Map<string, string>();
+const mutationKeys = new WeakMap<QueryClient, Map<string, string>>();
+
 
 export const invalidateDynamicMutationQueries = (
   queryClient: Pick<QueryClient, "invalidateQueries">,
   schemaName: string,
-  scope?: PageRequestScope,
-) =>
-  queryClient.invalidateQueries(scope ? {
-    predicate: query => query.queryKey[0] === "dynamic" && query.queryKey[1] === schemaName || pageRequestInvalidationPredicate(scope, schemaName)(query),
-  } : { queryKey: ["dynamic", schemaName] });
+  requestScope?: PageRequestScope,
+  projectScope: ProjectScope | null = requestScope ?? currentProjectScope(),
+) => queryClient.invalidateQueries({
+  predicate: query => shouldInvalidateDynamicQuery(query.queryKey, schemaName, projectScope, false) ||
+    pageRequestInvalidationPredicate(requestScope, schemaName)(query),
+});
 
 export const shouldInvalidateAfterDynamicUpdate = (error: unknown) =>
   error != null;
@@ -107,59 +113,23 @@ function createIdempotencyKey() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function getIdempotencyFingerprint(
-  schemaName: string,
-  operation: string,
-  payload: unknown,
-) {
-  return stableSerialize({ operation, payload, schemaName });
-}
-
-function getIdempotencyKey(fingerprint: string) {
-  const existingKey = idempotencyKeys.get(fingerprint);
-
-  if (existingKey) {
-    return existingKey;
-  }
-
-  const key = createIdempotencyKey();
-  idempotencyKeys.set(fingerprint, key);
-
-  return key;
-}
-
-function idempotencyHeader(
-  schemaName: string,
-  operation: string,
-  payload: unknown,
-) {
-  const fingerprint = getIdempotencyFingerprint(schemaName, operation, payload);
-
-  return {
-    "Idempotency-Key": getIdempotencyKey(fingerprint),
-  };
-}
-
-function releaseIdempotencyKey(
-  schemaName: string,
-  operation: string,
-  payload: unknown,
-) {
-  idempotencyKeys.delete(
-    getIdempotencyFingerprint(schemaName, operation, payload),
-  );
-}
-
 async function withIdempotency<T>(
+  client: QueryClient,
+  scope: ProjectScope | null,
   schemaName: string,
   operation: string,
   payload: unknown,
   request: (headers: Record<string, string>) => Promise<T>,
 ) {
+  const keys = mutationKeys.get(client) ?? new Map<string, string>();
+  mutationKeys.set(client, keys);
+  const fingerprint = stableSerialize({ scope, schemaName, operation, payload });
+  const key = keys.get(fingerprint) ?? createIdempotencyKey();
+  keys.set(fingerprint, key);
   try {
-    return await request(idempotencyHeader(schemaName, operation, payload));
+    return await request({ "Idempotency-Key": key });
   } finally {
-    releaseIdempotencyKey(schemaName, operation, payload);
+    if (keys.get(fingerprint) === key) keys.delete(fingerprint);
   }
 }
 
@@ -189,12 +159,13 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   customQueryKey?: unknown[],
   refreshSharedRequests = true,
 ) {
-  const queryKey = (customQueryKey || listKey(schemaName)) as unknown[];
+  const { scope, requestConfig } = useTenantProject();
+  const queryKey = customQueryKey?.[0] === "page-request" ? customQueryKey : projectQueryKey(scope, customQueryKey || listKey(schemaName));
   const qc = useQueryClient();
   const requestScope = usePageRequestConsumer()?.scope;
   const { t } = useTranslation();
   const invalidateSchemaQueries = () =>
-    invalidateDynamicMutationQueries(qc, schemaName, refreshSharedRequests ? requestScope : undefined);
+    invalidateDynamicMutationQueries(qc, schemaName, refreshSharedRequests ? requestScope : undefined, scope);
 
   // Custom create function that handles FormData
   async function createRequest(payload: Partial<T>) {
@@ -207,11 +178,13 @@ export function useDynamicCrud<T extends { _id: string | number }>(
       : { "Content-Type": "application/json" };
 
     const response = await withIdempotency(
+      qc, scope,
       schemaName,
       "create",
       payload,
       (idempotencyHeaders) =>
         axiosClient.post<T>(url, data, {
+          ...requestConfig,
           headers: {
             ...headers,
             ...idempotencyHeaders,
@@ -236,11 +209,13 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
     const idempotencyPayload = { id, updates };
     const response = await withIdempotency(
+      qc, scope,
       schemaName,
       "update",
       idempotencyPayload,
       (idempotencyHeaders) =>
         axiosClient.patch<T>(url, data, {
+          ...requestConfig,
           headers: {
             ...headers,
             ...idempotencyHeaders,
@@ -255,6 +230,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   // Create mutation
   const createMutation = useMutation({
+    mutationKey: projectQueryKey(scope, ["dynamic", schemaName, "createRequest", requestConfig.runtimeSession]),
     mutationFn: createRequest,
     onMutate: async (itemDetails: Partial<T>) => {
       await qc.cancelQueries({ queryKey });
@@ -297,6 +273,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   // Update mutation
   const updateMutation = useMutation({
+    mutationKey: projectQueryKey(scope, ["dynamic", schemaName, "update", requestConfig.runtimeSession]),
     mutationFn: ({
       id,
       updates,
@@ -347,11 +324,13 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   async function deleteRequest(id: string | number) {
     const url = `${BASE}/${id}?${qs({ schemaName })}`;
     const response = await withIdempotency(
+      qc, scope,
       schemaName,
       "delete",
       { id },
       (idempotencyHeaders) =>
         axiosClient.delete(url, {
+          ...requestConfig,
           headers: idempotencyHeaders,
         }),
     );
@@ -360,6 +339,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   // Delete single item mutation
   const deleteMutation = useMutation({
+    mutationKey: projectQueryKey(scope, ["dynamic", schemaName, "deleteRequest", requestConfig.runtimeSession]),
     mutationFn: deleteRequest,
     onMutate: async (id: string | number) => {
       await qc.cancelQueries({ queryKey });
@@ -413,11 +393,13 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   // Create multiple items functionality
   async function createManyRequest(payload: Array<Partial<T>>) {
     const { data } = await withIdempotency(
+      qc, scope,
       schemaName,
       "createMultiple",
       payload,
       (idempotencyHeaders) =>
         axiosClient.post(`${BASE}/multiple?${qs({ schemaName })}`, payload, {
+          ...requestConfig,
           headers: {
             "Content-Type": "application/json",
             ...idempotencyHeaders,
@@ -428,6 +410,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   }
 
   const createManyMutation = useMutation({
+    mutationKey: projectQueryKey(scope, ["dynamic", schemaName, "createManyRequest", requestConfig.runtimeSession]),
     mutationFn: createManyRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (err: any) => {
@@ -444,12 +427,14 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
   async function deleteManyRequest(payload: Array<{ _id: string | number }>) {
     const { data } = await withIdempotency(
+      qc, scope,
       schemaName,
       "deleteMultiple",
       payload,
       (idempotencyHeaders) =>
         axiosClient.delete(`${BASE}/multiple?${qs({ schemaName })}`, {
           data: payload,
+          ...requestConfig,
           headers: {
             "Content-Type": "application/json",
             ...idempotencyHeaders,
@@ -460,6 +445,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   }
 
   const deleteManyMutation = useMutation({
+    mutationKey: projectQueryKey(scope, ["dynamic", schemaName, "deleteManyRequest", requestConfig.runtimeSession]),
     mutationFn: deleteManyRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (err: any) => {
@@ -485,6 +471,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     }));
 
     const { data } = await withIdempotency(
+      qc, scope,
       schemaName,
       "updateMultiple",
       flattenedPayload,
@@ -493,6 +480,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           `${BASE}/multiple?${qs({ schemaName })}`,
           flattenedPayload,
           {
+            ...requestConfig,
             headers: {
               "Content-Type": "application/json",
               ...idempotencyHeaders,
@@ -504,6 +492,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   }
 
   const updateManyMutation = useMutation({
+    mutationKey: projectQueryKey(scope, ["dynamic", schemaName, "updateManyRequest", requestConfig.runtimeSession]),
     mutationFn: updateManyRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (err: any) => {
@@ -535,6 +524,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
     const targetSchema = workflowSchema || schemaName;
     const payload = { record, oldRecord, formConfigRef };
     const { data } = await withIdempotency(
+      qc, scope,
       targetSchema,
       `workflow:${workflowName}`,
       payload,
@@ -545,6 +535,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
           })}`,
           payload,
           {
+            ...requestConfig,
             headers: {
               "Content-Type": "application/json",
               ...idempotencyHeaders,
@@ -556,6 +547,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
   }
 
   const executeWorkflowMutation = useMutation({
+    mutationKey: projectQueryKey(scope, ["dynamic", schemaName, "executeWorkflowRequest", requestConfig.runtimeSession]),
     mutationFn: executeWorkflowRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (err: any) => {
@@ -594,6 +586,7 @@ export function useDynamicCrud<T extends { _id: string | number }>(
 
 export function useExportDynamicItems() {
   const { t } = useTranslation();
+  const { scope, requestConfig } = useTenantProject();
 
   async function exportRequest(payload: {
     schemaName: string;
@@ -607,18 +600,22 @@ export function useExportDynamicItems() {
       `${BASE}/export?schemaName=${payload.schemaName}`,
       payload,
       {
+        ...requestConfig,
         responseType: "blob",
+        timeout: 120000,
       },
     );
     return response.data;
   }
 
   const exportMutation = useMutation({
+    mutationKey: projectQueryKey(scope, ["dynamic", "exportRequest", requestConfig.runtimeSession]),
     mutationFn: exportRequest,
     onError: () => {
-      toast.error(t("Export failed"));
+      if (ownsProjectRequest(requestConfig)) toast.error(t("Export failed"));
     },
     onSuccess: (data) => {
+      if (!ownsProjectRequest(requestConfig) || projectPath(currentProjectScope(), "/") !== projectPath(scope, "/")) return;
       const url = window.URL.createObjectURL(new Blob([data]));
       const link = document.createElement("a");
       link.href = url;
@@ -626,6 +623,7 @@ export function useExportDynamicItems() {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      setTimeout(() => window.URL.revokeObjectURL?.(url), 0);
       toast.success(t("Export successful"));
     },
   });
@@ -788,6 +786,7 @@ export function useGetWorkflowData<T>(
   sourceRevision = "",
   enabled = true,
 ) {
+  const { scope, requestConfig } = useTenantProject();
   const schemaName = binding.schemaName || "";
   const workflowName = binding.workflowName || "";
   const mergedParams = { ...(binding.params || {}), ...(resolvedParams || {}) };
@@ -809,14 +808,16 @@ export function useGetWorkflowData<T>(
 
   const shared = usePageRead("data", legacyRead({ transport: "workflow", schemaName, workflowName }, { params: normalizedQueryParams as PageRequestValues["params"] }), undefined, enabled);
   const { data } = useQuery({
-    queryKey,
-    queryFn: async () => {
+    queryKey: projectQueryKey(scope, queryKey),
+    queryFn: async ({ signal }) => {
       const response = await axiosClient.post<DynamicExecutionResponse<T>>(
         `${BASE}/workflow/${encodeURIComponent(workflowName)}?${serializeQueryEntries(
           normalizeQueryEntries({ schemaName, ...normalizedQueryParams }),
         )}`,
         { record: normalizedRecord },
         {
+          signal,
+          ...requestConfig,
           headers: {
             "Content-Type": "application/json",
           },
@@ -843,17 +844,20 @@ export function useGetSelection<T>(
   // Only enable the request if both schemaName and fieldName are provided
   const enabled = requestEnabled && Boolean(schemaName && fieldName);
 
+  const { scope } = useTenantProject();
   const queryEntries = normalizeQueryEntries(resolvedParams || {});
   const { path, queryKey } = getSelectionQueryConfig({
     schemaName,
     fieldName,
     valueField,
+    tenantSlug: scope?.tenant ?? "",
+    projectSlug: scope?.project ?? "",
     extraParams: queryEntries,
     sourceRevision,
   });
 
   const shared = usePageRead(requestSlot, legacyRead({ transport: "selection", schemaName, fieldName, valueField }, { params: resolvedParams as PageRequestValues["params"] }), undefined, requestEnabled);
-  const legacy = useGet<T>(path, queryKey, enabled && !shared.handled);
+  const legacy = useGet<T>(path, queryKey, enabled && !shared.handled, true);
   const data = shared.handled ? (Array.isArray(shared.data) ? shared.data : (shared.data as { items?: unknown[] } | undefined)?.items) : legacy;
 
   return (data ?? ([] as T)) as T;

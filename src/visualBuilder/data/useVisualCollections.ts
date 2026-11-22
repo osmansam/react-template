@@ -29,7 +29,7 @@ function readSignedInMarker(): boolean {
  * and returns what the pure renderer needs. The renderer never fetches.
  */
 function useStandaloneVisualCollections(root: ComponentNode, enabled = true): CollectionAssembly & { diagnostics: CollectionDiagnostics } {
-  const { tenant, project } = useTenantProject();
+  const { tenant, project, requestConfig } = useTenantProject();
   const { user } = useUserContext();
   const userId = typeof user?._id === "string" ? user._id : undefined;
   const signedIn = readSignedInMarker();
@@ -37,7 +37,7 @@ function useStandaloneVisualCollections(root: ComponentNode, enabled = true): Co
     networkMode: "always", queryKey: ["visual-session", tenant, project, userId || "", signedIn],
     queryFn: async ({ signal }) => {
       try {
-        const response = await axiosClient.get<{ authenticated: boolean; user?: { _id?: string; id?: string } }>("/auth/session", { signal, timeout: 15000, runtimeScope: { tenant: tenant!, project: project! } });
+        const response = await axiosClient.get<{ authenticated: boolean; user?: { _id?: string; id?: string } }>("/auth/session", { signal, timeout: 15000, ...requestConfig });
         if (typeof response.data?.authenticated !== "boolean") throw new Error("The session could not be verified.");
         const id = response.data.user?._id || response.data.user?.id;
         if (response.data.authenticated && (typeof id !== "string" || !id)) throw new Error("The session identity could not be verified.");
@@ -70,7 +70,7 @@ function useStandaloneVisualCollections(root: ComponentNode, enabled = true): Co
   const metadata = useQuery({
     networkMode: "always", queryKey: ["visual-field-types", tenant, project, identity],
     queryFn: async ({ signal }) => {
-      try { return (await axiosClient.get<unknown>("/runtime/schemas", { signal, timeout: 15000, runtimeScope: { tenant: tenant!, project: project! } })).data; }
+      try { return (await axiosClient.get<unknown>("/runtime/schemas", { signal, timeout: 15000, ...requestConfig })).data; }
       catch (reason) { if (axios.isCancel(reason)) throw reason; throw classifyCollectionError(reason); }
     },
     enabled: needsMetadata && scopeReady,

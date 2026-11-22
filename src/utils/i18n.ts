@@ -25,4 +25,15 @@ i18n
     },
   });
 
+export function createProjectTranslations() {
+  const instance = i18n.createInstance();
+  void instance.init({
+    ...i18n.options,
+    lng: i18n.language,
+    resources: structuredClone(resources),
+    initImmediate: false,
+  });
+  return instance;
+}
+
 export default i18n;

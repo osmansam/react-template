@@ -35,7 +35,7 @@ export const useTableLookupSelectionData = (
 
   const results = useQueries({
     queries: lookups.map((lookup) => {
-      const { path, queryKey } = getSelectionQueryConfig({
+      const { path, queryKey, config } = getSelectionQueryConfig({
         schemaName: lookup.schemaName || "",
         fieldName: lookup.labelField || "",
         valueField: lookup.matchField || "_id",
@@ -43,7 +43,7 @@ export const useTableLookupSelectionData = (
 
       return pageOptions(`lookup:${getTableLookupKey(lookup)}`, path, {
         queryKey,
-        queryFn: () => get<SelectionResponse>({ path }),
+        queryFn: () => get<SelectionResponse>({ path, config }),
         enabled: Boolean(lookup.schemaName && lookup.labelField),
         staleTime: Infinity,
       });

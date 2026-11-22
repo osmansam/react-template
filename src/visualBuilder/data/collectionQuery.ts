@@ -1,3 +1,4 @@
+import { captureProjectRequest } from "../../utils/projectSessionStorage";
 import type { QueryKey } from "@tanstack/react-query";
 import { BASE_QUERY_GC_TIME, BASE_QUERY_REFETCH_ON_RECONNECT, BASE_QUERY_STALE_TIME } from "../../config/queryClient";
 import type { ResolvedCollectionMap, ResolvedCollectionState, ResolvedCollectionStateMap } from "../../visual-engine/renderer/repeaters";
@@ -20,11 +21,12 @@ export function shouldRetryCollection(failureCount: number, error: unknown): boo
 }
 
 export function collectionQueryOptions(scope: CollectionScope, descriptor: CollectionDescriptor, enabled = true) {
+  const owner = captureProjectRequest(scope);
   return {
     networkMode: "always" as const,
     queryKey: collectionQueryKey(scope, descriptor),
     meta: { visualCollectionSchema: descriptor.schemaName },
-    queryFn: ({ signal }: { signal: AbortSignal }): Promise<CollectionPage> => fetchCollection(descriptor, signal, scope),
+    queryFn: ({ signal }: { signal: AbortSignal }): Promise<CollectionPage> => fetchCollection(descriptor, signal, scope, owner.runtimeSession),
     enabled,
     staleTime: BASE_QUERY_STALE_TIME,
     gcTime: BASE_QUERY_GC_TIME,

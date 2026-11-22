@@ -24,8 +24,23 @@ jobs:
       - name: Lint
         run: yarn lint
       - name: Test and type-check
-        run: yarn test
+        run: yarn test:coverage
       - name: Build
         env:
           VITE_API_URL: https://api.example.com/api/v1
         run: yarn build
+      - name: Check bundle budgets and budget regression test
+        run: |
+          yarn test:bundle
+          yarn check:bundle
+      - name: Install Chromium
+        run: yarn playwright install --with-deps chromium
+      - name: Production browser regressions
+        run: yarn test:e2e
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-results
+          path: test-results/
+          retention-days: 7

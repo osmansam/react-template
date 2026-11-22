@@ -5,14 +5,14 @@ import {
   MenuItem,
   MenuList,
 } from "@material-tailwind/react";
-import { useQueryClient } from "@tanstack/react-query";
+
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FiChevronDown } from "react-icons/fi";
 import { IoIosLogOut } from "react-icons/io";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTenantProject } from "../../hooks/useTenantProject";
-import { removeProjectSessionItem, setProjectSessionItem } from "../../utils/projectSessionStorage";
+import { useLogout } from "../../utils/api/auth";
 
 export interface MenuRoute {
   name: string;
@@ -49,7 +49,7 @@ export function PageSelector({
   const navigate = useNavigate();
   const { t } = useTranslation();
   const location = useLocation();
-  const queryClient = useQueryClient();
+  const { logout } = useLogout();
   const { buildPath } = useTenantProject();
   const currentRoute = location.pathname;
   const [openGroups, setOpenGroups] = useState<{ [group: string]: boolean }>(
@@ -64,15 +64,7 @@ export function PageSelector({
     if (onLogout) {
       onLogout();
     } else {
-      // Default logout behavior
-      setProjectSessionItem("loggedOut", "true");
-      removeProjectSessionItem("loggedIn");
-      removeProjectSessionItem("user");
-      setTimeout(() => removeProjectSessionItem("loggedOut"), 500);
-      queryClient.clear();
-
-      // Redirect to login with tenant/project context preserved using buildPath
-      navigate(buildPath("/login"));
+      void logout().catch(() => undefined);
     }
   }
 
@@ -86,7 +78,6 @@ export function PageSelector({
         onNavigate();
       }
       const fullPath = buildPath(path);
-      console.log("PageSelector navigating to:", fullPath, "from path:", path);
       navigate(fullPath);
       window.scrollTo(0, 0);
     }

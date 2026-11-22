@@ -1,11 +1,10 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGeneralContext } from "../context/General.context";
 import { useUserContext } from "../context/User.context";
 import { useFilteredRoutes } from "./useFilteredRoutes";
 import { useTenantProject } from "./useTenantProject";
-import { removeProjectSessionItem, setProjectSessionItem } from "../utils/projectSessionStorage";
+import { useLogout } from "../utils/api/auth";
 import { getTabSlug } from "../utils/slug";
 
 export type SidebarTabItem = {
@@ -87,11 +86,11 @@ const collectRouteOptions = (
 export const useSidebarNavigation = (onNavigateComplete?: () => void) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const queryClient = useQueryClient();
+  const { logout } = useLogout();
   const routes = useFilteredRoutes() as SidebarRouteItem[];
   const { buildPath } = useTenantProject();
   const { resetGeneralContext } = useGeneralContext();
-  const { setUser, user } = useUserContext();
+  const { user } = useUserContext();
   const [openGroups, setOpenGroups] = useState<{ [group: string]: boolean }>(
     {}
   );
@@ -162,14 +161,8 @@ export const useSidebarNavigation = (onNavigateComplete?: () => void) => {
   );
 
   const handleLogoutClick = useCallback(() => {
-    setProjectSessionItem("loggedOut", "true");
-    removeProjectSessionItem("loggedIn");
-    removeProjectSessionItem("user");
-    setTimeout(() => removeProjectSessionItem("loggedOut"), 500);
-    setUser(undefined);
-    queryClient.clear();
-    navigate(buildPath("/login"));
-  }, [buildPath, navigate, queryClient, setUser]);
+    void logout().catch(() => undefined);
+  }, [logout]);
 
   return {
     user,

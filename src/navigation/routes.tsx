@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useMemo,
+  useEffect,
   type ComponentType,
 } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
@@ -16,7 +17,7 @@ import {
 } from "./dynamicPagesLoading";
 import {
   getProjectSessionItem,
-  removeProjectSessionItem,
+  clearProjectSession,
 } from "../utils/projectSessionStorage";
 
 const GoogleCallback = lazy(() => import("../pages/GoogleCallback"));
@@ -72,6 +73,11 @@ const RouterContainer = () => {
   );
   const tenantLandingPath = landingPath.replace(/^\/+/, "") || ".";
 
+  const loginRedirect = loadDynamicPages && isError ? getDynamicPagesAuthFailureRedirect(location.pathname, error) : undefined;
+  useEffect(() => {
+    if (loginRedirect) clearProjectSession(location.pathname);
+  }, [loginRedirect, location.pathname]);
+
   // Show loading screen while fetching dynamic pages to prevent 404 flash
   if (loadDynamicPages && isLoading) {
     return (
@@ -82,12 +88,7 @@ const RouterContainer = () => {
   }
 
   if (loadDynamicPages && isError) {
-    const loginRedirect = getDynamicPagesAuthFailureRedirect(
-      location.pathname,
-      error,
-    );
     if (loginRedirect) {
-      removeProjectSessionItem("loggedIn", location.pathname);
       return <Navigate to={loginRedirect} state={{ from: location }} replace />;
     }
     return (

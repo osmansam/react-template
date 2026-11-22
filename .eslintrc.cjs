@@ -14,7 +14,7 @@ module.exports = {
       files: ['src/visual-engine/**/*.{ts,tsx}'],
       rules: {
         'react-refresh/only-export-components': 'off',
-        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
         '@typescript-eslint/no-explicit-any': 'warn',
       },
     },
@@ -24,8 +24,21 @@ module.exports = {
       files: ['src/visual-engine/effects/providers/reactbits/**/*.{ts,tsx}'],
       rules: { '@typescript-eslint/no-explicit-any': 'off', '@typescript-eslint/no-unused-vars': 'off' },
     },
+    {
+      // Context modules and render-helper modules intentionally export hooks and
+      // helpers alongside components. Fast Refresh still reloads these files.
+      files: [
+        'scripts/fixtures/**/*.{ts,tsx}',
+        'src/components/LinkCell.tsx',
+        'src/components/panelComponents/TabPanel/UnifiedTabPanel.tsx',
+        'src/context/General.context.tsx',
+        'src/utils/linkSupport.tsx',
+      ],
+      rules: { 'react-refresh/only-export-components': 'off' },
+    },
   ],
   rules: {
+    'no-console': ['error', { allow: ['warn', 'error'] }],
     'react-refresh/only-export-components': [
       'warn',
       { allowConstantExport: true },

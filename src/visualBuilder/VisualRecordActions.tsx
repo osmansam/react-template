@@ -2,7 +2,7 @@ import { pageRequestInvalidationPredicate } from "../pageRuntime/requests/invali
 import { usePageRequestConsumer } from "../pageRuntime/requests/ConsumerProvider";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { shouldInvalidateVisualCollectionQuery } from "../utils/dynamicQueryKeys";
+import { shouldInvalidateDynamicQuery, shouldInvalidateVisualCollectionQuery } from "../utils/dynamicQueryKeys";
 import { useTenantProject } from "../hooks/useTenantProject";
 import { useUserContext } from "../context/User.context";
 import { useDynamicCrud } from "../utils/dynamic";
@@ -74,7 +74,7 @@ export default function VisualRecordActions({ children }: { children: (host: Vis
    const schemas = new Set([pending.config.schemaName, pending.config.action.submit?.workflowSchema].filter((name): name is string => !!name));
    await queryClient.invalidateQueries({
     predicate: query => [...schemas].some(schema =>
-     (query.queryKey[0] === "dynamic" && query.queryKey[1] === schema)
+     shouldInvalidateDynamicQuery(query.queryKey, schema, tenant && project ? { tenant, project } : null, false)
      || shouldInvalidateVisualCollectionQuery(query, schema, tenant && project ? { tenant, project } : null)
      || pageRequestInvalidationPredicate(requestScope, schema)(query)),
     refetchType: "active",

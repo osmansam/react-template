@@ -13,6 +13,9 @@ const SelectionToggleButton: React.FC<SelectionToggleButtonProps> = ({
 }) => {
   return (
     <button
+      type="button"
+      aria-label={isActive ? "Disable selection" : "Enable selection"}
+      aria-pressed={isActive}
       onClick={onClick}
       className={`inline-flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 border ${
         isActive

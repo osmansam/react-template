@@ -5,6 +5,7 @@ interface IconButtonProps {
   onClick: () => void;
   className?: string;
   active?: boolean;
+  label?: string;
 }
 
 const IconButton: React.FC<IconButtonProps> = ({
@@ -12,9 +13,12 @@ const IconButton: React.FC<IconButtonProps> = ({
   onClick,
   className = "",
   active = false,
+  label = "Table action",
 }) => {
   return (
     <button
+      type="button"
+      aria-label={label}
       onClick={onClick}
       className={`inline-flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 border ${
         active
@@ -22,7 +26,7 @@ const IconButton: React.FC<IconButtonProps> = ({
           : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"
       } ${className}`}
     >
-      <span className="text-lg">{icon}</span>
+      <span className="text-lg" aria-hidden="true">{icon}</span>
     </button>
   );
 };

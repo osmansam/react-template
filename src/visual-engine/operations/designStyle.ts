@@ -66,11 +66,27 @@ export function configuredDesignPaletteStyle(preset: DesignPresetId, mode: Theme
 function clearPadding<T extends { spacing?: StyleSpec["spacing"]; custom?: StyleSpec["custom"] }>(style: T): T {
   const result = { ...style };
   if (style.spacing) {
-    const { padding, paddingX, paddingY, paddingTop, paddingRight, paddingBottom, paddingLeft, ...spacing } = style.spacing;
+    const {
+      padding: _padding,
+      paddingX: _paddingX,
+      paddingY: _paddingY,
+      paddingTop: _paddingTop,
+      paddingRight: _paddingRight,
+      paddingBottom: _paddingBottom,
+      paddingLeft: _paddingLeft,
+      ...spacing
+    } = style.spacing;
     result.spacing = spacing;
   }
   if (style.custom) {
-    const { padding, paddingTop, paddingRight, paddingBottom, paddingLeft, ...custom } = style.custom;
+    const {
+      padding: _customPadding,
+      paddingTop: _customPaddingTop,
+      paddingRight: _customPaddingRight,
+      paddingBottom: _customPaddingBottom,
+      paddingLeft: _customPaddingLeft,
+      ...custom
+    } = style.custom;
     result.custom = custom;
   }
   return result;

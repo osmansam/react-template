@@ -1,3 +1,4 @@
+import { captureProjectRequest } from "../../utils/projectSessionStorage";
 import { safeInstanceKey } from "../../visual-engine/renderer/instances";
 import { useMemo } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
@@ -18,6 +19,7 @@ import { baseQueryOptions } from "../../config/queryClient";
 
 export function usePageVisualCollections(root: ComponentNode): CollectionAssembly & { diagnostics: { requestCount: number; repeaterCount: number } } {
   const consumer = usePageRequestConsumer(), scope = consumer?.scope;
+  const requestConfig = captureProjectRequest(scope ?? null);
   const componentId = consumer?.component.id;
   const repeaters = useMemo(() => {
     const entries: Array<{ id: string; source: AutoTableCollectionSource; slot: string }> = [];
@@ -33,7 +35,7 @@ export function usePageVisualCollections(root: ComponentNode): CollectionAssembl
   const needsMetadata = repeaters.some(entry => !consumer?.connections.has(entry.slot) && entry.source.filters?.length);
   const metadata = useQuery({
     queryKey: ["visual-field-types", scope?.tenant, scope?.project, scope?.identity],
-    queryFn: async ({ signal }) => (await axiosClient.get("/runtime/schemas", { signal, timeout: 15000, runtimeScope: scope })).data as unknown,
+    queryFn: async ({ signal }) => (await axiosClient.get("/runtime/schemas", { signal, timeout: 15000, ...requestConfig })).data as unknown,
     enabled: !!scope && needsMetadata, ...baseQueryOptions,
   });
   const fieldTypes = useMemo(() => Object.fromEntries(normalizeContainersResponse(metadata.data).map(container => [container.schemaName, Object.fromEntries(container.fields.map(field => [field.name, field.type]))])) as Record<string, CollectionFieldTypes>, [metadata.data]);

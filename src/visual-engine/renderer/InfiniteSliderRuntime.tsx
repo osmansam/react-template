@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { ComponentNode, InfiniteSliderNode } from "../model";
 import { normalizeLinkUrl } from "../model/urls";
 import { CARD_EXPANSION_EVENT } from "./ExpandableCardRuntime";
@@ -62,7 +62,7 @@ export function InfiniteSliderRuntime({ node, mode, className, style, background
     return () => document.removeEventListener("keydown", keyboard, true);
   }, []);
 
-  const emphasize = () => {
+  const emphasize = useCallback(() => {
     const viewport = viewportRef.current;
     if (!viewport || canvas) return;
     const bounds = viewport.getBoundingClientRect();
@@ -75,8 +75,8 @@ export function InfiniteSliderRuntime({ node, mode, className, style, background
       const distance = Math.min(1, Math.abs(rect.left + rect.width / 2 - (bounds.left + bounds.width / 2)) / (bounds.width / 2));
       slide.style.setProperty("--ve-slide-scale", String(1 - distance * 0.14));
     });
-  };
-  const wrap = () => {
+  }, [canvas, node.centerEmphasis, reducedMotion]);
+  const wrap = useCallback(() => {
     const viewport = viewportRef.current;
     const period = periodRef.current;
     if (!viewport || canvas || period <= 0) return;
@@ -84,7 +84,7 @@ export function InfiniteSliderRuntime({ node, mode, className, style, background
     if (viewport.scrollLeft < period || viewport.scrollLeft >= period * 2) {
       viewport.scrollLeft = period + ((viewport.scrollLeft - period) % period + period) % period;
     }
-  };
+  }, [canvas, focused]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -107,7 +107,7 @@ export function InfiniteSliderRuntime({ node, mode, className, style, background
     if (groupRef.current) observer?.observe(groupRef.current);
     window.addEventListener("resize", measure);
     return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
-  }, [canvas, node.children.length, node.slideWidth, node.gap, repeats]);
+  }, [canvas, node.children.length, node.slideWidth, node.gap, repeats, emphasize]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -145,7 +145,7 @@ export function InfiniteSliderRuntime({ node, mode, className, style, background
     };
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
-  }, [running, node.speed, node.direction, node.centerEmphasis, reducedMotion, focused, canvas, repeats]);
+  }, [running, node.speed, node.direction, node.centerEmphasis, reducedMotion, focused, canvas, repeats, emphasize, wrap]);
 
   const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (canvas || event.button !== 0 || event.pointerType === "touch") return;

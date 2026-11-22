@@ -5,7 +5,7 @@ import { visualizer } from "rollup-plugin-visualizer";
 import svgrPlugin from "vite-plugin-svgr";
 import viteTsconfigPaths from "vite-tsconfig-paths";
 
-export default defineConfig(() => {
+export default defineConfig(({mode}) => {
   const analyze = process.env.ANALYZE === "true";
   const plugins: PluginOption[] = [
     react(),
@@ -33,6 +33,8 @@ export default defineConfig(() => {
     },
     build: {
       outDir: "dist",
+      manifest: true,
+      rollupOptions: mode === "e2e" ? { input: {app: fileURLToPath(new URL("./index.html", import.meta.url)), runtime: fileURLToPath(new URL("./tests/fixtures/runtime.html", import.meta.url))} } : undefined,
     },
     esbuild:
       process.env.NODE_ENV === "production"

@@ -346,10 +346,16 @@ const kitPalettes: Record<NewPresetId, Record<ThemePaletteName, Partial<Resolved
 };
 
 function applySurfaceStyle(style: StyleSpec, button: boolean, surfaceBorder: NonNullable<StyleSpec["border"]>): void {
-  const { topLeftRadius, topRightRadius, bottomLeftRadius, bottomRightRadius, ...border } = style.border ?? {};
+  const {
+    topLeftRadius: _topLeftRadius,
+    topRightRadius: _topRightRadius,
+    bottomLeftRadius: _bottomLeftRadius,
+    bottomRightRadius: _bottomRightRadius,
+    ...border
+  } = style.border ?? {};
   style.border = { ...border, ...surfaceBorder };
   if (style.custom?.borderRadius !== undefined || style.custom?.borderWidth !== undefined) {
-    const { borderRadius, borderWidth, ...custom } = style.custom;
+    const { borderRadius: _borderRadius, borderWidth: _borderWidth, ...custom } = style.custom;
     style.custom = custom;
   }
   style.color = { ...style.color, background: style.color?.background ?? (button ? "primary" : "surface"), text: style.color?.text ?? (button ? "primary-foreground" : "text") };

@@ -70,12 +70,12 @@ export function classifyCollectionError(error: unknown): CollectionError {
 }
 
 /** Fetches one collection through the scoped, authenticated runtime client with exact record keys. */
-export async function fetchCollection(descriptor: CollectionDescriptor, signal?: AbortSignal, scope?: { tenant: string; project: string }): Promise<CollectionPage> {
+export async function fetchCollection(descriptor: CollectionDescriptor, signal?: AbortSignal, scope?: { tenant: string; project: string }, runtimeSession?: number): Promise<CollectionPage> {
   try {
     const response = await axiosClient.get<unknown>(collectionRequestPath(descriptor), {
       signal,
       timeout: COLLECTION_TIMEOUT_MS,
-      preserveRecordKeys: true, runtimeScope: scope,
+      preserveRecordKeys: true, runtimeScope: scope, runtimeSession,
     });
     return parseCollectionPage(response.data, descriptor.limit);
   } catch (error) {

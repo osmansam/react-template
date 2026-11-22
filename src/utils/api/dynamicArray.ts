@@ -1,6 +1,9 @@
+import type { ProjectScope } from "../projectScope";
 import { axiosClient } from "./axiosClient";
 
 export interface DynamicArrayTarget {
+  runtimeScope?: ProjectScope | null;
+  runtimeSession?: number;
   schemaName: string;
   parentId: string | number;
   arrayField: string;
@@ -17,10 +20,10 @@ const basePath = (target: DynamicArrayTarget) => `/dynamic/${segment(target.sche
 const dataOf = (response: { data: { data?: DynamicArrayMutationResult } }) => response.data.data as DynamicArrayMutationResult;
 
 export const addDynamicArrayRow = async (target: DynamicArrayTarget & { item: Record<string, unknown> }) =>
-  dataOf(await axiosClient.post(basePath(target), { rowIdentityField: target.rowIdentityField, item: target.item }));
+  dataOf(await axiosClient.post(basePath(target), { rowIdentityField: target.rowIdentityField, item: target.item }, { runtimeScope: target.runtimeScope, runtimeSession: target.runtimeSession }));
 export const updateDynamicArrayRow = async (target: DynamicArrayTarget & { rowIdentity: unknown; updates: Record<string, unknown> }) =>
-  dataOf(await axiosClient.patch(`${basePath(target)}/${segment(target.rowIdentity)}`, { rowIdentityField: target.rowIdentityField, updates: target.updates }));
+  dataOf(await axiosClient.patch(`${basePath(target)}/${segment(target.rowIdentity)}`, { rowIdentityField: target.rowIdentityField, updates: target.updates }, { runtimeScope: target.runtimeScope, runtimeSession: target.runtimeSession }));
 export const deleteDynamicArrayRow = async (target: DynamicArrayTarget & { rowIdentity: unknown }) =>
-  dataOf(await axiosClient.delete(`${basePath(target)}/${segment(target.rowIdentity)}`, { data: { rowIdentityField: target.rowIdentityField } }));
+  dataOf(await axiosClient.delete(`${basePath(target)}/${segment(target.rowIdentity)}`, { runtimeScope: target.runtimeScope, runtimeSession: target.runtimeSession, data: { rowIdentityField: target.rowIdentityField } }));
 export const reorderDynamicArrayRows = async (target: DynamicArrayTarget & { orderField: string; rowIdentities: unknown[] }) =>
-  dataOf(await axiosClient.patch(`${basePath(target)}/reorder`, { rowIdentityField: target.rowIdentityField, orderField: target.orderField, rowIdentities: target.rowIdentities }));
+  dataOf(await axiosClient.patch(`${basePath(target)}/reorder`, { rowIdentityField: target.rowIdentityField, orderField: target.orderField, rowIdentities: target.rowIdentities }, { runtimeScope: target.runtimeScope, runtimeSession: target.runtimeSession }));

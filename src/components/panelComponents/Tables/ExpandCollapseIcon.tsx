@@ -12,7 +12,10 @@ const ExpandCollapseIcon: React.FC<ExpandCollapseIconProps> = ({
   className = "",
 }) => {
   return (
-    <div
+    <button
+      type="button"
+      aria-label={isExpanded ? "Collapse row" : "Expand row"}
+      aria-expanded={isExpanded}
       className={`inline-flex items-center justify-center w-6 h-6 cursor-pointer rounded transition-all duration-200 hover:bg-blue-50 group ${className}`}
       onClick={onClick}
     >
@@ -32,7 +35,7 @@ const ExpandCollapseIcon: React.FC<ExpandCollapseIconProps> = ({
           strokeLinejoin="round"
         />
       </svg>
-    </div>
+    </button>
   );
 };
 

@@ -1,3 +1,7 @@
+import { I18nextProvider } from "react-i18next";
+import { createProjectTranslations } from "./utils/i18n";
+import { useState } from "react";
+import { useTenantProject } from "./hooks/useTenantProject";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { Slide, ToastContainer } from "react-toastify";
@@ -52,33 +56,42 @@ function AppContent() {
   );
 }
 
-function App() {
+function ProjectApp() {
+  const [translations] = useState(createProjectTranslations);
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: baseQueryOptions } }));
   return (
     <div className="App">
-      <UserContextProvider>
-        <GeneralContextProvider>
-          <BrandingProvider>
-            <AppContent />
-          </BrandingProvider>
-        </GeneralContextProvider>
-      </UserContextProvider>
+      <I18nextProvider i18n={translations}>
+        <QueryClientProvider client={client}>
+          <GeneralContextProvider>
+            <BrandingProvider>
+              <AppContent />
+            </BrandingProvider>
+          </GeneralContextProvider>
+        </QueryClientProvider>
+      </I18nextProvider>
     </div>
   );
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: baseQueryOptions,
-  },
-});
-
-// We are wrapping the App component to be able to use isMutating hooks in it
-function Wrapper() {
+function ScopedApp() {
+  const { tenant, project, requestConfig } = useTenantProject();
+  const { user, signedIn } = useUserContext();
+  // The revision retires cache even when a batched sign-out/sign-in returns to
+  // the same tenant, actor, and signed-in state.
   return (
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <ProjectApp
+      key={JSON.stringify([
+        tenant,
+        project,
+        user?._id,
+        signedIn,
+        requestConfig.runtimeSession,
+      ])}
+    />
   );
 }
 
-export default Wrapper;
+export default function App() {
+  return <UserContextProvider><ScopedApp /></UserContextProvider>;
+}

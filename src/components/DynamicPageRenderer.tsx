@@ -1,3 +1,4 @@
+import { RuntimeErrorBoundary } from "../common/RuntimeErrorBoundary";
 import React from "react";
 import { useParams } from "react-router-dom";
 import { PageModel, PageSection } from "../types/page";
@@ -45,7 +46,7 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
   );
 
   return (
-    <PageRuntimeProvider page={runtimePage}>
+    <RuntimeErrorBoundary resetKey={runtimePage.id || runtimePage._id || runtimePage.name}><PageRuntimeProvider page={runtimePage}>
       <Header />
       <div className={`dynamic-page-renderer ${className}`}>
         <PageNavigator items={navigatorItems} />
@@ -77,6 +78,6 @@ export const DynamicPageRenderer: React.FC<DynamicPageRendererProps> = ({
           </div>
         )}
       </div>
-    </PageRuntimeProvider>
+    </PageRuntimeProvider></RuntimeErrorBoundary>
   );
 };

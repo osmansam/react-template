@@ -1,8 +1,6 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FcGoogle } from "react-icons/fc";
-import { useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { GenericButton } from "../components/panelComponents/FormElements/GenericButton";
 import TextInput from "../components/panelComponents/FormElements/TextInput";
@@ -17,7 +15,6 @@ import {
 } from "../utils/api/auth";
 import {
   redirectAfterGoogleLogin,
-  refreshAfterGoogleLogin,
 } from "./googleCallbackAuth";
 import { setProjectSessionItem } from "../utils/projectSessionStorage";
 import { useBranding } from "../context/useBranding";
@@ -26,18 +23,18 @@ import { loginBranding } from "../components/brandingSelection";
 
 const Login = () => {
   const { t } = useTranslation();
-  const location = useLocation();
-  const queryClient = useQueryClient();
   const { data: loginConfig, isLoading, isError } = useLoginConfig();
-  const { buildPath } = useTenantProject();
+  const popupCleanup = useRef<() => void>();
+  useEffect(() => () => popupCleanup.current?.(), []);
+  const { buildPath, scope } = useTenantProject();
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const { setUser } = useUserContext();
   const effectiveBranding = loginBranding(useBranding());
 
   // Don't pass redirectPath - let useLogin determine the first page automatically
-  const { login } = useLogin();
-  const { register } = useRegister();
+  const { login, isPending: loginPending } = useLogin();
+  const { register, isPending: registerPending } = useRegister();
 
 
   const handleInputChange = (fieldName: string, value: string) => {
@@ -46,6 +43,7 @@ const Login = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (loginPending || registerPending) return;
     if (isRegisterMode) {
       register({ ...formData, schemaName: loginConfig?.schemaName || "" });
     } else {
@@ -60,20 +58,10 @@ const Login = () => {
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
 
-    // Extract tenant and project from current URL
-    const pathParts = location.pathname.split("/");
-    const tIndex = pathParts.indexOf("t");
-    const pIndex = pathParts.indexOf("p");
-    const tenant = tIndex !== -1 ? pathParts[tIndex + 1] : "";
-    const project = pIndex !== -1 ? pathParts[pIndex + 1] : "";
-
-    // Ensure API URL doesn't have trailing slash for consistent construction
+    popupCleanup.current?.();
     const baseUrl = import.meta.env.VITE_API_URL.replace(/\/$/, "");
-    console.log(tenant, project);
-    const googleLoginUrl =
-      tenant && project
-        ? `${baseUrl}/${tenant}/${project}/auth/google/login`
-        : `${baseUrl}/auth/google/login`;
+    const prefix = scope ? `/${encodeURIComponent(scope.tenant)}/${encodeURIComponent(scope.project)}` : "";
+    const googleLoginUrl = `${baseUrl}${prefix}/auth/google/login`;
 
     const popup = window.open(
       googleLoginUrl,
@@ -81,29 +69,22 @@ const Login = () => {
       `width=${width},height=${height},left=${left},top=${top}`,
     );
 
+    if (!popup) return;
+
     // Listen for messages from the popup
     const handleMessage = (event: MessageEvent) => {
       // Verify origin for security
-      if (event.origin !== window.location.origin) return;
+      if (event.origin !== window.location.origin || event.source !== popup) return;
 
-      if (event.data.type === "GOOGLE_AUTH_SUCCESS") {
+      if (event.data?.type === "GOOGLE_AUTH_SUCCESS") {
         const { user } = event.data;
-        setProjectSessionItem("loggedIn", "true");
-
-        if (user) {
-          setProjectSessionItem("user", JSON.stringify(user));
-          setUser(user);
-        }
-
-        refreshAfterGoogleLogin(queryClient).then(() => {
-          toast.success(t("Logged in successfully"));
-
-          redirectAfterGoogleLogin(buildPath);
-
-          // Close popup
-          if (popup) popup.close();
-        });
-      } else if (event.data.type === "GOOGLE_AUTH_ERROR") {
+        popupCleanup.current?.();
+        setProjectSessionItem("loggedIn", "true", buildPath("/"));
+        setUser(user);
+        toast.success(t("Logged in successfully"));
+        redirectAfterGoogleLogin(buildPath);
+        popup.close();
+      } else if (event.data?.type === "GOOGLE_AUTH_ERROR") {
         toast.error(t("Google login failed"));
         if (popup) popup.close();
       }
@@ -118,6 +99,10 @@ const Login = () => {
         clearInterval(checkPopupClosed);
       }
     }, 500);
+    popupCleanup.current = () => {
+      window.removeEventListener("message", handleMessage);
+      clearInterval(checkPopupClosed);
+    };
   };
 
   if (isLoading || !loginConfig) {
@@ -185,6 +170,8 @@ const Login = () => {
               <TextInput
                 key={field.name}
                 label={getLoginConfigFieldLabel(field)}
+                name={field.name}
+                autoComplete={field.isHashed ? (isRegisterMode ? "new-password" : "current-password") : "username"}
                 type={field.isHashed ? "password" : "text"}
                 value={formData[field.name] || ""}
                 onChange={(val) => handleInputChange(field.name, val)}
@@ -195,6 +182,8 @@ const Login = () => {
 
             <GenericButton
               type="submit"
+              isLoading={loginPending || registerPending}
+              aria-busy={loginPending || registerPending}
               variant="primary"
               className="w-full py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
               style={effectiveBranding ? { backgroundColor: effectiveBranding.primaryColor } : undefined}

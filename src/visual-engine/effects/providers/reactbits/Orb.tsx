@@ -1,5 +1,5 @@
 import { Mesh, Program, Renderer, Triangle, Vec3 } from 'ogl';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 interface OrbProps {
   hue?: number;
@@ -18,7 +18,7 @@ export default function Orb({
 }: OrbProps) {
   const ctnDom = useRef<HTMLDivElement>(null);
 
-  const vert = /* glsl */ `
+  const vert = useMemo(() => /* glsl */ `
     precision highp float;
     attribute vec2 position;
     attribute vec2 uv;
@@ -27,9 +27,9 @@ export default function Orb({
       vUv = uv;
       gl_Position = vec4(position, 0.0, 1.0);
     }
-  `;
+  `, []);
 
-  const frag = /* glsl */ `
+  const frag = useMemo(() => /* glsl */ `
     precision highp float;
 
     uniform float iTime;
@@ -189,7 +189,7 @@ export default function Orb({
       vec4 col = mainImage(fragCoord);
       gl_FragColor = vec4(col.rgb * col.a, col.a);
     }
-  `;
+  `, []);
 
   useEffect(() => {
     const container = ctnDom.current;
@@ -293,7 +293,7 @@ export default function Orb({
       container.removeChild(gl.canvas);
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-  }, [hue, hoverIntensity, rotateOnHover, forceHoverState, backgroundColor]);
+  }, [hue, hoverIntensity, rotateOnHover, forceHoverState, backgroundColor, frag, vert]);
 
   return <div ref={ctnDom} className="w-full h-full" />;
 }

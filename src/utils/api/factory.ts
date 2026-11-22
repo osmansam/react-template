@@ -1,3 +1,5 @@
+import { useTenantProject } from "../../hooks/useTenantProject";
+import { projectQueryKey } from "../projectScope";
 import {
   QueryKey,
   useMutation,
@@ -22,13 +24,15 @@ interface Props<T> {
 export function useGet<T>(
   path: string,
   queryKey?: QueryKey,
-  enabled: boolean = true
+  enabled: boolean = true,
+  keyIncludesScope = false,
 ) {
   // We are using path as a query key if queryKey is not provided
-  const fetchQueryKey = queryKey || [path];
+  const { scope, requestConfig } = useTenantProject();
+  const fetchQueryKey = keyIncludesScope && queryKey ? queryKey : projectQueryKey(scope, queryKey || [path]);
   const { data } = useQuery({
     queryKey: fetchQueryKey,
-    queryFn: () => get<T>({ path }),
+    queryFn: ({ signal }) => get<T>({ path, config: { ...requestConfig, signal } }),
     enabled: enabled, // Control whether the query should run
     ...baseQueryOptions,
   });
@@ -45,14 +49,18 @@ export function useGetList<T>(
 
 export function useMutationApi<T extends { _id: number | string }>({
   baseQuery,
-  queryKey = [baseQuery],
+  queryKey: baseKey = [baseQuery],
   isInvalidate = false,
   isAdditionalInvalidate = false,
   sortFunction,
   additionalInvalidates,
 }: Props<T>) {
+  const { scope, requestConfig } = useTenantProject();
+  const queryKey = projectQueryKey(scope, baseKey);
+  const config = requestConfig;
   function createRequest(itemDetails: Partial<T>): Promise<T> {
     return post<Partial<T>, T>({
+      config,
       path: baseQuery,
       payload: itemDetails,
     });
@@ -60,12 +68,14 @@ export function useMutationApi<T extends { _id: number | string }>({
 
   function deleteRequest(id: number | string): Promise<T> {
     return remove<T>({
+      config,
       path: `${baseQuery}/${id}`,
     });
   }
 
   function updateRequest({ id, updates }: UpdatePayload<T>): Promise<T> {
     return patch<Partial<T>, T>({
+      config,
       path: `${baseQuery}/${id}`,
       payload: updates,
     });
@@ -74,6 +84,7 @@ export function useMutationApi<T extends { _id: number | string }>({
   function useCreateItemMutation() {
     const queryClient = useQueryClient();
     return useMutation({
+      mutationKey: [...queryKey, requestConfig.runtimeSession, "create"],
       mutationFn: createRequest,
       // We are updating tables query data with new item
       onMutate: async (itemDetails: Partial<T>) => {
@@ -110,7 +121,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         }
         if (isAdditionalInvalidate) {
           additionalInvalidates?.forEach((key) => {
-            queryClient.invalidateQueries({ queryKey: key });
+            queryClient.invalidateQueries({ queryKey: projectQueryKey(scope, key) });
           });
         }
       },
@@ -120,6 +131,7 @@ export function useMutationApi<T extends { _id: number | string }>({
     const queryClient = useQueryClient();
 
     return useMutation({
+      mutationKey: [...queryKey, requestConfig.runtimeSession, "delete"],
       mutationFn: deleteRequest,
       // We are updating tables query data with new item
       onMutate: async (id: number | string) => {
@@ -159,7 +171,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         }
         if (isAdditionalInvalidate) {
           additionalInvalidates?.forEach((key) => {
-            queryClient.invalidateQueries({ queryKey: key });
+            queryClient.invalidateQueries({ queryKey: projectQueryKey(scope, key) });
           });
         }
       },
@@ -168,6 +180,7 @@ export function useMutationApi<T extends { _id: number | string }>({
   function useUpdateItemMutation() {
     const queryClient = useQueryClient();
     return useMutation({
+      mutationKey: [...queryKey, requestConfig.runtimeSession, "update"],
       mutationFn: updateRequest,
       // We are updating tables query data with new item
       onMutate: async ({ id, updates }: UpdatePayload<T>) => {
@@ -213,7 +226,7 @@ export function useMutationApi<T extends { _id: number | string }>({
         }
         if (isAdditionalInvalidate || additionalInvalidates) {
           additionalInvalidates?.forEach((key) => {
-            queryClient.invalidateQueries({ queryKey: key });
+            queryClient.invalidateQueries({ queryKey: projectQueryKey(scope, key) });
           });
         }
       },
