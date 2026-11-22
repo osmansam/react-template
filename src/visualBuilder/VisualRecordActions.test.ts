@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { MemoryRouter } from "react-router-dom";
 import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, expect, it } from "vitest";
+import { useGetPaginatedItems } from "../utils/dynamic";
 import { axiosClient } from "../utils/api/axiosClient";
 import VisualRecordActions from "./VisualRecordActions";
 import VisualBlock from "./VisualBlock";
@@ -132,8 +133,8 @@ it("refreshes the table and all matching card copies after a visual edit without
  for (const entry of unrelated) await client.fetchQuery({ queryKey: entry.key, meta: { visualCollectionSchema: entry.schema }, queryFn: async () => ({ items: [{ name: "Untouched" }] }), staleTime: Infinity });
  const document: ComponentDocument = { version: 2, id: "edit-doc", name: "Editable cards", root: { id: "root", type: "section", children: [{ id: "list", type: "repeater", itemAlias: "item", source: { kind: "autotable", schemaName: "products", limit: 5 }, children: [{ id: "slot", type: "slot", name: "item", children: [{ id: "card", type: "card", element: "article", children: [{ id: "name", type: "heading", level: 3, text: "{{item.name}}" }, { id: "edit", type: "button", label: "Edit data", action }] }] }] }] } };
  function Page() {
-  const table = useQuery({ queryKey: ["dynamic", "products", "page"], queryFn: async () => (await axiosClient.get<{ items: typeof record[] }>("/dynamic/page?schemaName=products")).data });
-  return createElement("div", null, createElement("p", null, `Table: ${table.data?.items[0]?.name || "Loading"}`), ...["copy-a", "copy-b"].map(id => createElement(VisualBlock, { key: id, component: { id, type: "custom", props: { visualBuilder: { document } } } })));
+  const table = useGetPaginatedItems<typeof record>(1, 10, "products", {});
+  return createElement("div", null, createElement("p", null, `Table: ${table?.items[0]?.name || "Loading"}`), ...["copy-a", "copy-b"].map(id => createElement(VisualBlock, { key: id, component: { id, type: "custom", props: { visualBuilder: { document } } } })));
  }
  render(createElement(QueryClientProvider, { client }, createElement(MemoryRouter, { initialEntries: ["/t/acme/p/shop/catalog"] }, createElement(Page))));
  await waitFor(() => expect(screen.getAllByRole("heading", { name: "Before visual edit" })).toHaveLength(2));

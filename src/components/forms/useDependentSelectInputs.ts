@@ -223,7 +223,7 @@ export const useDependentSelectInputs = (
 
     const validationError = validationErrorsByField.get(input.formKey);
     if (validationError) {
-      const { path, queryKey } = getSelectionQueryConfig({
+      const { path, queryKey, config } = getSelectionQueryConfig({
         schemaName: input.sourceSchemaName || "",
         fieldName,
         valueField,
@@ -239,7 +239,7 @@ export const useDependentSelectInputs = (
           path,
           {
             queryKey,
-            queryFn: () => get<SelectionResponse>({ path }),
+            queryFn: () => get<SelectionResponse>({ path, config }),
             enabled: false,
             staleTime: Infinity,
           },
@@ -262,7 +262,7 @@ export const useDependentSelectInputs = (
           message: undefined,
         };
 
-    const { path, queryKey } = getSelectionQueryConfig({
+    const { path, queryKey, config } = getSelectionQueryConfig({
       schemaName: input.sourceSchemaName || "",
       fieldName,
       valueField,
@@ -280,7 +280,7 @@ export const useDependentSelectInputs = (
       path,
       {
         queryKey,
-        queryFn: () => get<SelectionResponse>({ path }),
+        queryFn: () => get<SelectionResponse>({ path, config }),
         enabled: canFetch,
         staleTime: Infinity,
       },

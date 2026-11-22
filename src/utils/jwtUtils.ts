@@ -77,6 +77,5 @@ export function validateTokenForTenantProject(
     decoded.tenantSlug === urlTenantSlug &&
     decoded.projectSlug === urlProjectSlug;
 
-  console.log("✅ Slug match result:", isValid);
   return isValid;
 }

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { SketchPicker } from "react-color";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+const SketchPicker = lazy(() => import("react-color").then(module => ({default: module.SketchPicker})));
 import "react-day-picker/dist/style.css";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import { FiMinusCircle } from "react-icons/fi";
@@ -36,6 +36,10 @@ type TextInputProps = {
   isDebounce?: boolean;
   isDatePickerLabel?: boolean;
   isReadOnly?: boolean;
+  autoComplete?: string;
+  id?: string;
+  name?: string;
+  helpText?: string;
   error?: string; // Validation error message
 };
 
@@ -57,6 +61,8 @@ const TextInput = ({
   requiredField = false,
   isDebounce = false,
   isReadOnly = false,
+  autoComplete,
+  id, name, helpText,
   error,
   className = "px-3 py-2 border border-neutral-200 rounded-lg __className_a182b8 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 transition-all",
 }: TextInputProps) => {
@@ -66,10 +72,16 @@ const TextInput = ({
     typeof setTimeout
   > | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const generatedId = useId();
+  const inputId = id || generatedId;
+  const helpId = `${inputId}-help`;
+  const errorId = useId();
 
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
+
+  useEffect(() => () => { if (debounceTimer) clearTimeout(debounceTimer); }, [debounceTimer]);
 
   const handleDivClick = () => {
     if (inputRef.current) {
@@ -210,14 +222,15 @@ const TextInput = ({
           )}
         </H6>
         <div className=" flex flex-row gap-2 ">
-          <SketchPicker
+          <Suspense fallback={<span role="status">Loading color picker…</span>}><SketchPicker
             color={value}
             onChange={(color) => {
               onChange(color.hex);
             }}
-          />
+          /></Suspense>
 
           <GenericButton
+            aria-label="Clear color"
             onClick={() => {
               onChange("");
             }}
@@ -243,7 +256,9 @@ const TextInput = ({
         {/* Icon on the right */}
         <GenericButton
           type="button"
-          disabled={disabled}
+          disabled={disabled || isReadOnly}
+          aria-label={label ?? "Toggle option"}
+          aria-pressed={Boolean(localValue ?? value)}
           onClick={() => {
             const newValue = !(localValue ?? value);
             setLocalValue(newValue);
@@ -266,10 +281,11 @@ const TextInput = ({
       className={` flex ${isTopFlexRow ? "flex-row gap-4 " : "flex-col gap-2"}`}
       onClick={handleDivClick}
     >
-      <H6
+      <label
+        htmlFor={inputId}
         className={`${
           isTopFlexRow ? "min-w-20 " : "min-w-10"
-        } my-auto text-sm font-medium text-neutral-700`}
+        } my-auto text-sm font-medium leading-6 text-neutral-700`}
       >
         {label}
         {requiredField && (
@@ -277,14 +293,16 @@ const TextInput = ({
             <span className="text-error-500">* </span>
           </>
         )}
-      </H6>
+      </label>
       <div
         className={`flex items-center justify-end ${
           isNumberButtonsActive ? "gap-4" : "gap-2"
         } ${inputWidth ? inputWidth : "w-full"} relative`}
       >
         <input
-          id={"number-input"}
+          id={inputId}
+          name={name}
+          required={requiredField}
           ref={inputRef}
           type={
             type === "password" && !showPassword
@@ -297,10 +315,15 @@ const TextInput = ({
             fontSize: "16px",
           }}
           placeholder={placeholder}
+          autoComplete={autoComplete}
           disabled={isInputLocked}
           value={localValue}
           onChange={handleChange}
           className={inputClassName}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={[helpText && helpId, error && errorId].filter(Boolean).join(" ") || undefined}
+          aria-required={requiredField || undefined}
+          aria-label={label ? undefined : placeholder}
           {...(type === "number"
             ? {
                 ...(isMinNumber ? { min: minNumber } : {}),
@@ -312,38 +335,42 @@ const TextInput = ({
         {type === "password" && (
           <button
             type="button"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            aria-controls={inputId}
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 text-neutral-500 hover:text-neutral-700 focus:outline-none transition-colors"
+            className="absolute right-3 text-neutral-500 hover:text-neutral-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded transition-colors"
           >
             {showPassword ? (
-              <AiOutlineEyeInvisible size={18} />
+              <AiOutlineEyeInvisible size={18} aria-hidden="true" />
             ) : (
-              <AiOutlineEye size={18} />
+              <AiOutlineEye size={18} aria-hidden="true" />
             )}
           </button>
         )}
         {isNumberButtonsActive && (
-          <FiMinusCircle
+          <button type="button" disabled={isInputLocked} aria-label={`Decrease ${label || "value"}`} onClick={handleDecrement}><FiMinusCircle
             className={`w-7 h-7 flex-shrink-0 focus:outline-none transition-colors active:scale-95 ${
               isInputLocked
                 ? "text-neutral-300 cursor-not-allowed"
                 : "text-error-500 hover:text-error-600 cursor-pointer"
             }`}
-            onClick={handleDecrement}
-          />
+            aria-hidden="true"
+          /></button>
         )}
         {isNumberButtonsActive && (
-          <GoPlusCircle
+          <button type="button" disabled={isInputLocked} aria-label={`Increase ${label || "value"}`} onClick={handleIncrement}><GoPlusCircle
             className={`w-7 h-7 flex-shrink-0 focus:outline-none transition-colors active:scale-95 ${
               isInputLocked
                 ? "text-neutral-300 cursor-not-allowed"
                 : "text-success-500 hover:text-success-600 cursor-pointer"
             }`}
-            onClick={handleIncrement}
-          />
+            aria-hidden="true"
+          /></button>
         )}
         {onClear && isOnClearActive && (
           <GenericButton
+            aria-label="Clear value"
             onClick={() => {
               setLocalValue("");
               onClear();
@@ -351,11 +378,16 @@ const TextInput = ({
             variant="icon"
             className="w-8 h-8 my-auto text-xl text-neutral-400 hover:text-neutral-600"
           >
-            <IoIosClose size={24} />
+            <IoIosClose size={24} aria-hidden="true" />
           </GenericButton>
         )}
       </div>
-      {error && <p className="text-error-500 text-xs mt-1.5">{error}</p>}
+      {helpText && <p id={helpId} className="text-xs text-neutral-500">{helpText}</p>}
+      {error && (
+        <p id={errorId} role="alert" className="text-error-500 text-xs mt-1.5">
+          {error}
+        </p>
+      )}
     </div>
   );
 };

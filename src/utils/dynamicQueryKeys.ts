@@ -1,3 +1,4 @@
+import { currentProjectScope, type ProjectScope } from "./projectScope";
 import { canonicalizeRuntimeValue } from "../pageRuntime/pageParameterResolver";
 
 export type DynamicTableSourceBinding = {
@@ -202,11 +203,12 @@ export function getTableSourceQueryKey(
 export function shouldInvalidateDynamicQuery(
   queryKey: readonly unknown[],
   schemaName: string,
+  scope: ProjectScope | null = currentProjectScope(),
+  includeTableSources = true,
 ) {
-  return (
-    queryKey[0] === "dynamic" &&
-    (queryKey[1] === schemaName || queryKey[2] === "table-source")
-  );
+  if (queryKey[0] !== "dynamic" || queryKey[1] !== (scope?.tenant ?? "") || queryKey[2] !== (scope?.project ?? "")) return false;
+  return queryKey[3] === schemaName || (queryKey[3] === "selection" && queryKey[4] === schemaName) ||
+    (includeTableSources && queryKey[4] === "table-source");
 }
 
 /** Visual queries retain their actor/request keys; schema metadata connects them to data events. */

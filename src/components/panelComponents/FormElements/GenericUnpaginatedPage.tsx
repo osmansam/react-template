@@ -1,379 +1,73 @@
-import { usePageReadKey } from "../../../pageRuntime/requests/usePageRead";
-import { legacyRead } from "../../../pageRuntime/requests/legacyAdapters";
-import { usePageSelectionOptions } from "../../../pageRuntime/requests/selectionOptions";
-import { useTableRequestOverrides } from "../../../pageRuntime/requests/tableOverrides";
-import { legacyValues } from "../../../pageRuntime/requests/legacyAdapters";
-import { useTableRecordSelection } from "../../../pageRuntime/useTableRecordSelection";
-import { useQueries } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { IoCheckmark, IoCloseOutline } from "react-icons/io5";
-import { CheckSwitch } from "../../../common/CheckSwitch";
-import { ConfirmationDialog } from "../../../common/ConfirmationDialog";
-import { LinkCell, renderLinkedCellContent } from "../../../components/LinkCell";
+import { TableStateScope } from "../../../context/TableState.context";
 import { useUserContext } from "../../../context/User.context";
 import { useSelectionData } from "../../../hooks/useSelectionData";
-import TableOutputPublisher from "../../../pageRuntime/TableOutputPublisher";
-import { resolveSelectedRowIds, type TableOutputState } from "../../../pageRuntime/tableOutputAdapter";
-import { FormElementsState } from "../../../types";
+import { useTenantProject } from "../../../hooks/useTenantProject";
 import {
+  legacyRead,
+  legacyValues,
+} from "../../../pageRuntime/requests/legacyAdapters";
+import { useTableRequestOverrides } from "../../../pageRuntime/requests/tableOverrides";
+import { usePageReadKey } from "../../../pageRuntime/requests/usePageRead";
+import TableOutputPublisher from "../../../pageRuntime/TableOutputPublisher";
+import {
+  resolveSelectedRowIds,
+  type TableOutputState,
+} from "../../../pageRuntime/tableOutputAdapter";
+import { useTableRecordSelection } from "../../../pageRuntime/useTableRecordSelection";
+import type { FormElementsState } from "../../../types";
+import type {
   ComponentOutputDefinition,
   DataBinding,
-  TableActionConfig,
-  TableActionFormFieldConfig,
   TableComponentConfig,
 } from "../../../types/page";
-import { UpdatePayload, get } from "../../../utils/api";
 import {
-  applyHiddenActionValues,
-  buildActionInitialValues,
-  partitionActionConstantValues,
-} from "../../../utils/actionConstantValues";
-import {
-  ContainerModel,
-  Field,
-  Types,
+  type ContainerModel,
+  type Field,
   useGetContainers,
 } from "../../../utils/api/container";
 import {
-  useDynamicCrud,
-  useExportDynamicItems,
-  useGetDynamicItems,
-} from "../../../utils/dynamic";
-import { mergeTableConstantValues, omitTableConstantKeys } from "../../../utils/tableConstantValues";
-import {
-  RawContainer,
-  evaluateRowCondition,
-  fieldToInput,
-  getFieldLabel,
-  getMatchingRowClassPresentation,
-  getMatchingRowClassNames,
-  humanize,
-  isDisplayablePrimitive,
-  normalizeContainer,
-  normalizeField,
-  isComputedField,
-  tailwindBgToStyle,
-} from "../../../utils/genericPageHelpers";
-import { getIconByName } from "../../../utils/menuIcons";
-import { formatPopulatedArrayValue } from "../../../utils/populatedArrayDisplay";
-import { formatTableDate } from "../../../utils/tableDateFormat";
-import {
-  hasDependentSelectFilters,
-  referencedSelectRecordFields,
-} from "../../../utils/selectFilters";
-import { getSelectionQueryConfig } from "../../../utils/selectionQuery";
-import { renderTableColumnTemplate } from "../../../utils/tableColumnTemplate";
-import { getTableActionRowState } from "../../../utils/tableActions";
+  reorderDynamicArrayRows,
+  updateDynamicArrayRow,
+} from "../../../utils/api/dynamicArray";
+import { useDynamicCrud, useGetDynamicItems } from "../../../utils/dynamic";
+import { humanize } from "../../../utils/genericPageHelpers";
 import {
   applyTableArraySource,
   applyTableNestedRows,
   getArraySourceMutationTarget,
-  getComputedLabelValue,
-  getLookupLabelValue,
-  getProgressBarValue,
-  getTableCellClassName,
-  getTableDisplayName,
-  getTableLinkConfig,
   isTableSearchEnabled,
   normalizeConfiguredTableRows,
 } from "../../../utils/tableConfig";
-import { addDynamicArrayRow, deleteDynamicArrayRow, reorderDynamicArrayRows, updateDynamicArrayRow } from "../../../utils/api/dynamicArray";
+import { buildConfiguredFilterInputs } from "../../../utils/tableFilters";
 import { useTableLookupSelectionData } from "../../../utils/tableLookupSelection";
-import { useGeneratedRelationTableColumns } from "../../../utils/useGeneratedRelationTableColumns";
-import { resolveTableActionFormLayout } from "../../../utils/tableActionFormLayout";
 import {
   reorderCurrentPageRows,
-  resolveTableDragState,
   sortRowsByOrderField,
 } from "../../../utils/tableRowReorder";
-import {
-  appendShowFiltersControl,
-  createTableToggleState,
-  isBooleanColumnEditable,
-  isBooleanColumnSwitchPresentation,
-  isTableColumnVisible,
-  isTableToggleUpperSide,
-  resolveToggleRequestEffects,
-} from "../../../utils/tableToggles";
-import {
-  buildConfiguredFilterInputs,
-  getFilterDefaultValues,
-  useFilterPanelSelectionData,
-} from "../../../utils/tableFilters";
-import {
-  isFieldRequired,
-  parseValidationRules,
-} from "../../../utils/validationHelper";
+import { useGeneratedRelationTableColumns } from "../../../utils/useGeneratedRelationTableColumns";
 import { Header } from "../../header/Header";
-import SwitchButton from "../common/SwitchButton";
-import { FormKeyTypeEnum, GenericInputType, InputTypes } from "../shared/types";
-import GenericTable from "../Tables/GenericTable";
 import ExportModal from "../Modals/ExportModal";
-import GenericAddEditPanel from "./GenericAddEditPanel";
-
-type GenericItem = Record<string, unknown> & { _id: string };
-
-const isTruthyBooleanValue = (value: unknown): boolean =>
-  value === true || value === "true" || value === 1 || value === "1";
-
-const getActionId = (action: TableActionConfig, index: number) =>
-  action.id || action.key || `${action.kind}-${index}`;
-
-type ActionSelectDataMap = Map<string, GenericItem[]>;
-
-const getSelectionFieldName = (field: TableActionFormFieldConfig) =>
-  field.sourceLabelField || field.sourceValueField || "_id";
-
-const useActionFormSelectionData = (
-  actions: TableActionConfig[] = [],
-): ActionSelectDataMap => {
-  const pageOptions = usePageSelectionOptions();
-  const schemaSelectFields = actions.flatMap((action, actionIndex) =>
-    (action.formFields || [])
-      .filter(
-        (field) =>
-          field.type === "select" &&
-          !hasDependentSelectFilters(field) &&
-          ((field.optionsSource === "schema" && field.sourceSchemaName) || pageOptions.connected(`actionOptions:${getActionId(action, actionIndex)}:${field.formKey}`)),
-      )
-      .map((field) => ({
-        action,
-        actionId: getActionId(action, actionIndex),
-        field,
-      })),
-  );
-
-  const queryResults = useQueries({
-    queries: schemaSelectFields.map(({ action, field, actionId }) => {
-      const fieldName = getSelectionFieldName(field);
-      const valueField = field.sourceValueField || "_id";
-      const dataFields = Array.from(
-        new Set([
-          ...(field.sourceDataFields || []),
-          ...referencedSelectRecordFields(action.formFields || [], field.formKey),
-        ]),
-      ).filter((name) => name !== fieldName && name !== valueField);
-      const { path, queryKey } = getSelectionQueryConfig({
-        schemaName: field.sourceSchemaName || "",
-        fieldName,
-        valueField,
-        dataFields,
-        filterParams: field.sourceRequestFilters,
-      });
-      return pageOptions(
-        `actionOptions:${actionId}:${field.formKey}`,
-        path,
-        {
-          queryKey,
-          queryFn: () =>
-            get<GenericItem[]>({
-              path,
-            }),
-          enabled: Boolean(field.sourceSchemaName && fieldName),
-          staleTime: Infinity,
-        },
-        { dataFields },
-      );
-    }),
-  });
-
-  return schemaSelectFields.reduce<ActionSelectDataMap>((map, item, index) => {
-    const rawData = queryResults[index]?.data;
-    const items = Array.isArray(rawData)
-      ? rawData
-      : (rawData as { data?: GenericItem[]; items?: GenericItem[] } | undefined)
-          ?.data ||
-        (rawData as { data?: GenericItem[]; items?: GenericItem[] } | undefined)
-          ?.items ||
-        [];
-    map.set(`${item.actionId}:${item.field.formKey}`, items);
-    return map;
-  }, new Map());
-};
-
-const parseActionConstantValues = (
-  action: TableActionConfig,
-): Record<string, unknown> => {
-  if (action.constantValues) return action.constantValues;
-  if (!action.constantValuesJson?.trim()) return {};
-
-  try {
-    const parsed = JSON.parse(action.constantValuesJson);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed
-      : {};
-  } catch {
-    return {};
-  }
-};
-
-const actionInputType = (type: string | undefined): InputTypes => {
-  const normalized = (type || "text").toLowerCase();
-  if (normalized === "number") return InputTypes.NUMBER;
-  if (normalized === "select") return InputTypes.SELECT;
-  if (normalized === "textarea") return InputTypes.TEXTAREA;
-  if (normalized === "checkbox" || normalized === "boolean")
-    return InputTypes.CHECKBOX;
-  if (normalized === "date") return InputTypes.DATE;
-  if (normalized === "time") return InputTypes.TIME;
-  if (normalized === "color") return InputTypes.COLOR;
-  return InputTypes.TEXT;
-};
-
-const actionFormKeyType = (field: TableActionFormFieldConfig): string => {
-  if (field.formKeyType) return field.formKeyType;
-  if (field.isMultiple) return FormKeyTypeEnum.STRING_ARRAY;
-  if (field.type === "number") return FormKeyTypeEnum.NUMBER;
-  if (field.type === "checkbox") return FormKeyTypeEnum.BOOLEAN;
-  return FormKeyTypeEnum.STRING;
-};
-
-const getStaticActionOptions = (field: TableActionFormFieldConfig) => {
-  if (field.staticOptions?.length) return field.staticOptions;
-  if (!field.staticOptionsJson?.trim()) return [];
-
-  try {
-    const parsed = JSON.parse(field.staticOptionsJson);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const getActionFieldOptions = (
-  actionId: string,
-  field: TableActionFormFieldConfig,
-  selectDataMap: ActionSelectDataMap,
-) => {
-  if (field.type !== "select") return [];
-  if (field.optionsSource !== "schema") return getStaticActionOptions(field);
-
-  const valueField = field.sourceValueField || "_id";
-  const labelField = field.sourceLabelField || valueField;
-  return (selectDataMap.get(`${actionId}:${field.formKey}`) || []).map(
-    (item) => ({
-      value: String(item[valueField] ?? item._id ?? ""),
-      label: String(item[labelField] ?? item[valueField] ?? item._id ?? ""),
-      sourceItem: item,
-    }),
-  );
-};
-const buildActionInputs = (
-  action: TableActionConfig,
-  fallbackInputs: GenericInputType[],
-  actionId: string,
-  selectDataMap: ActionSelectDataMap,
-): GenericInputType[] => {
-  if (action.formFields !== undefined) {
-    const allFields = action.formFields;
-    return allFields.map((field) => {
-      const fallback = fallbackInputs.find(
-        (input) => input.formKey === field.formKey,
-      );
-      return {
-        ...(fallback || {}),
-        type: actionInputType(field.type),
-        formKey: field.formKey,
-        label: field.label || fallback?.label || field.formKey,
-        placeholder:
-          field.placeholder ||
-          fallback?.placeholder ||
-          field.label ||
-          field.formKey,
-        required: field.required ?? fallback?.required ?? false,
-        requiredCondition: field.requiredCondition,
-        disabledCondition: field.disabledCondition,
-        isDisabled: field.isDisabled ?? fallback?.isDisabled,
-        isMultiple: field.isMultiple ?? fallback?.isMultiple,
-        isNumberButtonsActive:
-          field.isNumberButtonsActive ?? fallback?.isNumberButtonsActive,
-        options: getActionFieldOptions(
-          actionId,
-          field,
-          selectDataMap,
-        ),
-        optionsSource: field.optionsSource ?? fallback?.optionsSource,
-        sourceSchemaName: field.sourceSchemaName ?? fallback?.sourceSchemaName,
-        sourceValueField: field.sourceValueField ?? fallback?.sourceValueField,
-        sourceLabelField: field.sourceLabelField ?? fallback?.sourceLabelField,
-        sourceDataFields:
-          field.type === "select"
-            ? Array.from(
-                new Set([
-                  ...(field.sourceDataFields || fallback?.sourceDataFields || []),
-                  ...referencedSelectRecordFields(allFields, field.formKey),
-                ]),
-              )
-            : (field.sourceDataFields ?? fallback?.sourceDataFields),
-        optionDisplay: field.optionDisplay ?? fallback?.optionDisplay,
-        sourceRequestFilters:
-          field.sourceRequestFilters ?? fallback?.sourceRequestFilters,
-        sourceFilterBindings:
-          field.sourceFilterBindings ?? fallback?.sourceFilterBindings,
-        selectionRequestSlot:
-          field.type === "select"
-            ? `actionOptions:${actionId}:${field.formKey}`
-            : fallback?.selectionRequestSlot,
-        sourceFilterCondition: field.sourceFilterCondition,
-        invalidateKeys: field.invalidateKeys?.map((key) => ({
-          key,
-          defaultValue: "",
-        })),
-        min: field.min ?? fallback?.min,
-        max: field.max ?? fallback?.max,
-        minLength: field.minLength ?? fallback?.minLength,
-        maxLength: field.maxLength ?? fallback?.maxLength,
-        pattern: field.pattern ?? fallback?.pattern,
-        validationMessage:
-          field.validationMessage ?? fallback?.validationMessage,
-      };
-    });
-  }
-
-  return fallbackInputs;
-};
-
-const buildActionFormKeys = (
-  action: TableActionConfig,
-  actionInputs: GenericInputType[],
-) => {
-  if (action.formFields !== undefined) {
-    return action.formFields.map((field) => ({
-      key: field.formKey,
-      type: actionFormKeyType(field),
-    }));
-  }
-
-  return actionInputs.map((input) => ({
-    key: input.formKey,
-    type:
-      input.type === InputTypes.NUMBER
-        ? FormKeyTypeEnum.NUMBER
-        : FormKeyTypeEnum.STRING,
-  }));
-};
-
-const getActionDefaultValues = (
-  action: TableActionConfig,
-): Record<string, unknown> =>
-  (action.formFields || []).reduce<Record<string, unknown>>((values, field) => {
-    if (field.formKey && field.defaultValue !== undefined) {
-      values[field.formKey] = field.defaultValue;
-    }
-    return values;
-  }, {});
-
-const resolveActionTemplate = (
-  template: string | undefined,
-  row: GenericItem | null,
-): string => {
-  if (!template || !row) return template || "";
-  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, key: string) => {
-    const value = row[key.trim()];
-    return value === null || value === undefined ? "" : String(value);
-  });
-};
+import GenericTable from "../Tables/GenericTable";
+import type { GenericItem } from "./tableActionForm";
+import { buildBaseRowKeys } from "./unpaginatedPage/buildBaseRowKeys";
+import { buildFilterControls } from "./unpaginatedPage/buildFilterControls";
+import {
+  buildAddEditFormConfig,
+  buildDefaultFilterPanelInputs,
+} from "./unpaginatedPage/formInputBuilders";
+import {
+  buildTableColumns,
+  computeDisplayFields,
+  computeRowStyle,
+  containerHasImageField,
+  findMatchingContainer,
+} from "./unpaginatedPage/pageHelpers";
+import { useUnpaginatedBulkActions } from "./unpaginatedPage/useUnpaginatedBulkActions";
+import { useUnpaginatedExport } from "./unpaginatedPage/useUnpaginatedExport";
+import { useUnpaginatedRowActions } from "./unpaginatedPage/useUnpaginatedRowActions";
+import { useUnpaginatedTableFilters } from "./unpaginatedPage/useUnpaginatedTableFilters";
 
 type Props = {
   schemaName: string;
@@ -391,7 +85,7 @@ type Props = {
   sourceRevision?: string;
 };
 
-export default function GenericUnpaginatedPage({
+function GenericUnpaginatedPageContent({
   schemaName,
   includeFields,
   excludeFields,
@@ -407,16 +101,27 @@ export default function GenericUnpaginatedPage({
 }: Props) {
   const { t } = useTranslation();
   const { user } = useUserContext();
-  const configuredTableToggles = useMemo(
-    () => tableConfig?.toggles || [],
-    [tableConfig?.toggles],
-  );
-  const [tableToggleState, setTableToggleState] = useState(() =>
-    createTableToggleState(configuredTableToggles),
-  );
-  useEffect(() => {
-    setTableToggleState(createTableToggleState(configuredTableToggles));
-  }, [configuredTableToggles]);
+  const { requestConfig } = useTenantProject();
+
+  const {
+    configuredTableToggles,
+    tableToggleState,
+    setTableToggleState,
+    showFilters,
+    setShowFilters,
+    filterFormElements,
+    setFilterFormElements,
+    configuredFilterInputs,
+    filterSelectionDataMap,
+    tableDragState,
+    requestFilters,
+    filtersById,
+  } = useUnpaginatedTableFilters({
+    tableConfig,
+    constantFilter,
+    resolvedParams,
+  });
+
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState<GenericItem[]>([]);
   const [isSelectionActive, setIsSelectionActive] = useState(false);
@@ -429,157 +134,39 @@ export default function GenericUnpaginatedPage({
     setIsSelectionInitialized(true);
     setIsSelectionActive(nextActive);
   }, []);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isCustomActionOpen, setIsCustomActionOpen] = useState(false);
-  const [activeCustomAction, setActiveCustomAction] =
-    useState<TableActionConfig | null>(null);
-  const [rowToAction, setRowToAction] = useState<GenericItem | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterFormElements, setFilterFormElements] =
-    useState<FormElementsState>({});
-  const configuredFilterInputs = tableConfig?.filterPanel?.inputs;
-  const filterSelectionDataMap = useFilterPanelSelectionData(
-    configuredFilterInputs,
+
+  const pageRequestOverrides = useTableRequestOverrides(
+    legacyValues(requestFilters),
+    legacyValues({ ...tableConfig?.constantFilters, ...constantFilter }),
   );
-  const configuredFilterDefaults = useMemo(
-    () => getFilterDefaultValues(configuredFilterInputs),
-    [configuredFilterInputs],
-  );
-
-  useEffect(() => {
-    if (!Object.keys(configuredFilterDefaults).length) return;
-
-    setFilterFormElements((prev) => {
-      const next = { ...prev };
-      let changed = false;
-
-      Object.entries(configuredFilterDefaults).forEach(([key, value]) => {
-        if (next[key] === undefined) {
-          next[key] = value as FormElementsState[string];
-          changed = true;
-        }
-      });
-
-      return changed ? next : prev;
-    });
-  }, [configuredFilterDefaults]);
-
-  const tableDragState = useMemo(
-    () =>
-      resolveTableDragState(
-        tableConfig?.drag,
-        filterFormElements.sort,
-        tableConfig?.constantSort?.sort,
-      ),
-    [
-      filterFormElements.sort,
-      tableConfig?.constantSort?.sort,
-      tableConfig?.drag,
-    ],
-  );
-
-  const requestFilters = useMemo(
-    () => ({
-      ...filterFormElements,
-      ...(!filterFormElements.sort && tableConfig?.constantSort?.sort
-        ? {
-            sort: tableConfig.constantSort.sort,
-            asc: tableConfig.constantSort.asc ?? 1,
-          }
-        : !filterFormElements.sort && tableDragState.defaultSort
-          ? { sort: tableDragState.defaultSort, asc: 1 }
-          : {}),
-      ...resolveToggleRequestEffects(
-        configuredTableToggles,
-        tableToggleState,
-      ),
-      ...(tableConfig?.constantFilters || {}),
-      ...(constantFilter || {}),
-      ...(resolvedParams || {}),
-    }),
-    [
-      filterFormElements,
-      configuredTableToggles,
-      tableToggleState,
-      tableConfig?.constantFilters,
-      tableConfig?.constantSort,
-      tableDragState.defaultSort,
-      constantFilter,
-      resolvedParams,
-    ],
-  );
-  const pageRequestOverrides = useTableRequestOverrides(legacyValues(requestFilters), legacyValues({ ...tableConfig?.constantFilters, ...constantFilter }));
   const items = useGetDynamicItems<GenericItem>(
     schemaName,
     requestFilters as FormElementsState,
     sourceRevision,
     pageRequestOverrides,
   );
-  const activePageQueryKey = usePageReadKey("data", legacyRead({ transport: "list", schemaName }, legacyValues(requestFilters)), pageRequestOverrides);
+  const activePageQueryKey = usePageReadKey(
+    "data",
+    legacyRead({ transport: "list", schemaName }, legacyValues(requestFilters)),
+    pageRequestOverrides,
+  );
   const rawContainers = useGetContainers();
 
-  const container: ContainerModel | undefined = useMemo(() => {
-    if (!rawContainers) return undefined;
-    const normalized = rawContainers.map((c: RawContainer) =>
-      normalizeContainer(c),
-    );
-    return normalized.find(
-      (c: ContainerModel) =>
-        (c.schemaName || "").toLowerCase() === schemaName.toLowerCase(),
-    );
-  }, [rawContainers, schemaName]);
+  const container: ContainerModel | undefined = useMemo(
+    () => findMatchingContainer(rawContainers, schemaName),
+    [rawContainers, schemaName],
+  );
 
   const rowStyleFunction = useCallback(
-    (row: GenericItem): React.CSSProperties => {
-      const styles: React.CSSProperties = {};
-      const rowClassName = tableConfig?.rows?.className;
-
-      if (rowClassName) {
-        Object.assign(
-          styles,
-          tailwindBgToStyle(getMatchingRowClassNames(row, rowClassName)),
-        );
-        return styles;
-      }
-
-      // Container level configs
-      if (container?.frontend?.rowClassName) {
-        Object.assign(
-          styles,
-          tailwindBgToStyle(
-            getMatchingRowClassNames(row, container.frontend.rowClassName),
-          ),
-        );
-      }
-
-      // Field level configs
-      container?.fields.forEach((field) => {
-        if (field.frontend?.rowClassName) {
-          Object.assign(
-            styles,
-            tailwindBgToStyle(
-              getMatchingRowClassNames(row, field.frontend.rowClassName),
-            ),
-          );
-        }
-      });
-
-      return styles;
-    },
+    (row: GenericItem): React.CSSProperties =>
+      computeRowStyle(row, container, tableConfig),
     [container, tableConfig],
   );
 
-  // Check if container has image fields
-  const hasImageField = useMemo(() => {
-    if (!container?.fields) return false;
-    return container.fields.some(
-      (field) =>
-        (field.type || "").toLowerCase() === Types.Image ||
-        (field.type || "").toLowerCase() === Types.Image,
-    );
-  }, [container]);
+  const hasImageField = useMemo(
+    () => containerHasImageField(container),
+    [container],
+  );
 
   const {
     createDynamicItem,
@@ -589,74 +176,34 @@ export default function GenericUnpaginatedPage({
     deleteDynamicItem,
     deleteMultipleDynamicItem,
     updateMultipleDynamicItem,
-  } = useDynamicCrud<GenericItem>(schemaName, hasImageField, activePageQueryKey ? [...activePageQueryKey] : undefined);
+  } = useDynamicCrud<GenericItem>(
+    schemaName,
+    hasImageField,
+    activePageQueryKey ? [...activePageQueryKey] : undefined,
+  );
 
-  const displayFields: Field[] = useMemo(() => {
-    if (!container?.fields) return [];
-    let fields = container.fields
-      .map(normalizeField)
-      .filter(isDisplayablePrimitive);
+  const displayFields: Field[] = useMemo(
+    () =>
+      computeDisplayFields({
+        container,
+        includeFields,
+        excludeFields,
+        userRole: user?.role,
+        tableConfig,
+        tableToggleState,
+        configuredTableToggles,
+      }),
+    [
+      container,
+      includeFields,
+      excludeFields,
+      user,
+      tableConfig,
+      tableToggleState,
+      configuredTableToggles,
+    ],
+  );
 
-    if (tableConfig?.columns?.length) {
-      fields = tableConfig.columns
-        .filter((column) =>
-          isTableColumnVisible(
-            column.visibilityToggle,
-            tableToggleState,
-            configuredTableToggles,
-          ),
-        )
-        .map((column) => {
-          const field = fields.find((item) => item.name === column.field);
-          return (
-            field || {
-              name: column.field,
-              type: "string",
-              frontend: column.displayName
-                ? { displayName: column.displayName }
-                : undefined,
-            }
-          );
-        })
-        .filter((field): field is Field => Boolean(field?.name));
-    }
-
-    if (includeFields?.length) {
-      fields = includeFields
-        .map((name) => fields.find((f) => f.name === name))
-        .filter((f): f is Field => Boolean(f));
-    }
-    if (excludeFields?.length) {
-      const ex = new Set(excludeFields);
-      fields = fields.filter((f) => !ex.has(f.name));
-    }
-    fields = fields.filter((f) => f.name !== "_id" && f.name !== "id");
-
-    // Filter by authorizeRole if isAuthorized is true
-    fields = fields.filter((f) => {
-      // If not authorized, show it
-      if (!f.isAuthorized) return true;
-
-      // If authorized, user must exist and have a matching role
-      if (!user?.role) return false;
-
-      // Check if authorizeRole exists and includes user role
-      if (!f.authorizeRole || f.authorizeRole.length === 0) return false;
-      return f.authorizeRole.includes(user.role);
-    });
-
-    return fields;
-  }, [
-    container,
-    includeFields,
-    excludeFields,
-    user,
-    tableConfig,
-    tableToggleState,
-    configuredTableToggles,
-  ]);
-
-  // Fetch selection data for objectId/autoIncrementId fields with populationSettings
   const selectionDataMap = useSelectionData(container?.fields || []);
   const lookupSelectionDataMap = useTableLookupSelectionData(tableConfig);
 
@@ -667,7 +214,15 @@ export default function GenericUnpaginatedPage({
     updateRow: async (id, updates, row) => {
       const target = getArraySourceMutationTarget(row);
       if (target) {
-        await updateDynamicArrayRow({ schemaName, parentId: target.parentId, arrayField: target.arrayField, rowIdentityField: target.rowIdentityField, rowIdentity: target.rowIdentity, updates });
+        await updateDynamicArrayRow({
+          ...requestConfig,
+          schemaName,
+          parentId: target.parentId,
+          arrayField: target.arrayField,
+          rowIdentityField: target.rowIdentityField,
+          rowIdentity: target.rowIdentity,
+          updates,
+        });
         return;
       }
       updateDynamicItem(id, updates);
@@ -676,467 +231,14 @@ export default function GenericUnpaginatedPage({
 
   const baseRowKeys = useMemo(
     () =>
-      displayFields.map((f) => {
-        const fieldType = (f.type || "").toLowerCase();
-        const originalType = f.type || "";
-        const isStringArray =
-          fieldType === Types.StringArray ||
-          originalType === Types.StringArray ||
-          fieldType === "string[]" ||
-          fieldType === "array<string>";
-        const isIntArray =
-          fieldType === Types.IntArray ||
-          originalType === Types.IntArray ||
-          fieldType === "int[]" ||
-          fieldType === "array<int>";
-        const isNumberArray =
-          fieldType === Types.NumberArray ||
-          originalType === Types.NumberArray ||
-          fieldType === "number[]" ||
-          fieldType === "array<number>";
-        const isArray = isStringArray || isIntArray || isNumberArray;
-
-        const rowKey: {
-          key: string;
-          isImage?: boolean;
-          isDate?: boolean;
-          isBoolean?: boolean;
-          className?: string | ((row: GenericItem) => string);
-          style?: React.CSSProperties | ((row: GenericItem) => React.CSSProperties);
-          node?: (row: GenericItem) => React.ReactNode;
-        } = {
-          key: f.name,
-          isImage: fieldType === Types.Image,
-          isDate: fieldType === Types.Date,
-          isBoolean: fieldType === Types.Boolean || fieldType === "bool",
-        };
-
-        const cellClassName = getTableCellClassName(tableConfig, f);
-        const legacyCellClassName = f.frontend?.rowKeyClassName;
-        const rowKeyClassName = cellClassName ?? legacyCellClassName;
-        const linkConfig = getTableLinkConfig(tableConfig, f);
-
-        // Compute className based on table column cellClassName conditions
-        if (rowKeyClassName) {
-          rowKey.className = (row: GenericItem) =>
-            getMatchingRowClassPresentation(row, rowKeyClassName).className;
-          rowKey.style = (row: GenericItem) =>
-            getMatchingRowClassPresentation(row, rowKeyClassName).style;
-        }
-
-        const columnConfig = tableConfig?.columns?.find(
-          (column) => column.field === f.name,
-        );
-        if (columnConfig?.type === "template") {
-          rowKey.node = (row: GenericItem) =>
-            renderLinkedCellContent(
-              f,
-              row,
-              linkConfig,
-              <span>
-                {renderTableColumnTemplate(columnConfig.template, row)}
-              </span>,
-            );
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "computedLabel") {
-          const getComputedValue = (row: GenericItem) =>
-            getComputedLabelValue(
-              tableConfig,
-              f.name,
-              row,
-              evaluateRowCondition,
-            );
-
-          if (rowKeyClassName) {
-            rowKey.className = (row: GenericItem) =>
-              getMatchingRowClassPresentation(
-                { ...row, [f.name]: getComputedValue(row) },
-                rowKeyClassName,
-              ).className;
-            rowKey.style = (row: GenericItem) =>
-              getMatchingRowClassPresentation(
-                { ...row, [f.name]: getComputedValue(row) },
-                rowKeyClassName,
-              ).style;
-          }
-
-          rowKey.node = (row: GenericItem) =>
-            renderLinkedCellContent(
-              f,
-              row,
-              linkConfig,
-              <span>{getComputedValue(row)}</span>,
-            );
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "lookupLabel") {
-          const getLookupValue = (row: GenericItem) =>
-            getLookupLabelValue(columnConfig, row, lookupSelectionDataMap);
-
-          if (rowKeyClassName) {
-            rowKey.className = (row: GenericItem) =>
-              getMatchingRowClassPresentation(
-                { ...row, [f.name]: getLookupValue(row) },
-                rowKeyClassName,
-              ).className;
-            rowKey.style = (row: GenericItem) =>
-              getMatchingRowClassPresentation(
-                { ...row, [f.name]: getLookupValue(row) },
-                rowKeyClassName,
-              ).style;
-          }
-
-          rowKey.node = (row: GenericItem) =>
-            renderLinkedCellContent(
-              f,
-              row,
-              linkConfig,
-              <span>{getLookupValue(row)}</span>,
-            );
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "progressBar") {
-          rowKey.node = (row: GenericItem) => {
-            const progress = getProgressBarValue(
-              tableConfig,
-              f.name,
-              row,
-              evaluateRowCondition,
-            );
-            if (!progress) return <span>-</span>;
-
-            return (
-              <span className="inline-flex items-center gap-3 align-middle">
-                <span
-                  className="inline-flex overflow-hidden rounded-full"
-                  style={{
-                    width: progress.width,
-                    height: progress.height,
-                    backgroundColor: progress.trackColor,
-                  }}
-                >
-                  <span
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${progress.percent}%`,
-                      backgroundColor: progress.color,
-                    }}
-                  />
-                </span>
-                {progress.showValue && (
-                  <span className="text-sm font-medium text-neutral-500">
-                    {progress.value}/{progress.max}
-                  </span>
-                )}
-              </span>
-            );
-          };
-          return rowKey;
-        }
-
-        // --- New explicit display type overrides ---
-        if (columnConfig?.type === "number") {
-          rowKey.node = (row: GenericItem) => {
-            const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
-            const n = Number(v);
-            return renderLinkedCellContent(
-              f,
-              row,
-              linkConfig,
-              <span>{isNaN(n) ? String(v) : n.toLocaleString()}</span>,
-            );
-          };
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "currency") {
-          rowKey.node = (row: GenericItem) => {
-            const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
-            const n = Number(v);
-            return renderLinkedCellContent(
-              f,
-              row,
-              linkConfig,
-              <span>
-                {isNaN(n) ? String(v) : n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-              </span>,
-            );
-          };
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "percentage") {
-          rowKey.node = (row: GenericItem) => {
-            const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
-            const n = Number(v);
-            return renderLinkedCellContent(
-              f,
-              row,
-              linkConfig,
-              <span>{isNaN(n) ? String(v) : `${n.toLocaleString()}%`}</span>,
-            );
-          };
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "growthPercentage") {
-          rowKey.node = (row: GenericItem) => {
-            const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
-            const n = Number(v);
-            if (isNaN(n)) {
-              return renderLinkedCellContent(f, row, linkConfig, <span>{String(v)}</span>);
-            }
-            const isPositive = n > 0;
-            const isNegative = n < 0;
-            const sign = isPositive ? "+" : "";
-            const arrow = isPositive ? "↑" : isNegative ? "↓" : "→";
-            const color = isPositive
-              ? "#2e7d32"
-              : isNegative
-                ? "#c62828"
-                : "#827717";
-            return renderLinkedCellContent(
-              f,
-              row,
-              linkConfig,
-              <span style={{ color, display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                <span>{arrow}</span>
-                <span>{sign}{n.toLocaleString()}%</span>
-              </span>,
-            );
-          };
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "date") {
-          rowKey.node = (row: GenericItem) => {
-            const v = row[f.name];
-            if (!v) return <span>-</span>;
-            const formatted = formatTableDate(v, columnConfig.dateFormat);
-            return renderLinkedCellContent(
-              f,
-              row,
-              linkConfig,
-              <span>{formatted || String(v)}</span>,
-            );
-          };
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "boolean") {
-          rowKey.node = (row: GenericItem) => {
-            const v = row[f.name];
-            const isTrue = isTruthyBooleanValue(v);
-            return (
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                  isTrue
-                    ? "bg-green-100 text-green-700"
-                    : "bg-neutral-100 text-neutral-500"
-                }`}
-              >
-                {isTrue ? "Yes" : "No"}
-              </span>
-            );
-          };
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "booleanSwitch") {
-          rowKey.node = (row: GenericItem) => {
-            const isChecked = isTruthyBooleanValue(row[f.name]);
-            if (
-              !isBooleanColumnSwitchPresentation(
-                columnConfig.booleanDisplayToggle,
-                tableToggleState,
-                configuredTableToggles,
-              ) ||
-              !isBooleanColumnEditable(
-                columnConfig.booleanEditToggle,
-                tableToggleState,
-                configuredTableToggles,
-              )
-            ) {
-              const label = getTableDisplayName(tableConfig, f);
-              return (
-                <span
-                  aria-label={`${label}: ${isChecked ? "Yes" : "No"}`}
-                >
-                  {isChecked ? (
-                    <IoCheckmark className="text-blue-500 text-2xl" />
-                  ) : (
-                    <IoCloseOutline className="text-red-800 text-2xl" />
-                  )}
-                </span>
-              );
-            }
-            return (
-              <CheckSwitch
-                checked={isChecked}
-                onChange={() => {
-                  updateDynamicItem(row._id, {
-                    [f.name]: !isChecked,
-                  });
-                }}
-              />
-            );
-          };
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "image") {
-          rowKey.isImage = true;
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "badge") {
-          rowKey.node = (row: GenericItem) => {
-            const v = row[f.name];
-            if (v === undefined || v === null || v === "") return <span>-</span>;
-            return renderLinkedCellContent(
-              f,
-              row,
-              linkConfig,
-              <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
-                {String(v)}
-              </span>,
-            );
-          };
-          return rowKey;
-        }
-
-        if (columnConfig?.type === "array") {
-          rowKey.node = (row: GenericItem) => {
-            const v = row[f.name];
-            if (v === undefined || v === null) return <span>-</span>;
-            const content = Array.isArray(v)
-              ? formatPopulatedArrayValue(v)
-              : String(v);
-            return renderLinkedCellContent(f, row, linkConfig, <span>{content || "-"}</span>);
-          };
-          return rowKey;
-        }
-        // --- End of explicit display type overrides ---
-
-        // Add node function for boolean fields
-        if (rowKey.isBoolean) {
-          rowKey.node = (row: GenericItem) => (
-            <CheckSwitch
-              checked={!!row[f.name]}
-              onChange={() => {
-                updateDynamicItem(row._id, {
-                  [f.name]: !row[f.name],
-                });
-              }}
-            />
-          );
-        } else if (isArray) {
-          // Handle array types - display as comma-separated values
-          rowKey.node = (row: GenericItem) => {
-            const value = row[f.name];
-            const content = Array.isArray(value)
-              ? formatPopulatedArrayValue(value)
-              : String(value || "");
-            return linkConfig?.linkTemplate ? (
-              <LinkCell field={f} row={row} linkConfig={linkConfig} />
-            ) : (
-              <span>{content}</span>
-            );
-          };
-        } else if (
-          (fieldType === Types.ObjectId ||
-            fieldType === Types.AutoIncrementId) &&
-          f.populationSettings &&
-          f.populationSettings.displayFields &&
-          f.populationSettings.displayFields.length > 0
-        ) {
-          // Handle populated objectId/autoIncrementId fields
-          rowKey.node = (row: GenericItem) => {
-            const value = row[f.name];
-            let content = "";
-            if (value && typeof value === "object") {
-              // Display the fields specified in displayFields
-              const valueObj = value as Record<string, unknown>;
-              const displayValues = f
-                .populationSettings!.displayFields.map(
-                  (fieldName) => valueObj[fieldName],
-                )
-                .filter(Boolean)
-                .map(String);
-              content = displayValues.join(" - ") || String(valueObj._id || "");
-            } else {
-              content = String(value || "");
-            }
-            return linkConfig?.linkTemplate ? (
-              <LinkCell field={f} row={row} linkConfig={linkConfig} />
-            ) : (
-              <span>{content}</span>
-            );
-          };
-        } else if (
-          fieldType === Types.ObjectIdArray &&
-          f.populationSettings &&
-          f.populationSettings.displayFields &&
-          f.populationSettings.displayFields.length > 0
-        ) {
-          // Handle populated objectIdArray fields
-          rowKey.node = (row: GenericItem) => {
-            const value = row[f.name];
-            let content = "";
-            if (Array.isArray(value) && value.length > 0) {
-              // Map over array of populated objects
-              const displayItems = value.map((item) => {
-                if (item && typeof item === "object") {
-                  const itemObj = item as Record<string, unknown>;
-                  const displayValues = f
-                    .populationSettings!.displayFields.map(
-                      (fieldName) => itemObj[fieldName],
-                    )
-                    .filter(Boolean)
-                    .map(String);
-                  return displayValues.join(" - ") || String(itemObj._id || "");
-                } else if (typeof item === "string") {
-                  // Handle ID strings by looking up in selectionDataMap
-                  const selectionOptions = selectionDataMap.get(f.name) || [];
-                  const foundOption = selectionOptions.find(
-                    (opt) => opt._id === item,
-                  );
-                  if (foundOption) {
-                    return String(
-                      foundOption[f.populationSettings!.inputSelectionField] ||
-                        item,
-                    );
-                  }
-                  return item;
-                }
-                return String(item || "");
-              });
-              content = displayItems.join(", ");
-            } else {
-              content = String(value || "");
-            }
-            return linkConfig?.linkTemplate ? (
-              <LinkCell field={f} row={row} linkConfig={linkConfig} />
-            ) : (
-              <span>{content}</span>
-            );
-          };
-        } else if (linkConfig?.linkTemplate) {
-          // Handle all other field types with linkTemplate (e.g., regular strings, numbers)
-          rowKey.node = (row: GenericItem) => (
-            <LinkCell field={f} row={row} linkConfig={linkConfig} />
-          );
-        }
-
-        return rowKey;
+      buildBaseRowKeys({
+        displayFields,
+        updateDynamicItem,
+        selectionDataMap,
+        lookupSelectionDataMap,
+        tableConfig,
+        tableToggleState,
+        configuredTableToggles,
       }),
     [
       displayFields,
@@ -1154,1090 +256,73 @@ export default function GenericUnpaginatedPage({
     [baseRowKeys, generatedRelationTableColumns.rowKeys],
   );
 
-  const columns = useMemo(() => {
-    const baseCols = [
-      ...displayFields.map((f) => ({
-      key: t(getTableDisplayName(tableConfig, f) || getFieldLabel(f)),
-      isSortable:
-        tableConfig?.columns?.find((column) => column.field === f.name)
-          ?.type !== "computedLabel",
-      correspondingKey: f.name,
-      })),
-      ...generatedRelationTableColumns.columns,
-    ];
-    if (actionsEnabled) {
-      return [...baseCols, { key: t("Actions"), label: tableConfig?.actionsColumnLabel?.trim() ? tableConfig.actionsColumnLabel : undefined, isSortable: false }];
-    }
-    return baseCols;
-  }, [displayFields, t, actionsEnabled, tableConfig, generatedRelationTableColumns.columns]);
-
-  const { inputs, formKeys } = useMemo(() => {
-    const ins = displayFields
-      .map((f) => {
-        // Skip fields with equation
-        if (isComputedField(f)) return null;
-
-        const m = fieldToInput(f);
-        const label = t(getFieldLabel(f));
-        const fieldType = (f.type || "").toLowerCase();
-
-        // Parse validation rules from tag
-        const validationRules = parseValidationRules(f.tag);
-        const isRequired = isFieldRequired(f.tag);
-
-        // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
-        if (
-          (fieldType === Types.ObjectId ||
-            fieldType === Types.AutoIncrementId ||
-            fieldType === Types.ObjectIdArray) &&
-          f.populationSettings &&
-          f.objectSchemaName
-        ) {
-          const selectionData = selectionDataMap.get(f.name) || [];
-          const displayLabel = f.populationSettings.displayLabel || label;
-
-          return {
-            type: InputTypes.SELECT,
-            formKey: f.name,
-            label: t(displayLabel),
-            placeholder: t(displayLabel),
-            required: isRequired,
-            isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
-            optionsSource: "schema" as const,
-            sourceSchemaName: f.objectSchemaName,
-            sourceValueField: "_id",
-            sourceLabelField: f.populationSettings.inputSelectionField,
-            options: selectionData.map((item) => ({
-              value: String(item._id || ""),
-              label: String(
-                item[f.populationSettings!.inputSelectionField] ||
-                  item._id ||
-                  "",
-              ),
-              sourceItem: item,
-            })),
-            invalidateKeys:
-              f.frontend?.invalidateKeys?.map((key) => ({
-                key: String(key),
-                defaultValue: undefined,
-              })) ?? [],
-          };
-        }
-
-        // Check if field has enumList
-        if (f.enumList && f.enumList.length > 0) {
-          const originalType = f.type || "";
-
-          // Check if it's an array type
-          const isStringArray =
-            fieldType === Types.StringArray ||
-            originalType === Types.StringArray ||
-            fieldType === "string[]" ||
-            fieldType === "array<string>";
-          const isIntArray =
-            fieldType === Types.IntArray ||
-            originalType === Types.IntArray ||
-            fieldType === "int[]" ||
-            fieldType === "array<int>";
-          const isNumberArray =
-            fieldType === Types.NumberArray ||
-            originalType === Types.NumberArray ||
-            fieldType === "number[]" ||
-            fieldType === "array<number>";
-
-          const isArrayType = isStringArray || isIntArray || isNumberArray;
-
-          return {
-            type: InputTypes.SELECT,
-            formKey: f.name,
-            label,
-            placeholder: label,
-            required: isRequired,
-            isMultiple: isArrayType,
-            options: f.enumList.map((item) => ({
-              value: item,
-              label: String(item),
-            })),
-            invalidateKeys:
-              f.frontend?.invalidateKeys?.map((key) => ({
-                key: String(key),
-                defaultValue: undefined,
-              })) ?? [],
-          };
-        }
-
-        return {
-          type: m.inputType,
-          formKey: f.name,
-          label,
-          placeholder: label,
-          required: isRequired,
-          minLength: validationRules.minlength,
-          maxLength: validationRules.maxlength,
-          min: validationRules.min,
-          max: validationRules.max,
-          pattern: validationRules.pattern,
-          invalidateKeys:
-            f.frontend?.invalidateKeys?.map((key) => ({
-              key: String(key),
-              defaultValue: undefined,
-            })) ?? [],
-        };
-      })
-      .filter((i): i is NonNullable<typeof i> => i !== null);
-
-    const fks = displayFields
-      .map((f) => {
-        if (isComputedField(f)) return null;
-        const m = fieldToInput(f);
-        return { key: f.name, type: m.formKeyType };
-      })
-      .filter((k): k is NonNullable<typeof k> => k !== null);
-
-    return { inputs: ins, formKeys: fks };
-  }, [displayFields, t, selectionDataMap]);
-
-  const handleSubmitItem = useCallback(
-    async (item: GenericItem | UpdatePayload<GenericItem>) => {
-      if ("id" in item && "updates" in item) {
-        const target = getArraySourceMutationTarget(rowToAction || undefined);
-        if (target) {
-          await updateDynamicArrayRow({ schemaName, parentId: target.parentId, arrayField: target.arrayField, rowIdentityField: target.rowIdentityField, rowIdentity: target.rowIdentity, updates: item.updates as Record<string, unknown> });
-          return;
-        }
-        updateDynamicItem(
-          item.id as string | number,
-          omitTableConstantKeys(
-            item.updates as GenericItem,
-            tableConfig?.constantFilters,
-            constantFilter,
-          ) as Partial<GenericItem>,
-        );
-      } else {
-        const addConstants = partitionActionConstantValues(
-          tableConfig?.addButton?.constantValues,
-          formKeys.map((formKey) => formKey.key),
-        );
-        const nextItem = mergeTableConstantValues(
-            applyHiddenActionValues(
-              item as GenericItem,
-              addConstants.hiddenValues,
-            ) as GenericItem,
-            undefined,
-            tableConfig?.constantFilters,
-            constantFilter,
-          );
-        const source = tableConfig?.arraySource;
-        const parentId = items?.[0]?._id;
-        if (source?.enabled && source.field && source.rowIdentityField && parentId != null) {
-          await addDynamicArrayRow({ schemaName, parentId, arrayField: source.field, rowIdentityField: source.rowIdentityField, item: nextItem as Record<string, unknown> });
-          return;
-        }
-        createDynamicItem(nextItem);
-      }
-    },
+  const columns = useMemo(
+    () =>
+      buildTableColumns({
+        displayFields,
+        tableConfig,
+        generatedColumns: generatedRelationTableColumns.columns,
+        actionsEnabled,
+        t,
+      }),
     [
-      updateDynamicItem,
-      createDynamicItem,
+      displayFields,
+      t,
+      actionsEnabled,
       tableConfig,
-      constantFilter,
-      formKeys,
-      rowToAction,
-      schemaName,
-      items,
+      generatedRelationTableColumns.columns,
     ],
   );
 
-  const deleteTableRow = useCallback(async (row: GenericItem) => {
-    const target = getArraySourceMutationTarget(row);
-    if (target) {
-      await deleteDynamicArrayRow({ schemaName, parentId: target.parentId, arrayField: target.arrayField, rowIdentityField: target.rowIdentityField, rowIdentity: target.rowIdentity });
-      return;
-    }
-    deleteDynamicItem(row._id);
-  }, [deleteDynamicItem, schemaName]);
-
-  const addButton = useMemo(() => {
-    const addConstants = partitionActionConstantValues(
-      tableConfig?.addButton?.constantValues,
-      formKeys.map((formKey) => formKey.key),
-    );
-    return {
-      name: t("Add"),
-      isModal: true,
-      modal: (
-        <GenericAddEditPanel
-          isOpen={isAddOpen}
-          close={() => setIsAddOpen(false)}
-          inputs={inputs}
-          formKeys={formKeys}
-          submitItem={handleSubmitItem}
-          itemToEdit={
-            Object.keys(addConstants.visibleDefaults).length
-              ? {
-                  id: "",
-                  updates: {
-                    ...addConstants.visibleDefaults,
-                    _id: "",
-                  } as GenericItem,
-                }
-              : undefined
-          }
-          {...resolveTableActionFormLayout(tableConfig?.addButton, {
-            topClassName: "flex flex-col gap-2",
-          })}
-        />
-      ),
-      isModalOpen: isAddOpen,
-      setIsModal: setIsAddOpen,
-      isPath: false,
-      icon: null,
-      className: "bg-blue-500 hover:text-blue-500 hover:border-blue-500",
-    };
-  }, [t, isAddOpen, inputs, formKeys, handleSubmitItem, tableConfig?.addButton]);
-
-  const actionSelectionDataMap = useActionFormSelectionData(
-    tableConfig?.actions || [],
-  );
-  const bulkEditActionConfig = tableConfig?.bulkActions?.edit;
-  const bulkDeleteActionConfig = tableConfig?.bulkActions?.delete;
-  const isBulkSelectionEnabled = Boolean(
-    (bulkEditActionConfig && bulkEditActionConfig.enabled !== false) ||
-      (bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false),
-  );
-  const configuredBulkEditFields = useMemo(
-    () => bulkEditActionConfig?.formFields || [],
-    [bulkEditActionConfig?.formFields],
-  );
-  const bulkActionSelectionDataMap = useActionFormSelectionData(
-    bulkEditActionConfig ? [bulkEditActionConfig] : [],
+  const { inputs, formKeys } = useMemo(
+    () =>
+      buildAddEditFormConfig({
+        displayFields,
+        selectionDataMap,
+        t,
+      }),
+    [displayFields, t, selectionDataMap],
   );
 
-  const actions = useMemo(() => {
-    if (!actionsEnabled) return [];
-
-    const configuredActions = (tableConfig?.actions || [])
-      .filter((action) => action.enabled !== false)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const hasConfiguredActions = Array.isArray(tableConfig?.actions);
-    const hasConfiguredDeleteAction = configuredActions.some(
-      (action) => action.kind === "delete",
-    );
-    const hasConfiguredEditAction = configuredActions.some(
-      (action) => action.kind === "edit",
-    );
-
-    const buildDeleteAction = (deleteActionConfig?: TableActionConfig) => {
-      const DeleteIcon = getIconByName(
-        deleteActionConfig?.icon || "HiOutlineTrash",
-      );
-      return {
-        name: deleteActionConfig?.label || t("Delete"),
-        isHidden: (row: GenericItem) =>
-          deleteActionConfig
-            ? getTableActionRowState(deleteActionConfig, row).hidden
-            : false,
-        isDisabled: (row: GenericItem) =>
-          deleteActionConfig
-            ? getTableActionRowState(deleteActionConfig, row).disabled
-            : false,
-        icon: <DeleteIcon />,
-        setRow: setRowToAction as (value: GenericItem) => void,
-        modal: rowToAction ? (
-          <ConfirmationDialog
-            isOpen={isDeleteOpen}
-            close={() => setIsDeleteOpen(false)}
-            confirm={() => {
-              void deleteTableRow(rowToAction);
-              setIsDeleteOpen(false);
-            }}
-            title={deleteActionConfig?.confirmTitle || t("Delete")}
-            text={deleteActionConfig?.confirmText || t("GeneralDeleteMessage")}
-          />
-        ) : null,
-        className:
-          deleteActionConfig?.className ||
-          "text-red-500 cursor-pointer text-2xl ",
-        isModal: true,
-        isModalOpen: isDeleteOpen,
-        setIsModal: setIsDeleteOpen,
-        isPath: false,
-      };
-    };
-
-    const buildEditAction = (editActionConfig?: TableActionConfig) => {
-      const EditIcon = getIconByName(editActionConfig?.icon || "FiEdit");
-      const editActionId = editActionConfig
-        ? getActionId(editActionConfig, 0)
-        : "edit-0";
-      const editDefaultValues = editActionConfig
-        ? getActionDefaultValues(editActionConfig)
-        : {};
-      const editInputs = buildActionInputs(
-        editActionConfig || { kind: "edit" },
-        inputs,
-        editActionId,
-        actionSelectionDataMap,
-      );
-      const editInputKeys = new Set(editInputs.map((input) => input.formKey));
-      const editFormKeys =
-        editActionConfig?.formFields !== undefined
-          ? buildActionFormKeys(editActionConfig, editInputs)
-          : formKeys.filter((formKey) => editInputKeys.has(formKey.key));
-      const editConstantValues = partitionActionConstantValues(
-        editActionConfig ? parseActionConstantValues(editActionConfig) : {},
-        editFormKeys.map((formKey) => formKey.key),
-      );
-      return {
-        name: editActionConfig?.label || t("Edit"),
-        isHidden: (row: GenericItem) =>
-          editActionConfig
-            ? getTableActionRowState(editActionConfig, row).hidden
-            : false,
-        isDisabled: (row: GenericItem) =>
-          editActionConfig
-            ? getTableActionRowState(editActionConfig, row).disabled
-            : false,
-        icon: <EditIcon />,
-        className:
-          editActionConfig?.className || "text-blue-500 cursor-pointer text-xl",
-        isModal: true,
-        setRow: setRowToAction as (value: GenericItem) => void,
-        modal: rowToAction
-          ? (() => {
-              const normalizedUpdates = { ...rowToAction };
-              displayFields.forEach((f) => {
-                const fieldType = (f.type || "").toLowerCase();
-                if (
-                  (fieldType === Types.ObjectId ||
-                    fieldType === Types.AutoIncrementId) &&
-                  f.populationSettings &&
-                  normalizedUpdates[f.name] &&
-                  typeof normalizedUpdates[f.name] === "object"
-                ) {
-                  const populatedValue = normalizedUpdates[f.name] as Record<
-                    string,
-                    unknown
-                  >;
-                  normalizedUpdates[f.name] = populatedValue._id;
-                } else if (
-                  fieldType === Types.ObjectIdArray &&
-                  f.populationSettings &&
-                  normalizedUpdates[f.name] &&
-                  Array.isArray(normalizedUpdates[f.name])
-                ) {
-                  const populatedArray = normalizedUpdates[f.name] as Array<
-                    Record<string, unknown>
-                  >;
-                  normalizedUpdates[f.name] = populatedArray.map((item) =>
-                    item && typeof item === "object" ? item._id : item,
-                  );
-                }
-              });
-
-              return (
-                <GenericAddEditPanel
-                  isOpen={isEditOpen}
-                  close={() => setIsEditOpen(false)}
-                  inputs={editInputs}
-                  formKeys={editFormKeys}
-                  submitItem={(item) => {
-                    if ("id" in item && "updates" in item) {
-                      handleSubmitItem({
-                        id: item.id as string | number,
-                        updates: applyHiddenActionValues(
-                          item.updates as Record<string, unknown>,
-                          editConstantValues.hiddenValues,
-                        ) as Partial<GenericItem>,
-                      });
-                    }
-                  }}
-                  isEditMode
-                  buttonName={editActionConfig?.buttonName || t("Edit")}
-                  {...resolveTableActionFormLayout(editActionConfig, {
-                    topClassName: "flex flex-col gap-2",
-                  })}
-                  itemToEdit={{
-                    id: rowToAction._id,
-                    updates: buildActionInitialValues(
-                      editDefaultValues,
-                      editConstantValues.visibleDefaults,
-                      normalizedUpdates,
-                    ) as GenericItem,
-                  }}
-                />
-              );
-            })()
-          : null,
-        isModalOpen: isEditOpen,
-        setIsModal: setIsEditOpen,
-        isPath: false,
-      };
-    };
-
-    const buildCustomAction = (action: TableActionConfig, index: number) => {
-      const actionId = getActionId(action, index);
-      const ActionIcon = getIconByName(action.icon || "FiCheck");
-      const defaultValues = getActionDefaultValues(action);
-      const actionInputs = buildActionInputs(
-        action,
-        inputs,
-        actionId,
-        actionSelectionDataMap,
-      );
-      const actionFormKeys = buildActionFormKeys(action, actionInputs);
-      const constantValues = partitionActionConstantValues(
-        parseActionConstantValues(action),
-        actionFormKeys.map((formKey) => formKey.key),
-      );
-      const workflowSubmit = action.submit;
-      const isWorkflowAction = Boolean(
-        workflowSubmit?.workflowName && workflowSubmit?.workflowSchema,
-      );
-      const isFormAction = action.modalType === "form";
-      const isActiveAction =
-        activeCustomAction &&
-        getActionId(activeCustomAction, index) === actionId;
-
-      return {
-        name: action.label || t("Action"),
-        isHidden: (row: GenericItem) =>
-          getTableActionRowState(action, row).hidden,
-        isDisabled: (row: GenericItem) =>
-          getTableActionRowState(action, row).disabled,
-        icon: <ActionIcon />,
-        className:
-          action.className || "text-emerald-600 cursor-pointer text-xl ",
-        isButton: action.isButton,
-        buttonClassName: action.buttonClassName,
-        setRow: setRowToAction as (value: GenericItem) => void,
-        onClick: (row: GenericItem) => {
-          setActiveCustomAction(action);
-          if (isFormAction) return;
-
-          if (action.kind === "link") {
-            const path = resolveActionTemplate(
-              action.linkTemplate || action.path,
-              row,
-            );
-            if (path) window.location.href = path;
-            return;
-          }
-
-          if (action.kind === "update") {
-            if (isWorkflowAction) {
-              executeWorkflow({
-                workflowName: workflowSubmit?.workflowName || "",
-                workflowSchema: workflowSubmit?.workflowSchema,
-                record: applyHiddenActionValues(
-                  row,
-                  constantValues.hiddenValues,
-                ),
-                oldRecord: row,
-              });
-              return;
-            }
-            updateDynamicItem(
-              row._id,
-              constantValues.hiddenValues as Partial<GenericItem>,
-            );
-          }
-        },
-        modal:
-          isFormAction && rowToAction && isActiveAction ? (
-            <GenericAddEditPanel
-              isOpen={isCustomActionOpen}
-              close={() => setIsCustomActionOpen(false)}
-              inputs={actionInputs}
-              formKeys={actionFormKeys}
-              submitItem={(item) => {
-                if ("id" in item && "updates" in item) {
-                  const record = applyHiddenActionValues({
-                    ...rowToAction,
-                    ...(item.updates as Record<string, unknown>),
-                  }, constantValues.hiddenValues);
-                  if (isWorkflowAction) {
-                    executeWorkflow({
-                      workflowName: workflowSubmit?.workflowName || "",
-                      workflowSchema: workflowSubmit?.workflowSchema,
-                      record,
-                      oldRecord: rowToAction,
-                    });
-                  } else {
-                    updateDynamicItem(
-                      item.id as string | number,
-                      record as Partial<GenericItem>,
-                    );
-                  }
-                }
-                setIsCustomActionOpen(false);
-              }}
-              isEditMode
-              buttonName={action.buttonName || action.label || t("Update")}
-              {...resolveTableActionFormLayout(action, {
-                topClassName: "flex flex-col gap-2",
-              })}
-              itemToEdit={{
-                id: rowToAction._id,
-                updates: buildActionInitialValues(
-                  defaultValues,
-                  constantValues.visibleDefaults,
-                  rowToAction,
-                ) as GenericItem,
-              }}
-            />
-          ) : null,
-        isModal: isFormAction,
-        isModalOpen: isCustomActionOpen,
-        setIsModal: setIsCustomActionOpen,
-        isPath: false,
-      };
-    };
-
-    if (!hasConfiguredActions) {
-      return [buildDeleteAction(), buildEditAction()];
-    }
-
-    return configuredActions
-      .flatMap((action, index) => {
-        if (action.kind === "defaults") {
-          return [
-            !hasConfiguredDeleteAction ? buildDeleteAction() : null,
-            !hasConfiguredEditAction ? buildEditAction() : null,
-          ];
-        }
-        if (action.kind === "delete") return buildDeleteAction(action);
-        if (action.kind === "edit") return buildEditAction(action);
-        return buildCustomAction(action, index);
-      })
-      .filter((action): action is NonNullable<typeof action> =>
-        Boolean(action),
-      );
-  }, [
+  const { addButton, actions } = useUnpaginatedRowActions({
     t,
-    rowToAction,
-    isDeleteOpen,
-    isEditOpen,
-    isCustomActionOpen,
-    activeCustomAction,
-    deleteTableRow,
-    updateDynamicItem,
-    executeWorkflow,
-    handleSubmitItem,
+    schemaName,
+    requestConfig,
+    tableConfig,
+    constantFilter,
+    actionsEnabled,
+    items,
+    displayFields,
     inputs,
     formKeys,
-    actionsEnabled,
-    displayFields,
-    tableConfig?.actions,
-    actionSelectionDataMap,
-  ]);
-
-  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
-
-  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
-  const [isBulkStepTwo, setIsBulkStepTwo] = useState(false);
-  const [bulkSelectedKeys, setBulkSelectedKeys] = useState<string[]>([]);
-  const [bulkForm, setBulkForm] = useState<Record<string, unknown>>({});
-  const bulkFieldOptions = useMemo(
-    () => {
-      if (configuredBulkEditFields.length) {
-        return configuredBulkEditFields
-          .filter((field) => field.formKey)
-          .map((field) => ({
-            value: field.formKey,
-            label: t(field.label || field.formKey),
-          }));
-      }
-
-      return displayFields
-        .filter((f) => {
-          const fieldType = (f.type || "").toLowerCase();
-          return (
-            fieldType !== Types.Image &&
-            fieldType !== Types.Image &&
-            !isComputedField(f)
-          );
-        })
-        .map((f) => ({
-          value: f.name,
-          label: t(getFieldLabel(f)),
-        }));
-    },
-    [configuredBulkEditFields, displayFields, t],
-  );
-
-  const bulkFormKeys = useMemo(() => {
-    if (isBulkStepTwo) {
-      if (configuredBulkEditFields.length) {
-        const action = {
-          ...(bulkEditActionConfig || { kind: "update" }),
-          formFields: configuredBulkEditFields.filter((field) =>
-            bulkSelectedKeys.includes(field.formKey),
-          ),
-        } as TableActionConfig;
-        return buildActionFormKeys(action, []);
-      }
-
-      // Step 2: only the selected fields
-      return displayFields
-        .filter((f) => bulkSelectedKeys.includes(f.name))
-        .map((f) => {
-          const m = fieldToInput(f);
-          return { key: f.name, type: m.formKeyType };
-        });
-    } else {
-      // Step 1: only the selector
-      return [{ key: "bulkSelectedKeys", type: FormKeyTypeEnum.STRING }];
-    }
-  }, [
-    bulkEditActionConfig,
-    configuredBulkEditFields,
-    displayFields,
-    bulkSelectedKeys,
-    isBulkStepTwo,
-  ]);
-
-  // Generate bulk edit inputs
-  const bulkEditInputs = useMemo(() => {
-    const selectInput = {
-      type: InputTypes.SELECT,
-      formKey: "bulkSelectedKeys",
-      label: t("Edit Option Selection"),
-      options: bulkFieldOptions,
-      placeholder: t("Select fields to edit"),
-      isMultiple: true,
-      required: !isBulkStepTwo,
-      isDisabled: isBulkStepTwo,
-    };
-
-    const chosen = new Set(bulkSelectedKeys);
-    if (configuredBulkEditFields.length) {
-      const action = {
-        ...(bulkEditActionConfig || { kind: "update" }),
-        formFields: configuredBulkEditFields.filter((field) =>
-          chosen.has(field.formKey),
-        ),
-      } as TableActionConfig;
-      const valueInputs = buildActionInputs(
-        action,
-        [],
-        getActionId(bulkEditActionConfig || { kind: "update" }, 0),
-        bulkActionSelectionDataMap,
-      ).map((input) => ({
-        ...input,
-        required: false,
-        isDisabled: !isBulkStepTwo,
-      }));
-
-      return [selectInput, ...valueInputs];
-    }
-
-    const valueInputs = displayFields
-      .filter((f) => chosen.has(f.name))
-      .map((f) => {
-        const m = fieldToInput(f);
-        const label = t(getFieldLabel(f));
-        const fieldType = (f.type || "").toLowerCase();
-
-        // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
-        if (
-          (fieldType === "objectid" ||
-            fieldType === "autoincrementid" ||
-            fieldType === "objectidarray") &&
-          f.populationSettings &&
-          f.objectSchemaName
-        ) {
-          const selectionData = selectionDataMap.get(f.name) || [];
-          const displayLabel = f.populationSettings.displayLabel || label;
-
-          return {
-            type: InputTypes.SELECT,
-            formKey: f.name,
-            label: t(displayLabel),
-            placeholder: t(displayLabel),
-            required: false,
-            isDisabled: !isBulkStepTwo,
-            isMultiple: fieldType === "objectidarray", // Enable multi-select for objectIdArray
-            optionsSource: "schema" as const,
-            sourceSchemaName: f.objectSchemaName,
-            sourceValueField: "_id",
-            sourceLabelField: f.populationSettings.inputSelectionField,
-            options: selectionData.map((item) => ({
-              value: String(item._id || ""),
-              label: String(
-                item[f.populationSettings!.inputSelectionField] ||
-                  item._id ||
-                  "",
-              ),
-              sourceItem: item,
-            })),
-          };
-        }
-
-        // Check if field has enumList
-        if (f.enumList && f.enumList.length > 0) {
-          const originalType = f.type || "";
-
-          // Check if it's an array type
-          const isStringArray =
-            fieldType === Types.StringArray ||
-            originalType === "stringArray" ||
-            fieldType === "string[]" ||
-            fieldType === "array<string>";
-          const isIntArray =
-            fieldType === Types.IntArray ||
-            originalType === "intArray" ||
-            fieldType === "int[]" ||
-            fieldType === "array<int>";
-          const isNumberArray =
-            fieldType === Types.NumberArray ||
-            originalType === "numberArray" ||
-            fieldType === "number[]" ||
-            fieldType === "array<number>";
-
-          const isArrayType = isStringArray || isIntArray || isNumberArray;
-
-          return {
-            type: InputTypes.SELECT,
-            formKey: f.name,
-            label,
-            placeholder: label,
-            required: false,
-            isDisabled: !isBulkStepTwo,
-            isMultiple: isArrayType,
-            options: f.enumList.map((item) => ({
-              value: item,
-              label: String(item),
-            })),
-          };
-        }
-
-        return {
-          type: m.inputType,
-          formKey: f.name,
-          label,
-          placeholder: label,
-          required: false,
-          isDisabled: !isBulkStepTwo,
-        };
-      });
-
-    return [selectInput, ...valueInputs];
-  }, [
-    t,
-    bulkFieldOptions,
-    isBulkStepTwo,
-    displayFields,
-    bulkSelectedKeys,
-    configuredBulkEditFields,
-    bulkEditActionConfig,
-    bulkActionSelectionDataMap,
-    selectionDataMap,
-  ]);
-
-  // Memoize handlers to prevent recreating selection actions
-  const handleBulkEditSubmit = useCallback(() => {
-    // Only submit when in step 2
-    if (!isBulkStepTwo) return;
-
-    const chosen = new Set(bulkSelectedKeys);
-    const updates: Partial<GenericItem> = {};
-
-    // Convert values to proper types before submission
-    for (const k of Object.keys(bulkForm)) {
-      if (chosen.has(k)) {
-        const formKey = bulkFormKeys.find((fk) => fk.key === k);
-        let value = bulkForm[k];
-
-        // Convert boolean values - ensure false default
-        if (formKey?.type === FormKeyTypeEnum.BOOLEAN) {
-          if (value === undefined || value === null || value === "") {
-            value = false;
-          } else if (typeof value === "string") {
-            value = value === "true";
-          } else if (typeof value !== "boolean") {
-            value = false;
-          }
-        }
-
-        // Convert number values from string to actual number
-        if (formKey?.type === FormKeyTypeEnum.NUMBER) {
-          if (typeof value === "string" && value !== "") {
-            const numValue = Number(value);
-            if (!isNaN(numValue)) {
-              value = numValue;
-            }
-          }
-        }
-
-        // Convert string array - split comma-separated values into array
-        if (formKey?.type === FormKeyTypeEnum.STRING_ARRAY) {
-          if (typeof value === "string" && value !== "") {
-            value = value
-              .split(",")
-              .map((item) => item.trim())
-              .filter((item) => item !== "");
-          } else if (!Array.isArray(value)) {
-            value = [];
-          }
-        }
-
-        // Convert int array - split comma-separated values and parse to integers
-        if (formKey?.type === FormKeyTypeEnum.INT_ARRAY) {
-          if (typeof value === "string" && value !== "") {
-            value = value
-              .split(",")
-              .map((item) => parseInt(item.trim(), 10))
-              .filter((item) => !isNaN(item));
-          } else if (Array.isArray(value)) {
-            value = value.map((item) =>
-              typeof item === "string" ? parseInt(item, 10) : item,
-            );
-          } else {
-            value = [];
-          }
-        }
-
-        // Convert number array - split comma-separated values and parse to numbers
-        if (formKey?.type === FormKeyTypeEnum.NUMBER_ARRAY) {
-          if (typeof value === "string" && value !== "") {
-            value = value
-              .split(",")
-              .map((item) => parseFloat(item.trim()))
-              .filter((item) => !isNaN(item));
-          } else if (Array.isArray(value)) {
-            value = value.map((item) =>
-              typeof item === "string" ? parseFloat(item) : item,
-            );
-          } else {
-            value = [];
-          }
-        }
-
-        updates[k] = value;
-      }
-    }
-
-    const bulkConstants = partitionActionConstantValues(
-      bulkEditActionConfig
-        ? parseActionConstantValues(bulkEditActionConfig)
-        : {},
-      bulkSelectedKeys,
-    );
-    const submittedUpdates = applyHiddenActionValues(
-      updates,
-      bulkConstants.hiddenValues,
-    );
-    const items = (selectedRows as GenericItem[]).map((r) => ({
-      _id: r._id,
-      updates: submittedUpdates,
-    }));
-    if (bulkEditActionConfig?.submit?.workflowName) {
-      executeWorkflow({
-        workflowName: bulkEditActionConfig.submit.workflowName,
-        workflowSchema: bulkEditActionConfig.submit.workflowSchema || schemaName,
-        record: {
-          selectedIds: (selectedRows as GenericItem[]).map((r) => r._id),
-          updates: submittedUpdates,
-          items,
-          functionName: bulkEditActionConfig.submit.functionName,
-        },
-      });
-    } else {
-      updateMultipleDynamicItem(items);
-    }
-    setSelectedRows([]);
-    setIsSelectionActive(false);
-    setIsBulkStepTwo(false);
-    setBulkSelectedKeys([]);
-    setBulkForm({});
-    setIsBulkEditOpen(false);
-  }, [
-    isBulkStepTwo,
-    bulkForm,
-    bulkSelectedKeys,
-    bulkFormKeys,
-    bulkEditActionConfig,
-    selectedRows,
-    schemaName,
+    createDynamicItem,
+    updateDynamicItem,
+    deleteDynamicItem,
     executeWorkflow,
-    updateMultipleDynamicItem,
-    setSelectedRows,
-    setIsSelectionActive,
-  ]);
+  });
 
-  const handleBulkEditClose = useCallback(() => {
-    setIsBulkEditOpen(false);
-    setIsBulkStepTwo(false);
-    setBulkSelectedKeys([]);
-    setBulkForm({});
-  }, []);
-
-  const handleBulkFormChange = useCallback((f: Record<string, unknown>) => {
-    setBulkForm((prev) => ({ ...prev, ...f }));
-  }, []);
-
-  const handleBulkEditBackOrForward = useCallback(() => {
-    if (isBulkStepTwo) {
-      // We're in step 2, go back to step 1
-      setIsBulkStepTwo(false);
-    } else {
-      // We're in step 1, move forward to step 2
-      const selectedKeys = Array.isArray(bulkForm.bulkSelectedKeys)
-        ? (bulkForm.bulkSelectedKeys as string[])
-        : [];
-      if (selectedKeys.length > 0) {
-        setBulkSelectedKeys(selectedKeys);
-
-        // Initialize boolean fields to false for the selected fields
-        const initialBulkValues: Record<string, unknown> = {};
-        if (configuredBulkEditFields.length) {
-          const action = {
-            ...(bulkEditActionConfig || { kind: "update" }),
-            formFields: configuredBulkEditFields.filter((field) =>
-              selectedKeys.includes(field.formKey),
-            ),
-          } as TableActionConfig;
-          buildActionFormKeys(action, []).forEach((fieldKey) => {
-            if (fieldKey.type === FormKeyTypeEnum.BOOLEAN) {
-              initialBulkValues[fieldKey.key] = false;
-            }
-          });
-        } else {
-          displayFields
-            .filter((f) => selectedKeys.includes(f.name))
-            .forEach((f) => {
-              const m = fieldToInput(f);
-              if (m.formKeyType === FormKeyTypeEnum.BOOLEAN) {
-                initialBulkValues[f.name] = false;
-              }
-            });
-        }
-
-        const bulkConstants = partitionActionConstantValues(
-          bulkEditActionConfig
-            ? parseActionConstantValues(bulkEditActionConfig)
-            : {},
-          selectedKeys,
-        );
-        setBulkForm((prev) => ({
-          ...prev,
-          ...initialBulkValues,
-          ...bulkConstants.visibleDefaults,
-        }));
-        setIsBulkStepTwo(true);
-      }
-    }
-  }, [
-    isBulkStepTwo,
-    bulkForm,
-    bulkEditActionConfig,
-    configuredBulkEditFields,
-    displayFields,
-  ]);
-
-  const handleBulkDeleteConfirm = useCallback(() => {
-    const items = selectedRows.map((r) => ({ _id: (r as GenericItem)._id }));
-    if (bulkDeleteActionConfig?.submit?.workflowName) {
-      executeWorkflow({
-        workflowName: bulkDeleteActionConfig.submit.workflowName,
-        workflowSchema:
-          bulkDeleteActionConfig.submit.workflowSchema || schemaName,
-        record: {
-          selectedIds: items.map((item) => item._id),
-          items,
-          functionName: bulkDeleteActionConfig.submit.functionName,
-        },
-      });
-    } else {
-      deleteMultipleDynamicItem(items);
-    }
-    setSelectedRows([]);
-    setIsSelectionActive(false);
-    setIsBulkDeleteOpen(false);
-  }, [
-    selectedRows,
-    bulkDeleteActionConfig,
-    schemaName,
-    executeWorkflow,
-    deleteMultipleDynamicItem,
-    setSelectedRows,
-    setIsSelectionActive,
-  ]);
+  const { isBulkSelectionEnabled, selectionActions } =
+    useUnpaginatedBulkActions({
+      t,
+      schemaName,
+      tableConfig,
+      actionsEnabled,
+      displayFields,
+      selectionDataMap,
+      selectedRows,
+      setSelectedRows,
+      setIsSelectionActive,
+      executeWorkflow,
+      updateMultipleDynamicItem,
+      deleteMultipleDynamicItem,
+    });
 
   const filterPanelInputs = useMemo(() => {
-    const defaultInputs = displayFields
-      .filter((f) => {
-        const fieldType = (f.type || "").toLowerCase();
-        // Exclude id, image fields from filters
-        return (
-          !["_id", "id"].includes(f.name) &&
-          fieldType !== "image" &&
-          fieldType !== "img"
-        );
-      })
-      .map((f) => {
-        const m = fieldToInput(f);
-        const label = t(getFieldLabel(f));
-        const fieldType = (f.type || "").toLowerCase();
-
-        // Check if field has populationSettings (objectId/autoIncrementId/objectIdArray with selection data)
-        if (
-          (fieldType === Types.ObjectId ||
-            fieldType === Types.AutoIncrementId ||
-            fieldType === Types.ObjectIdArray) &&
-          f.populationSettings &&
-          f.objectSchemaName
-        ) {
-          const selectionData = selectionDataMap.get(f.name) || [];
-          const displayLabel = f.populationSettings.displayLabel || label;
-
-          return {
-            type: InputTypes.SELECT,
-            formKey: f.name,
-            label: t(displayLabel),
-            placeholder: t(displayLabel),
-            required: false,
-            isMultiple: fieldType === Types.ObjectIdArray, // Enable multi-select for objectIdArray
-            optionsSource: "schema" as const,
-            sourceSchemaName: f.objectSchemaName,
-            sourceValueField: "_id",
-            sourceLabelField: f.populationSettings.inputSelectionField,
-            options: selectionData.map((item) => ({
-              value: String(item._id || ""),
-              label: String(
-                item[f.populationSettings!.inputSelectionField] ||
-                  item._id ||
-                  "",
-              ),
-              sourceItem: item,
-            })),
-          };
-        }
-
-        // Convert boolean fields to SELECT input for filter panel
-        if (m.inputType === InputTypes.CHECKBOX) {
-          return {
-            type: InputTypes.SELECT,
-            formKey: f.name,
-            label,
-            placeholder: label,
-            required: false,
-            options: [
-              { value: "true", label: t("True") },
-              { value: "false", label: t("False") },
-            ],
-          };
-        }
-
-        return {
-          type: m.inputType,
-          formKey: f.name,
-          label,
-          placeholder: label,
-          required: false,
-        };
-      });
+    const defaultInputs = buildDefaultFilterPanelInputs({
+      displayFields,
+      selectionDataMap,
+      t,
+    });
     return buildConfiguredFilterInputs(
       configuredFilterInputs,
       defaultInputs,
@@ -2252,44 +337,25 @@ export default function GenericUnpaginatedPage({
   ]);
   const hasFilterPanelInputs = filterPanelInputs.length > 0;
 
-  const filters = useMemo(() => {
-    const displayToggleControls = configuredTableToggles.map((toggle) => ({
-        label: toggle.label || toggle.id,
-        isUpperSide: isTableToggleUpperSide(toggle),
-        node: (
-          <SwitchButton
-            checked={tableToggleState[toggle.id] ?? toggle.defaultValue}
-            onChange={() =>
-              setTableToggleState((current) => ({
-                ...current,
-                [toggle.id]: !(current[toggle.id] ?? toggle.defaultValue),
-              }))
-            }
-          />
-        ),
-      }));
-    return appendShowFiltersControl(
-      displayToggleControls,
-      hasFilterPanelInputs
-        ? {
-            label: t("Show Filters"),
-            isUpperSide: true,
-            node: (
-              <SwitchButton
-                checked={showFilters}
-                onChange={() => setShowFilters(!showFilters)}
-              />
-            ),
-          }
-        : undefined,
-    );
-  },
+  const filters = useMemo(
+    () =>
+      buildFilterControls({
+        configuredTableToggles,
+        tableToggleState,
+        setTableToggleState,
+        hasFilterPanelInputs,
+        showFilters,
+        setShowFilters,
+        t,
+      }),
     [
       t,
       showFilters,
       hasFilterPanelInputs,
       configuredTableToggles,
       tableToggleState,
+      setTableToggleState,
+      setShowFilters,
     ],
   );
 
@@ -2302,131 +368,49 @@ export default function GenericUnpaginatedPage({
       closeFilters: () => setShowFilters(false),
       isApplyButtonActive: true,
     }),
-    [showFilters, hasFilterPanelInputs, filterPanelInputs, filterFormElements],
-  );
-
-  const selectionActions = useMemo(
-    () => [
-      ...(bulkDeleteActionConfig && bulkDeleteActionConfig.enabled !== false
-        ? [
-            {
-              name: t(bulkDeleteActionConfig?.label || "Delete Selected"),
-        isButton: true,
-        buttonClassName:
-                bulkDeleteActionConfig?.buttonClassName ||
-                "px-2 bg-red-500 hover:text-red-500 hover:border-red-500 sm:px-3 py-1 h-fit w-fit  text-white  hover:bg-white  transition-transform  border  rounded-md cursor-pointer",
-        isModal: true,
-        className: "cursor-pointer",
-        isDisabled: !actionsEnabled || !selectedRows?.length,
-        modal:
-          selectedRows?.length > 0 ? (
-            <ConfirmationDialog
-              isOpen={isBulkDeleteOpen}
-              close={() => setIsBulkDeleteOpen(false)}
-              confirm={handleBulkDeleteConfirm}
-                    title={t(
-                      bulkDeleteActionConfig?.confirmTitle ||
-                        bulkDeleteActionConfig?.label ||
-                        "Delete Selected",
-                    )}
-                    text={t(
-                      bulkDeleteActionConfig?.confirmText ||
-                        "Are you sure you want to delete the selected items?",
-                    )}
-            />
-          ) : null,
-        isModalOpen: isBulkDeleteOpen,
-        setIsModal: setIsBulkDeleteOpen,
-        isPath: false,
-            },
-          ]
-        : []),
-      ...(bulkEditActionConfig && bulkEditActionConfig.enabled !== false
-        ? [
-            {
-              name: t(bulkEditActionConfig?.label || "Edit Selected"),
-        isButton: true,
-        buttonClassName:
-                bulkEditActionConfig?.buttonClassName ||
-                "px-2  bg-blue-500 hover:text-blue-500 hover:border-blue-500 sm:px-3 py-1 h-fit w-fit text-white hover:bg-white transition-transform border rounded-md cursor-pointer",
-        isModal: true,
-        className: "cursor-pointer",
-        modal: isBulkEditOpen ? (
-          <GenericAddEditPanel
-            isOpen={isBulkEditOpen}
-            close={handleBulkEditClose}
-            inputs={bulkEditInputs}
-            formKeys={bulkFormKeys}
-            setForm={handleBulkFormChange}
-            submitItem={() => {}}
-            isEditMode={false}
-            {...resolveTableActionFormLayout(bulkEditActionConfig, {
-              topClassName: "flex flex-col gap-2",
-              generalClassName: "overflow-visible",
-            })}
-                  buttonName={t(
-                    bulkEditActionConfig?.buttonName ||
-                      bulkEditActionConfig?.label ||
-                      "Edit",
-                  )}
-            isSubmitButtonActive={isBulkStepTwo}
-            submitFunction={handleBulkEditSubmit}
-            additionalButtons={[
-              {
-                label: isBulkStepTwo ? t("Back") : t("Forward"),
-                onClick: handleBulkEditBackOrForward,
-              },
-            ]}
-          />
-        ) : null,
-        isModalOpen: isBulkEditOpen,
-        setIsModal: setIsBulkEditOpen,
-        isPath: false,
-        isDisabled: !actionsEnabled || !selectedRows?.length,
-            },
-          ]
-        : []),
-    ],
     [
-      t,
-      actionsEnabled,
-      selectedRows,
-      bulkDeleteActionConfig,
-      isBulkDeleteOpen,
-      handleBulkDeleteConfirm,
-      bulkEditActionConfig,
-      isBulkEditOpen,
-      handleBulkEditClose,
-      handleBulkFormChange,
-      bulkEditInputs,
-      bulkFormKeys,
-      isBulkStepTwo,
-      handleBulkEditSubmit,
-      handleBulkEditBackOrForward,
+      showFilters,
+      hasFilterPanelInputs,
+      filterPanelInputs,
+      filterFormElements,
+      setFilterFormElements,
+      setShowFilters,
     ],
   );
 
-  const sourceRows = useMemo(() => applyTableArraySource(normalizeConfiguredTableRows(items || [], tableConfig), tableConfig), [items, tableConfig]);
+  const sourceRows = useMemo(
+    () =>
+      applyTableArraySource(
+        normalizeConfiguredTableRows(items || [], tableConfig),
+        tableConfig,
+      ),
+    [items, tableConfig],
+  );
   const rows = useMemo(() => {
-    const nestedRows = applyTableNestedRows(sourceRows, tableConfig, t, lookupSelectionDataMap);
-    return tableDragState.enabled ? sortRowsByOrderField(nestedRows, tableDragState.orderField) : nestedRows;
+    const nestedRows = applyTableNestedRows(
+      sourceRows,
+      tableConfig,
+      t,
+      lookupSelectionDataMap,
+    );
+    return tableDragState.enabled
+      ? sortRowsByOrderField(nestedRows, tableDragState.orderField)
+      : nestedRows;
   }, [sourceRows, tableConfig, t, lookupSelectionDataMap, tableDragState]);
 
-  const filtersById = useMemo(() => {
-    const normalized: Record<string, unknown> = {};
-    (configuredFilterInputs || []).forEach((filter) => {
-      if (filter.id && filter.formKey && Object.hasOwn(filterFormElements, filter.formKey)) {
-        normalized[filter.id] = filterFormElements[filter.formKey];
-      }
-    });
-    return normalized;
-  }, [configuredFilterInputs, filterFormElements]);
   const selectedIds = useMemo(
     () => resolveSelectedRowIds(selectedRows, isSelectionInitialized),
     [isSelectionInitialized, selectedRows],
   );
-  const hasRecordOutput = outputs?.some(output => output.source.kind === "tableSelectedRecord") === true;
-  const { selectedRecord, activeRecordId, activateRecord, reportVisibleRowIds } = useTableRecordSelection(sourceRows, hasRecordOutput);
+  const hasRecordOutput =
+    outputs?.some((output) => output.source.kind === "tableSelectedRecord") ===
+    true;
+  const {
+    selectedRecord,
+    activeRecordId,
+    activateRecord,
+    reportVisibleRowIds,
+  } = useTableRecordSelection(sourceRows, hasRecordOutput);
   const tableOutputState = useMemo<TableOutputState>(
     () => ({
       filters: filtersById,
@@ -2436,6 +420,7 @@ export default function GenericUnpaginatedPage({
     }),
     [filterFormElements.search, filtersById, selectedIds, selectedRecord],
   );
+
   const handleRowDrag = useCallback(
     (draggedRow: GenericItem, targetRow: GenericItem) => {
       const result = reorderCurrentPageRows(
@@ -2448,33 +433,37 @@ export default function GenericUnpaginatedPage({
       if (result.updates.length) {
         const firstTarget = getArraySourceMutationTarget(result.rows[0]);
         if (firstTarget) {
-          void reorderDynamicArrayRows({ schemaName, parentId: firstTarget.parentId, arrayField: firstTarget.arrayField, rowIdentityField: firstTarget.rowIdentityField, orderField: tableDragState.orderField, rowIdentities: result.rows.map((row) => getArraySourceMutationTarget(row)?.rowIdentity) });
+          void reorderDynamicArrayRows({
+            ...requestConfig,
+            schemaName,
+            parentId: firstTarget.parentId,
+            arrayField: firstTarget.arrayField,
+            rowIdentityField: firstTarget.rowIdentityField,
+            orderField: tableDragState.orderField,
+            rowIdentities: result.rows.map(
+              (row) => getArraySourceMutationTarget(row)?.rowIdentity,
+            ),
+          });
           return;
         }
         updateMultipleDynamicItem(result.updates);
       }
     },
-    [rows, tableDragState.orderField, updateMultipleDynamicItem, schemaName],
+    [
+      requestConfig,
+      rows,
+      tableDragState.orderField,
+      updateMultipleDynamicItem,
+      schemaName,
+    ],
   );
-  const { exportDynamicItems } = useExportDynamicItems();
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const handleExport = useCallback(
-    (
-      selectedFields: string[],
-      includeSearch: boolean,
-      includeFilters: boolean,
-    ) => {
-      exportDynamicItems({
-        schemaName,
-        fields: selectedFields,
-        filters: includeFilters ? requestFilters : {},
-        search: includeSearch ? String(filterFormElements.search || "") : "",
-        limit: 0,
-        page: 1,
-      });
-    },
-    [exportDynamicItems, filterFormElements.search, requestFilters, schemaName],
-  );
+
+  const { isExportModalOpen, setIsExportModalOpen, handleExport } =
+    useUnpaginatedExport({
+      schemaName,
+      requestFilters,
+      searchValue: filterFormElements.search,
+    });
 
   return (
     <>
@@ -2503,7 +492,9 @@ export default function GenericUnpaginatedPage({
           isSearch={isTableSearchEnabled(tableConfig)}
           selectionActions={selectionActions}
           isSelectionEnabled={isBulkSelectionEnabled}
-          onVisibleRowIdsChange={hasRecordOutput ? reportVisibleRowIds : undefined}
+          onVisibleRowIdsChange={
+            hasRecordOutput ? reportVisibleRowIds : undefined
+          }
           activeRecordId={hasRecordOutput ? activeRecordId : undefined}
           onRecordActivate={hasRecordOutput ? activateRecord : undefined}
           isExcel={!hasImageField}
@@ -2533,5 +524,13 @@ export default function GenericUnpaginatedPage({
         />
       </div>
     </>
+  );
+}
+
+export default function GenericUnpaginatedPage(props: Props) {
+  return (
+    <TableStateScope>
+      <GenericUnpaginatedPageContent {...props} />
+    </TableStateScope>
   );
 }

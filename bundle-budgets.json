@@ -1,0 +1,50 @@
+{
+  "routes": [
+    {
+      "name": "entry",
+      "entries": [
+        "index.html"
+      ],
+      "maxRawBytes": 581000,
+      "maxGzipBytes": 194000
+    },
+    {
+      "name": "login",
+      "entries": [
+        "index.html",
+        "src/pages/Login.tsx"
+      ],
+      "maxRawBytes": 598000,
+      "maxGzipBytes": 200000
+    },
+    {
+      "name": "tables",
+      "entries": [
+        "index.html",
+        "DynamicPageRenderer"
+      ],
+      "maxRawBytes": 1847000,
+      "maxGzipBytes": 533000
+    },
+    {
+      "name": "visual",
+      "entries": [
+        "index.html",
+        "DynamicPageRenderer",
+        "VisualBlock"
+      ],
+      "maxRawBytes": 2551000,
+      "maxGzipBytes": 712000
+    },
+    {
+      "name": "spreadsheet-export",
+      "entries": [
+        "index.html",
+        "DynamicPageRenderer",
+        "node_modules/xlsx/xlsx.mjs"
+      ],
+      "maxRawBytes": 2404000,
+      "maxGzipBytes": 713000
+    }
+  ]
+}

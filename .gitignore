@@ -30,3 +30,10 @@ yarn-error.log*
 
 # Browser automation scratch snapshots
 /.playwright-cli/
+
+# Generated compiler and browser test output
+/tsconfig.vitest-temp.json
+*.tsbuildinfo
+/.e2e-dist/
+/test-results/
+/playwright-report/

@@ -18,9 +18,12 @@ export function SlotMediaGrid({
   const viewport = useSyncExternalStore(subscribeViewport, viewportBreakpoint, () => "mobile" as Breakpoint);
   const activeBreakpoint = breakpoint ?? viewport;
   const layout = useMemo(() => resolveSlotLayout(node.mediaLayout, activeBreakpoint), [node.mediaLayout, activeBreakpoint]);
-  const images = node.children.filter((child): child is ImageNode => child.type === "image");
-  const imageIds = images.map((image) => image.id);
-  const slotIds = layout.slots.map((slot) => slot.id);
+  const images = useMemo(
+    () => node.children.filter((child): child is ImageNode => child.type === "image"),
+    [node.children],
+  );
+  const imageIds = useMemo(() => images.map((image) => image.id), [images]);
+  const slotIds = useMemo(() => layout.slots.map((slot) => slot.id), [layout]);
   const shuffle = node.animation?.shuffle;
   const reducedMotion = useReducedMotion();
   const random = useRef(shuffle?.seed === undefined ? Math.random : createSeededRandom(shuffle.seed));
@@ -28,7 +31,7 @@ export function SlotMediaGrid({
 
   useEffect(() => {
     setAssignment(initialSlotAssignment(imageIds, slotIds));
-  }, [imageIds.join("|"), slotIds.join("|")]);
+  }, [imageIds, slotIds]);
 
   useEffect(() => {
     if (!shuffle?.enabled || imageIds.length < 2) return;
@@ -37,7 +40,7 @@ export function SlotMediaGrid({
       setAssignment((current) => nextSlotAssignment(imageIds, slotIds, current, random.current));
     }, shuffle.intervalMs);
     return () => window.clearInterval(timer);
-  }, [shuffle?.enabled, shuffle?.intervalMs, shuffle?.seed, imageIds.join("|"), slotIds.join("|")]);
+  }, [shuffle?.enabled, shuffle?.intervalMs, shuffle?.seed, imageIds, slotIds]);
 
   const byId = new Map(images.map((image) => [image.id, image]));
   return (

@@ -1,3 +1,4 @@
+import { getStoredValue, setStoredValue } from "../../utils/safeStorage";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -18,21 +19,21 @@ const RTL = new Set(["ar", "fa", "he", "ur"]);
 
 export function LanguageSelector() {
   const { i18n } = useTranslation();
-  const { tenant, project } = useTenantProject();
+  const { requestConfig, tenant, project } = useTenantProject();
   const storageKey = `project-locale:${tenant || ""}:${project || ""}`;
   const settings = useQuery({
     queryKey: ["localization-settings", tenant, project],
-    queryFn: getRuntimeLocaleSettings,
+    queryFn: ({ signal }) => getRuntimeLocaleSettings({ ...requestConfig, signal }),
     enabled: Boolean(tenant && project),
   });
   const enabled = settings.data?.enabledLocales || EMPTY_LOCALES;
   const initial = useMemo(() => settings.data
-    ? resolveProjectLocale(enabled, localStorage.getItem(storageKey), settings.data.defaultLocale, settings.data.sourceLocale)
+    ? resolveProjectLocale(enabled, getStoredValue(storageKey), settings.data.defaultLocale, settings.data.sourceLocale)
     : "", [settings.data, enabled, storageKey]);
   const [locale, setLocale] = useState("");
   const translations = useQuery({
     queryKey: ["runtime-translations", tenant, project, locale],
-    queryFn: () => getRuntimeTranslations(locale),
+    queryFn: ({ signal }) => getRuntimeTranslations(locale, { ...requestConfig, signal }),
     enabled: Boolean(tenant && project && locale),
   });
 
@@ -43,7 +44,7 @@ export function LanguageSelector() {
   useEffect(() => {
     if (!locale) return;
     void i18n.changeLanguage(locale);
-    localStorage.setItem(storageKey, locale);
+    setStoredValue(storageKey, locale);
     document.documentElement.lang = locale;
     document.documentElement.dir = RTL.has(locale.split("-")[0]) ? "rtl" : "ltr";
   }, [i18n, locale, storageKey]);
@@ -69,7 +70,7 @@ export function LanguageSelector() {
         onChange={(event) => {
           const next = event.target.value;
           setLocale(next);
-          void saveRuntimeLocalePreference(next).catch(() => undefined);
+          void saveRuntimeLocalePreference(next, { ...requestConfig }).catch(() => undefined);
         }}
       >
         {enabled.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>)}

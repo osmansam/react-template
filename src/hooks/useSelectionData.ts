@@ -33,14 +33,14 @@ export function useSelectionData(
       const schemaName = field.objectSchemaName || "";
       const fieldName = field.populationSettings?.inputSelectionField || "";
       const hasParams = Boolean(schemaName && fieldName);
-      const { path, queryKey } = getSelectionQueryConfig({
+      const { path, queryKey, config } = getSelectionQueryConfig({
         schemaName,
         fieldName,
       });
       
       return {
         queryKey,
-        queryFn: () => get<Array<Record<string, unknown>>>({ path }),
+        queryFn: () => get<Array<Record<string, unknown>>>({ path, config }),
         enabled: hasParams,
         ...selectionQueryOptions,
       };

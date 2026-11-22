@@ -38,7 +38,7 @@ export const useFormSelectionData = (
           ...referencedSelectRecordFields(allFields, field.formKey),
         ]),
       ).filter((name) => name !== fieldName && name !== (field.sourceValueField || "_id"));
-      const { path, queryKey } = getSelectionQueryConfig({
+      const { path, queryKey, config } = getSelectionQueryConfig({
         schemaName: field.sourceSchemaName || "",
         fieldName,
         valueField: field.sourceValueField || "_id",
@@ -52,7 +52,7 @@ export const useFormSelectionData = (
           queryKey,
           queryFn: () =>
             get<SelectionResponse>({
-              path,
+              path, config,
             }),
           enabled: Boolean(field.sourceSchemaName && fieldName),
           staleTime: Infinity,

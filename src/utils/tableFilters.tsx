@@ -61,7 +61,7 @@ export const useFilterPanelSelectionData = (
           ...referencedSelectRecordFields(inputs, field.formKey),
         ]),
       ).filter((name) => name !== fieldName && name !== valueField);
-      const { path, queryKey } = getSelectionQueryConfig({
+      const { path, queryKey, config } = getSelectionQueryConfig({
         schemaName: field.sourceSchemaName || "",
         fieldName,
         valueField,
@@ -75,7 +75,7 @@ export const useFilterPanelSelectionData = (
           queryKey,
           queryFn: () =>
             get<Array<Record<string, unknown>>>({
-              path,
+              path, config,
             }),
           enabled: Boolean(field.sourceSchemaName && fieldName),
           staleTime: Infinity,

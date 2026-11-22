@@ -421,7 +421,7 @@ function buildContainerPath(
 
 // Hook to get current tenant and project context
 function useContainerContext() {
-  const { tenant: tenantSlug, project: projectSlug } = useTenantProject();
+  const { tenant: tenantSlug, project: projectSlug, requestConfig } = useTenantProject();
 
   if (!tenantSlug || !projectSlug) {
     throw new Error(
@@ -429,14 +429,14 @@ function useContainerContext() {
     );
   }
 
-  return { tenantSlug, projectSlug };
+  return { tenantSlug, projectSlug, requestConfig };
 }
 
 // React Query hooks
 export function useContainers(enabled: boolean = true) {
   const { tenantSlug, projectSlug } = useContainerContext();
   const basePath = buildContainerPath(tenantSlug, projectSlug);
-  const projectSpecificQueryKey = ["containers", tenantSlug, projectSlug];
+  const projectSpecificQueryKey = ["containers"];
 
   const response = useGet<ContainerModel[]>(
     basePath,
@@ -450,7 +450,7 @@ export function useContainers(enabled: boolean = true) {
 export function useContainer(id: string, enabled: boolean = true) {
   const { tenantSlug, projectSlug } = useContainerContext();
   const path = buildContainerPath(tenantSlug, projectSlug, `/${id}`);
-  const projectSpecificQueryKey = ["container", tenantSlug, projectSlug, id];
+  const projectSpecificQueryKey = ["container", id];
 
   const response = useGet<unknown>(path, projectSpecificQueryKey, enabled && !!id);
   return normalizeContainerResponse(response);
@@ -459,7 +459,7 @@ export function useContainer(id: string, enabled: boolean = true) {
 export function useContainerTypes(enabled: boolean = true) {
   const { tenantSlug, projectSlug } = useContainerContext();
   const path = buildContainerPath(tenantSlug, projectSlug, "/types");
-  const projectSpecificQueryKey = ["containerTypes", tenantSlug, projectSlug];
+  const projectSpecificQueryKey = ["containerTypes"];
 
   return useGet<ContainerTypes[]>(path, projectSpecificQueryKey, enabled);
 }
@@ -467,9 +467,10 @@ export function useContainerTypes(enabled: boolean = true) {
 export function useCreateContainer() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { tenant: tenantSlug, project: projectSlug } = useTenantProject();
+  const { tenant: tenantSlug, project: projectSlug, requestConfig } = useTenantProject();
 
   const createMutation = useMutation({
+    mutationKey: ["container", tenantSlug, projectSlug, requestConfig.runtimeSession, "create"],
     mutationFn: async (
       payload: CreateContainerPayload | CreateContainerRawPayload
     ) => {
@@ -481,13 +482,10 @@ export function useCreateContainer() {
       }
 
       const path = buildContainerPath(tenantSlug, projectSlug);
-      console.log("Creating container with payload:", payload);
-      const response = await axiosClient.post(path, payload);
-      console.log("Create container response:", response.data);
+      const response = await axiosClient.post(path, payload, requestConfig);
       return response.data;
     },
     onSuccess: (response) => {
-      console.log("Container creation successful:", response);
       if (tenantSlug && projectSlug) {
         queryClient.invalidateQueries({
           queryKey: ["containers", tenantSlug, projectSlug],
@@ -520,9 +518,10 @@ export function useCreateContainer() {
 export function useUpdateContainer() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { tenantSlug, projectSlug } = useContainerContext();
+  const { tenantSlug, projectSlug, requestConfig } = useContainerContext();
 
   const updateMutation = useMutation({
+    mutationKey: ["container", tenantSlug, projectSlug, requestConfig.runtimeSession, "update"],
     mutationFn: async ({
       id,
       payload,
@@ -531,7 +530,7 @@ export function useUpdateContainer() {
       payload: UpdateContainerPayload;
     }) => {
       const path = buildContainerPath(tenantSlug, projectSlug, `/${id}`);
-      const response = await axiosClient.patch(path, payload);
+      const response = await axiosClient.patch(path, payload, requestConfig);
       return response.data;
     },
     onSuccess: (response, variables) => {
@@ -569,12 +568,13 @@ export function useUpdateContainer() {
 export function useDeleteContainer() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { tenantSlug, projectSlug } = useContainerContext();
+  const { tenantSlug, projectSlug, requestConfig } = useContainerContext();
 
   const deleteMutation = useMutation({
+    mutationKey: ["container", tenantSlug, projectSlug, requestConfig.runtimeSession, "delete"],
     mutationFn: async (id: string) => {
       const path = buildContainerPath(tenantSlug, projectSlug, `/${id}`);
-      const response = await axiosClient.delete(path);
+      const response = await axiosClient.delete(path, requestConfig);
       return response.data;
     },
     onSuccess: (response) => {
@@ -607,9 +607,10 @@ export function useDeleteContainer() {
 export function useUpdateDynamicFunctions() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { tenantSlug, projectSlug } = useContainerContext();
+  const { tenantSlug, projectSlug, requestConfig } = useContainerContext();
 
   const updateMutation = useMutation({
+    mutationKey: ["container", tenantSlug, projectSlug, requestConfig.runtimeSession, "update"],
     mutationFn: async ({
       id,
       payload,
@@ -622,7 +623,7 @@ export function useUpdateDynamicFunctions() {
         projectSlug,
         `/dynamicFunctions/${id}`
       );
-      const response = await axiosClient.patch(path, payload);
+      const response = await axiosClient.patch(path, payload, requestConfig);
       return response.data;
     },
     onSuccess: (response, variables) => {
@@ -659,9 +660,10 @@ export function useUpdateDynamicFunctions() {
 export function useUpdatePipelines() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { tenantSlug, projectSlug } = useContainerContext();
+  const { tenantSlug, projectSlug, requestConfig } = useContainerContext();
 
   const updateMutation = useMutation({
+    mutationKey: ["container", tenantSlug, projectSlug, requestConfig.runtimeSession, "update"],
     mutationFn: async ({
       id,
       payload,
@@ -674,7 +676,7 @@ export function useUpdatePipelines() {
         projectSlug,
         `/pipelines/${id}`
       );
-      const response = await axiosClient.patch(path, payload);
+      const response = await axiosClient.patch(path, payload, requestConfig);
       return response.data;
     },
     onSuccess: (response, variables) => {
@@ -709,12 +711,13 @@ export function useUpdatePipelines() {
 // Redis operations
 export function useResetRedis() {
   const { t } = useTranslation();
-  const { tenantSlug, projectSlug } = useContainerContext();
+  const { tenantSlug, projectSlug, requestConfig } = useContainerContext();
 
   const resetMutation = useMutation({
+    mutationKey: ["container", tenantSlug, projectSlug, requestConfig.runtimeSession, "reset"],
     mutationFn: async () => {
       const path = buildContainerPath(tenantSlug, projectSlug, "/reset-redis");
-      const response = await axiosClient.post(path, {});
+      const response = await axiosClient.post(path, {}, requestConfig);
       return response.data;
     },
     onSuccess: (response) => {
@@ -743,7 +746,7 @@ export function useGetContainers(enabled: boolean = true) {
   const hasContext = Boolean(tenantSlug && projectSlug);
   const response = useGet<unknown>(
     "/runtime/schemas",
-    ["containers", tenantSlug, projectSlug, "runtime"],
+    ["containers", "runtime"],
     enabled && hasContext,
   );
   return hasContext ? normalizeContainersResponse(response) : [];
@@ -832,9 +835,10 @@ export interface UploadExcelResponse {
 export function useUploadExcel() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { tenant: tenantSlug, project: projectSlug } = useTenantProject();
+  const { tenant: tenantSlug, project: projectSlug, requestConfig } = useTenantProject();
 
   const uploadMutation = useMutation({
+    mutationKey: ["container", tenantSlug, projectSlug, requestConfig.runtimeSession, "upload"],
     mutationFn: async (payload: UploadExcelPayload) => {
       if (!tenantSlug || !projectSlug) {
         throw new Error("Tenant and project context required");
@@ -853,6 +857,7 @@ export function useUploadExcel() {
         path,
         formData,
         {
+          ...requestConfig,
           headers: {
             "Content-Type": "multipart/form-data",
           },

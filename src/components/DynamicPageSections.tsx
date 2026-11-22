@@ -1,3 +1,4 @@
+import { RuntimeErrorBoundary } from "../common/RuntimeErrorBoundary";
 import { PageRequestConsumerProvider, useConnectedDataBinding, usePageRequestConsumer } from "../pageRuntime/requests/ConsumerProvider";
 import React, { lazy, Suspense, useMemo, useState } from "react";
 import {
@@ -572,7 +573,7 @@ const RenderComponentBody: React.FC<{
   );
 });
 
-const RenderComponent: React.FC<{ component: ComponentBlock; routeParams: RouteParams }> = props => <PageRequestConsumerProvider component={props.component}><RenderComponentBody {...props} /></PageRequestConsumerProvider>;
+const RenderComponent: React.FC<{ component: ComponentBlock; routeParams: RouteParams }> = props => <RuntimeErrorBoundary resetKey={props.component.id}><PageRequestConsumerProvider component={props.component}><RenderComponentBody {...props} /></PageRequestConsumerProvider></RuntimeErrorBoundary>;
 
 const GridCellView: React.FC<{
   cell: GridCell;

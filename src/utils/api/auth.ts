@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { currentProjectScope, projectPath, projectQueryKey } from "../projectScope";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -10,7 +11,7 @@ import { User } from "../../types";
 import { get, post } from "./index";
 import { redirectAfterAuth } from "./authRedirect";
 import { notifyApiError } from "./errorMessage";
-import { removeProjectSessionItem, setProjectSessionItem } from "../projectSessionStorage";
+import { clearProjectSession, ownsProjectRequest, type ProjectRequestOwner, removeProjectSessionItem, setProjectSessionItem } from "../projectSessionStorage";
 
 interface LoginError {
   response: {
@@ -43,14 +44,11 @@ export function getLoginConfigFieldLabel(field: LoginConfigField) {
   return field.displayName || field.name;
 }
 
-async function getLoginConfigMethod() {
-  return get<LoginConfig>({ path: "/auth/login-config" });
-}
-
 export function useLoginConfig() {
+  const { scope, requestConfig } = useTenantProject();
   return useQuery({
-    queryKey: ["auth", "login-config"],
-    queryFn: getLoginConfigMethod,
+    queryKey: projectQueryKey(scope, ["auth", "login-config"]),
+    queryFn: ({ signal }) => get<LoginConfig>({ path: "/auth/login-config", config: { ...requestConfig, signal } }),
     ...baseQueryOptions,
   });
 }
@@ -63,8 +61,9 @@ export interface LoginResponse {
   };
 }
 
-async function loginMethod(payload: LoginCredentials) {
+async function loginMethod(payload: LoginCredentials, config: ProjectRequestOwner) {
   return post<LoginCredentials, LoginResponse>({
+    config,
     path: "/auth/login",
     payload,
   });
@@ -77,26 +76,25 @@ export function useLogin(
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { setUser } = useUserContext();
-  const queryClient = useQueryClient();
-  const { buildPath } = useTenantProject();
+  const { buildPath, scope, requestConfig } = useTenantProject();
 
-  const { mutate: login } = useMutation<
+  const { mutate: login, isPending } = useMutation<
     LoginResponse,
     LoginError,
     LoginCredentials
   >({
-    mutationFn: loginMethod,
-    // We are updating tables query data with new item
+    mutationKey: projectQueryKey(scope, ["login", requestConfig.runtimeSession]),
+    mutationFn: payload => loginMethod(payload, requestConfig),
     onSuccess: async (response: LoginResponse) => {
+      if (!ownsProjectRequest(requestConfig)) return;
       const { user } = response.data;
-      setProjectSessionItem("loggedIn", "true");
+      setProjectSessionItem("loggedIn", "true", buildPath("/"));
 
       if (user) {
-        setProjectSessionItem("user", JSON.stringify(user));
         setUser(user);
       }
 
-      queryClient.clear();
+      if (projectPath(currentProjectScope(), "/") !== buildPath("/")) return;
 
       toast.success(t("Logged in successfully"));
 
@@ -111,17 +109,19 @@ export function useLogin(
     },
 
     onError: (error) => {
+      if (!ownsProjectRequest(requestConfig)) return;
       notifyApiError(error, t, toast.error, "Login failed");
       onError?.(error);
     },
   });
-  return { login };
+  return { login, isPending };
 }
 
 async function registerMethod(
-  payload: LoginCredentials & { schemaName: string },
+  payload: LoginCredentials & { schemaName: string }, config: ProjectRequestOwner,
 ) {
   return post<LoginCredentials, LoginResponse>({
+    config,
     path: `/auth/register?schemaName=${payload.schemaName}`,
     payload,
   });
@@ -134,25 +134,25 @@ export function useRegister(
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { setUser } = useUserContext();
-  const queryClient = useQueryClient();
-  const { buildPath } = useTenantProject();
+  const { buildPath, scope, requestConfig } = useTenantProject();
 
-  const { mutate: register } = useMutation<
+  const { mutate: register, isPending } = useMutation<
     LoginResponse,
     LoginError,
     LoginCredentials & { schemaName: string }
   >({
-    mutationFn: registerMethod,
+    mutationKey: projectQueryKey(scope, ["register", requestConfig.runtimeSession]),
+    mutationFn: payload => registerMethod(payload, requestConfig),
     onSuccess: async (response: LoginResponse) => {
+      if (!ownsProjectRequest(requestConfig)) return;
       const { user } = response.data;
-      setProjectSessionItem("loggedIn", "true");
+      setProjectSessionItem("loggedIn", "true", buildPath("/"));
 
       if (user) {
-        setProjectSessionItem("user", JSON.stringify(user));
         setUser(user);
       }
 
-      queryClient.clear();
+      if (projectPath(currentProjectScope(), "/") !== buildPath("/")) return;
 
       toast.success(t("Registered successfully"));
 
@@ -165,15 +165,17 @@ export function useRegister(
     },
 
     onError: (error) => {
+      if (!ownsProjectRequest(requestConfig)) return;
       notifyApiError(error, t, toast.error, "Registration failed");
       onError?.(error);
     },
   });
-  return { register };
+  return { register, isPending };
 }
 
-async function logoutMethod() {
+async function logoutMethod(config: ProjectRequestOwner) {
   return post<undefined, { success: boolean }>({
+    config,
     path: "/auth/logout",
     payload: undefined,
   });
@@ -181,31 +183,26 @@ async function logoutMethod() {
 
 export function useLogout(onError?: (error: unknown) => void) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { setUser } = useUserContext();
+  const { buildPath, scope, requestConfig } = useTenantProject();
+  const { t } = useTranslation();
   const { mutateAsync: logout } = useMutation({
-    mutationFn: logoutMethod,
+    mutationKey: projectQueryKey(scope, ["logout", requestConfig.runtimeSession]),
+    mutationFn: () => logoutMethod(requestConfig),
     onSuccess: () => {
-      // Extract tenant/project from current URL before clearing
-      const pathParts = window.location.pathname.split("/");
-      const tIndex = pathParts.indexOf("t");
-      const pIndex = pathParts.indexOf("p");
-      const tenant = tIndex !== -1 ? pathParts[tIndex + 1] : "";
-      const project = pIndex !== -1 ? pathParts[pIndex + 1] : "";
-
-      setProjectSessionItem("loggedOut", "true");
-      removeProjectSessionItem("loggedIn");
-      removeProjectSessionItem("user");
-      setTimeout(() => removeProjectSessionItem("loggedOut"), 500);
+      if (!ownsProjectRequest(requestConfig)) return;
+      const pathname = buildPath("/");
+      clearProjectSession(pathname);
+      setProjectSessionItem("loggedOut", "true", pathname);
+      setTimeout(() => removeProjectSessionItem("loggedOut", pathname), 500);
       setUser(undefined);
-      queryClient.clear();
-
-      // Redirect to login with tenant/project context preserved
-      const loginPath =
-        tenant && project ? `/t/${tenant}/p/${project}/login` : "/login";
-      navigate(loginPath);
+      if (projectPath(currentProjectScope(), "/") === pathname) navigate(buildPath("/login"));
     },
-    onError,
+    onError: error => {
+      if (!ownsProjectRequest(requestConfig)) return;
+      notifyApiError(error, t, toast.error, "Logout failed");
+      onError?.(error);
+    },
   });
 
   return { logout };

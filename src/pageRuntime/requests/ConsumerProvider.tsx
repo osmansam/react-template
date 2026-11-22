@@ -29,7 +29,7 @@ const emptySnapshot: RuntimeSnapshot = { pageFilters: {}, pageVariables: {}, com
 const noSubscribe = () => () => {};
 export const usePageRequestConsumer = () => useContext(Context);
 export function useVerifiedPageRequestScope() {
-  const { tenant, project } = useTenantProject();
+  const { tenant, project, requestConfig } = useTenantProject();
   const { user } = useUserContext();
   const runtime = useOptionalPageRuntime();
   const userId = user?._id;
@@ -39,7 +39,7 @@ export function useVerifiedPageRequestScope() {
     queryKey: ["visual-session", tenant, project, userId || "", signedIn], networkMode: "always",
     queryFn: async ({ signal }) => {
       try {
-        const response = await axiosClient.get<{ authenticated: boolean; user?: { _id?: string; id?: string } }>("/auth/session", { signal, timeout: 15000, runtimeScope: { tenant: tenant!, project: project! } });
+        const response = await axiosClient.get<{ authenticated: boolean; user?: { _id?: string; id?: string } }>("/auth/session", { signal, timeout: 15000, ...requestConfig });
         const id = response.data.user?._id || response.data.user?.id;
         if (typeof response.data.authenticated !== "boolean" || response.data.authenticated && typeof id !== "string") throw new Error("The session identity could not be verified.");
         return response.data;

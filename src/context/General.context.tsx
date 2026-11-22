@@ -1,3 +1,4 @@
+import { getStoredValue, setStoredValue, readStoredJson } from "../utils/safeStorage";
 import { PropsWithChildren, createContext, useContext, useState } from "react";
 import { TabOption } from "../components/panelComponents/FormElements/TabInputScreen";
 import { ColumnType } from "../components/panelComponents/shared/types";
@@ -152,22 +153,21 @@ export const GeneralContextProvider = ({ children }: PropsWithChildren) => {
   );
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpenState] = useState<boolean>(() => {
-    const saved = localStorage.getItem("sidebar-open");
-    return saved ? JSON.parse(saved) : true;
+    return readStoredJson("sidebar-open", true, (value): value is boolean => typeof value === "boolean");
   });
   const setIsSidebarOpen = (open: boolean) => {
-    localStorage.setItem("sidebar-open", JSON.stringify(open));
+    setStoredValue("sidebar-open", JSON.stringify(open));
     setIsSidebarOpenState(open);
   };
   const [isHoverExpanded, setIsHoverExpanded] = useState<boolean>(false);
   const [tabOrientation, setTabOrientationState] = useState<TabOrientation>(
     () => {
-      const saved = localStorage.getItem("tab-orientation");
-      return (saved as TabOrientation) || "horizontal";
+      const saved = getStoredValue("tab-orientation");
+      return saved === "vertical" ? "vertical" : "horizontal";
     },
   );
   const setTabOrientation = (orientation: TabOrientation) => {
-    localStorage.setItem("tab-orientation", orientation);
+    setStoredValue("tab-orientation", orientation);
     setTabOrientationState(orientation);
   };
 

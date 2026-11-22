@@ -22,6 +22,8 @@ const SilkPlane = forwardRef<Mesh, { uniforms: SilkUniforms; reducedMotion: bool
 
 export default function Silk({ speed = 5, scale = 1, color = "#7B7481", noiseIntensity = 1.5, rotation = 0, reducedMotion = false }: SilkProps) {
   const meshRef = useRef<Mesh>(null);
+  // Uniform objects stay stable; the effect below copies prop changes into them.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const uniforms = useMemo<SilkUniforms>(() => ({ uSpeed: { value: speed }, uScale: { value: scale }, uNoiseIntensity: { value: noiseIntensity }, uColor: { value: new Color(...normalized(color)) }, uRotation: { value: rotation }, uTime: { value: 0 } }), []);
   useEffect(() => { uniforms.uSpeed.value = speed; uniforms.uScale.value = scale; uniforms.uNoiseIntensity.value = noiseIntensity; uniforms.uColor.value.setRGB(...normalized(color)); uniforms.uRotation.value = rotation; }, [speed, scale, noiseIntensity, color, rotation, uniforms]);
   return <div className="absolute inset-0 overflow-hidden" data-reactbits-background="silk"><Canvas dpr={[1, 2]} frameloop={reducedMotion ? "demand" : "always"}><SilkPlane ref={meshRef} uniforms={uniforms} reducedMotion={reducedMotion} /></Canvas></div>;

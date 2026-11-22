@@ -1,9 +1,10 @@
 import { QueryKey } from "@tanstack/react-query";
-import { AxiosHeaders } from "axios";
+import { AxiosHeaders, type AxiosRequestConfig } from "axios";
 import { axiosClient } from "./axiosClient";
 
 interface BaseRequest {
   path: string;
+  config?: AxiosRequestConfig;
 }
 
 interface RequestWithPayload<P> extends BaseRequest {
@@ -21,10 +22,11 @@ export interface UpdatePayload<P> {
 }
 
 // P = payload, R = ResponseType
-export async function get<R>({ path }: BaseRequest): Promise<R> {
+export async function get<R>({ path, config }: BaseRequest): Promise<R> {
   const headers: HeadersInit = { "Content-Type": "application/json" };
   const { data } = await axiosClient.get<R>(`${path}`, {
-    headers,
+    ...config,
+    headers: { ...headers, ...config?.headers },
   });
 
   return data;
@@ -33,43 +35,47 @@ export async function get<R>({ path }: BaseRequest): Promise<R> {
 // P = payload, R = ResponseType
 export async function post<P, R>({
   path,
+  config,
   payload,
 }: RequestWithPayload<P>): Promise<R> {
-  const { data } = await axiosClient.post<R>(`${path}`, payload);
+  const { data } = await axiosClient.post<R>(`${path}`, payload, config);
   return data;
 }
 
 // P = payload, R = ResponseType
 export async function postWithHeader<P, R>({
   path,
+  config,
   payload,
   headers,
 }: RequestWithPayloadAndHeader<P>): Promise<R> {
-  const { data } = await axiosClient.post<R>(`${path}`, payload, { headers });
+  const { data } = await axiosClient.post<R>(`${path}`, payload, { ...config, headers });
   return data;
 }
 
 // P = payload, R = ResponseType
 export async function put<P, R>({
   path,
+  config,
   payload,
 }: RequestWithPayload<P>): Promise<R> {
-  const { data } = await axiosClient.put<R>(`${path}`, payload);
+  const { data } = await axiosClient.put<R>(`${path}`, payload, config);
   return data;
 }
 
 // P = payload, R = ResponseType
 export async function patch<P, R>({
   path,
+  config,
   payload,
 }: RequestWithPayload<P>): Promise<R> {
-  const { data } = await axiosClient.patch<R>(`${path}`, payload);
+  const { data } = await axiosClient.patch<R>(`${path}`, payload, config);
   return data;
 }
 
 // R = ResponseType
-export async function remove<R>({ path }: BaseRequest): Promise<R> {
-  const { data } = await axiosClient.delete<R>(`${path}`);
+export async function remove<R>({ path, config }: BaseRequest): Promise<R> {
+  const { data } = await axiosClient.delete<R>(`${path}`, config);
   return data;
 }
 

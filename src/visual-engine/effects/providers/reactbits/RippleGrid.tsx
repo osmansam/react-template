@@ -39,7 +39,8 @@ const RippleGrid: React.FC<Props> = ({
   const uniformsRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     const hexToRgb = (hex: string): [number, number, number] => {
       const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -249,14 +250,14 @@ void main() {
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', resize);
-      if (mouseInteraction && containerRef.current) {
-        containerRef.current.removeEventListener('mousemove', handleMouseMove);
-        containerRef.current.removeEventListener('mouseenter', handleMouseEnter);
-        containerRef.current.removeEventListener('mouseleave', handleMouseLeave);
-      }
+      container.removeEventListener('mousemove', handleMouseMove);
+      container.removeEventListener('mouseenter', handleMouseEnter);
+      container.removeEventListener('mouseleave', handleMouseLeave);
       renderer.gl.getExtension('WEBGL_lose_context')?.loseContext();
-      containerRef.current?.removeChild(gl.canvas);
+      container.removeChild(gl.canvas);
     };
+    // The scene is built once; the effect below copies prop changes to uniforms.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

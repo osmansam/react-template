@@ -1,0 +1,84 @@
+{
+  "baselineCommit": "51bd09b",
+  "baselineDate": "2026-11-19",
+  "measurementDate": "2026-11-21",
+  "method": "Sum unique emitted static JS dependencies; gzip each file independently. Named optional routes include their requested feature entry.",
+  "routes": [
+    {
+      "name": "entry",
+      "entries": [
+        "index.html"
+      ],
+      "before": {
+        "rawBytes": 483913,
+        "gzipBytes": 161559
+      },
+      "after": {
+        "rawBytes": 518143,
+        "gzipBytes": 172402
+      }
+    },
+    {
+      "name": "login",
+      "entries": [
+        "index.html",
+        "src/pages/Login.tsx"
+      ],
+      "before": {
+        "rawBytes": 642612,
+        "gzipBytes": 208908
+      },
+      "after": {
+        "rawBytes": 533070,
+        "gzipBytes": 178516
+      }
+    },
+    {
+      "name": "tables",
+      "entries": [
+        "index.html",
+        "DynamicPageRenderer"
+      ],
+      "before": {
+        "rawBytes": 1966439,
+        "gzipBytes": 572589
+      },
+      "after": {
+        "rawBytes": 1648400,
+        "gzipBytes": 475458
+      }
+    },
+    {
+      "name": "visual",
+      "entries": [
+        "index.html",
+        "DynamicPageRenderer",
+        "VisualBlock"
+      ],
+      "before": {
+        "rawBytes": 2595547,
+        "gzipBytes": 732600
+      },
+      "after": {
+        "rawBytes": 2277506,
+        "gzipBytes": 635463
+      }
+    },
+    {
+      "name": "spreadsheet-export",
+      "entries": [
+        "index.html",
+        "DynamicPageRenderer",
+        "node_modules/xlsx/xlsx.mjs"
+      ],
+      "before": {
+        "rawBytes": 2464300,
+        "gzipBytes": 733544
+      },
+      "after": {
+        "rawBytes": 2146261,
+        "gzipBytes": 636413
+      }
+    }
+  ]
+}

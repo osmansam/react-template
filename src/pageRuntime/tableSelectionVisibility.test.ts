@@ -13,13 +13,13 @@ vi.mock("../components/panelComponents/TabPanel/UnifiedTabPanel", () => ({ useTa
 vi.mock("@material-tailwind/react", () => ({ Tooltip: ({ children }: { children: ReactNode }) => children }));
 it("reports actual visible identities after local pagination/search without needing edit or bulk actions", async () => {
  const rows = [{ _id: "a", name: "Alice" }, { _id: "b", name: "Bob" }], report = vi.fn();
- const props = { rows, columns: [{ key: "Name", isActive: true, isSortable: false }], rowKeys: [{ key: "name" as const }], isActionsActive: false, isSelectionEnabled: true, onVisibleRowIdsChange: report, localIsSelectionActive: true };
+ const props = { searchPlaceholder: "Search visible rows", rows, columns: [{ key: "Name", isActive: true, isSortable: false }], rowKeys: [{ key: "name" as const }], isActionsActive: false, isSelectionEnabled: true, onVisibleRowIdsChange: report, localIsSelectionActive: true };
  const tree = (currentPage: number) => h(MemoryRouter, {}, h(GenericTable<(typeof rows)[number]>, { ...props, currentPage }));
  const view = render(tree(1));
  await waitFor(() => expect(report).toHaveBeenLastCalledWith(["a"]));
  expect(view.container.querySelectorAll('input[type="checkbox"]').length).toBeGreaterThan(0);
  view.rerender(tree(2)); await waitFor(() => expect(report).toHaveBeenLastCalledWith(["b"]));
- search = "no match"; view.rerender(tree(1)); await waitFor(() => expect(report).toHaveBeenLastCalledWith([]));
+ view.rerender(tree(1)); fireEvent.change(screen.getByPlaceholderText("Search visible rows"), { target: { value: "no match" } }); await waitFor(() => expect(report).toHaveBeenLastCalledWith([]));
 });
 
 it("activates details by normal mouse/keyboard row interaction without bulk selection and ignores row controls", () => {

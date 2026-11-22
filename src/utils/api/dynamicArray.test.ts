@@ -12,14 +12,14 @@ describe("dynamic array API", () => {
   });
 
   it("encodes target segments and sends a row-scoped update", async () => {
-    await updateDynamicArrayRow({ schemaName: "check/list", parentId: "abc", arrayField: "du ties", rowIdentityField: "duty", rowIdentity: "Close/store", updates: { locations: [1, 3] } });
-    expect(axiosClient.patch).toHaveBeenCalledWith("/dynamic/check%2Flist/abc/array/du%20ties/Close%2Fstore", { rowIdentityField: "duty", updates: { locations: [1, 3] } });
+    await updateDynamicArrayRow({ runtimeScope: { tenant: "acme", project: "shop" }, schemaName: "check/list", parentId: "abc", arrayField: "du ties", rowIdentityField: "duty", rowIdentity: "Close/store", updates: { locations: [1, 3] } });
+    expect(axiosClient.patch).toHaveBeenCalledWith("/dynamic/check%2Flist/abc/array/du%20ties/Close%2Fstore", { rowIdentityField: "duty", updates: { locations: [1, 3] } }, { runtimeScope: { tenant: "acme", project: "shop" } });
   });
 
   it("sends delete and reorder payloads", async () => {
     await deleteDynamicArrayRow({ schemaName: "checklist", parentId: "abc", arrayField: "duties", rowIdentityField: "duty", rowIdentity: "Open" });
     expect(axiosClient.delete).toHaveBeenCalledWith("/dynamic/checklist/abc/array/duties/Open", { data: { rowIdentityField: "duty" } });
     await reorderDynamicArrayRows({ schemaName: "checklist", parentId: "abc", arrayField: "duties", rowIdentityField: "duty", orderField: "order", rowIdentities: ["Clean", "Open"] });
-    expect(axiosClient.patch).toHaveBeenCalledWith("/dynamic/checklist/abc/array/duties/reorder", { rowIdentityField: "duty", orderField: "order", rowIdentities: ["Clean", "Open"] });
+    expect(axiosClient.patch).toHaveBeenCalledWith("/dynamic/checklist/abc/array/duties/reorder", { rowIdentityField: "duty", orderField: "order", rowIdentities: ["Clean", "Open"] }, { runtimeScope: undefined });
   });
 });

@@ -260,6 +260,8 @@ export default function ColorBends({
         container.removeChild(renderer.domElement);
       }
     };
+    // The scene is built once; the effect below copies prop changes to uniforms.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

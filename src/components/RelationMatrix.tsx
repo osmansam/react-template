@@ -1,3 +1,5 @@
+import { useTenantProject } from "../hooks/useTenantProject";
+import { projectQueryKey } from "../utils/projectScope";
 import { usePageRequestConsumer } from "../pageRuntime/requests/ConsumerProvider";
 import { pageRequestInvalidationPredicate } from "../pageRuntime/requests/invalidation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -58,6 +60,7 @@ export default function RelationMatrix({
   title?: string;
 }) {
   const queryClient = useQueryClient();
+  const { scope, requestConfig } = useTenantProject();
   const consumer = usePageRequestConsumer();
   const requestScope = consumer?.scope;
   const rowSource = consumer?.connections.get("rows")?.definition.source;
@@ -134,11 +137,12 @@ export default function RelationMatrix({
       const result = nextChecked
         ? await addDynamicArrayRow({
             ...target,
+            ...requestConfig,
             item: { [config.targetItemMatchField]: rowId },
           })
-        : await deleteDynamicArrayRow({ ...target, rowIdentity: rowId });
+        : await deleteDynamicArrayRow({ ...target, ...requestConfig, rowIdentity: rowId });
       queryClient.setQueriesData(
-        { queryKey: ["dynamic", config.columnSchemaName] },
+        { queryKey: projectQueryKey(scope, ["dynamic", config.columnSchemaName]) },
         (data) =>
           replaceRelationParentInDynamicData(
             data,
@@ -147,7 +151,7 @@ export default function RelationMatrix({
           ),
       );
       await queryClient.invalidateQueries({
-        ...(requestScope ? { predicate: pageRequestInvalidationPredicate(requestScope, config.columnSchemaName) } : { queryKey: ["dynamic", config.columnSchemaName] }),
+        ...(requestScope ? { predicate: pageRequestInvalidationPredicate(requestScope, config.columnSchemaName) } : { queryKey: projectQueryKey(scope, ["dynamic", config.columnSchemaName]) }),
       });
       setOverrides((current) => {
         const next = { ...current };
@@ -168,7 +172,7 @@ export default function RelationMatrix({
         return next;
       });
     }
-  }, [config, pending, queryClient, requestScope]);
+  }, [config, pending, queryClient, requestScope, scope, requestConfig]);
 
   const tableColumns = descriptors.columns as ColumnType[];
   const rowKeys = useMemo<RowKeyType<RecordItem>[]>(

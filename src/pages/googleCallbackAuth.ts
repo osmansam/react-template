@@ -1,11 +1,15 @@
+import { currentProjectScope, type ProjectScope } from "../utils/projectScope";
 import { QueryClient } from "@tanstack/react-query";
 
 type QueryInvalidator = Pick<QueryClient, "invalidateQueries">;
 
 export async function refreshAfterGoogleLogin(
   queryClient: QueryInvalidator,
+  scope: ProjectScope | null = currentProjectScope(),
 ): Promise<void> {
-  await queryClient.invalidateQueries();
+  await queryClient.invalidateQueries({
+    predicate: query => query.queryKey[1] === (scope?.tenant ?? "") && query.queryKey[2] === (scope?.project ?? ""),
+  });
 }
 
 export function getPostGoogleLoginRedirectPath(

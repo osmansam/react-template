@@ -1,3 +1,5 @@
+import { parseProjectScope, projectPath } from "../utils/projectScope";
+
 export function isAuthPublicRoute(pathname: string) {
   return (
     pathname.endsWith("/login") ||
@@ -21,6 +23,5 @@ export function getDynamicPagesAuthFailureRedirect(
   if (response?.status !== 401 && response?.data?.statusCode !== 401) {
     return undefined;
   }
-  const match = pathname.match(/^\/t\/([^/]+)\/p\/([^/]+)(?:\/|$)/);
-  return match ? `/t/${match[1]}/p/${match[2]}/login` : "/login";
+  return projectPath(parseProjectScope(pathname), "/login");
 }

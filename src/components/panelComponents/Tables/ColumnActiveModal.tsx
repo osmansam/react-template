@@ -1,6 +1,6 @@
 import { RxDragHandleDots2 } from "react-icons/rx";
 import { CheckSwitch } from "../../../common/CheckSwitch";
-import { useGeneralContext } from "../../../context/General.context";
+import { useTableContext as useGeneralContext } from "../../../context/TableState.context";
 
 type Props = {
   title: string;

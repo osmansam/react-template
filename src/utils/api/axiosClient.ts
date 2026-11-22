@@ -1,4 +1,6 @@
+import { captureProjectRequest, ownsProjectRequest, type ProjectRequestOwner } from "../projectSessionStorage";
 import axios, { type InternalAxiosRequestConfig } from "axios";
+import { currentProjectScope, type ProjectScope } from "../projectScope";
 import { normalizeResponse } from "./normalizeResponse";
 
 declare module "axios" {
@@ -10,23 +12,19 @@ declare module "axios" {
      */
     preserveRecordKeys?: boolean;
     /** Host-resolved scope, pinned before queued query execution. */
-    runtimeScope?: { tenant: string; project: string };
+    runtimeScope?: ProjectScope | null;
+    runtimeSession?: number;
   }
-}
-
-// Helper to extract tenant and project from current URL
-function getTenantAndProject(): { tenant: string; project: string } | null {
-  if (typeof window === "undefined") return null;
-  const match = /^\/t\/([^/]+)\/p\/([^/]+)(?:\/|$)/.exec(window.location.pathname);
-  return match ? { tenant: match[1], project: match[2] } : null;
 }
 
 interface ProjectRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
+  _owner?: ProjectRequestOwner;
   _projectScope?: { prefix: string; path: string; generation: number } | null;
 }
 
 interface RefreshState {
+  session: number;
   generation: number;
   attempt?: { generation: number; promise: Promise<void> };
 }
@@ -37,19 +35,24 @@ function projectRefreshUrl(request: InternalAxiosRequestConfig, prefix: string) 
   return `${(request.baseURL || "").replace(/\/+$/, "")}${prefix}/auth/refresh`;
 }
 
-function getRefreshState(url: string): RefreshState {
+function getRefreshState(url: string, session: number): RefreshState {
   let state = refreshStates.get(url);
-  if (!state) {
-    state = { generation: 0 };
+  if (state?.session !== session) {
+    state = { generation: 0, session };
     refreshStates.set(url, state);
   }
   return state;
+}
+
+function assertOwner(owner?: ProjectRequestOwner) {
+  if (owner && !ownsProjectRequest(owner)) throw new axios.CanceledError("The session changed.");
 }
 
 export const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   responseType: "json",
   withCredentials: true,
+  timeout: 15000,
 });
 
 export const ACCESS_TOKEN = "jwt";
@@ -59,15 +62,19 @@ axiosClient.interceptors.request.use(
     const req = config as ProjectRequestConfig;
     // Axios re-runs request interceptors during retry. Capture scope once so
     // navigation cannot move a pending request into a different project.
+    const tenantProject = req.runtimeScope === undefined ? currentProjectScope() : req.runtimeScope;
+    req._owner ??= req.runtimeSession === undefined
+      ? captureProjectRequest(tenantProject)
+      : { runtimeScope: tenantProject, runtimeSession: req.runtimeSession };
+    assertOwner(req._owner);
     if (req._projectScope !== undefined) return req;
-    const tenantProject = req.runtimeScope ?? getTenantAndProject();
     req._projectScope = null;
     if (tenantProject && req.url && !/^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(req.url)) {
-      const prefix = `/${tenantProject.tenant}/${tenantProject.project}`;
+      const prefix = `/${encodeURIComponent(tenantProject.tenant)}/${encodeURIComponent(tenantProject.project)}`;
       const url = req.url.startsWith("/") ? req.url : `/${req.url}`;
       const alreadyScoped = url === prefix || url.startsWith(`${prefix}/`) || url.startsWith(`${prefix}?`);
       const path = alreadyScoped ? url.slice(prefix.length) : url;
-      const state = getRefreshState(projectRefreshUrl(req, prefix));
+      const state = getRefreshState(projectRefreshUrl(req, prefix), req._owner.runtimeSession);
       req._projectScope = { prefix, path, generation: state.generation };
       req.url = `${prefix}${path}`;
     }
@@ -81,6 +88,7 @@ axiosClient.interceptors.request.use(
 
 axiosClient.interceptors.response.use(
   (response) => {
+    assertOwner((response.config as ProjectRequestConfig)?._owner);
     // Transform response data from PascalCase to camelCase
     if (response.data && !response.config?.preserveRecordKeys) {
       response.data = normalizeResponse(response.data);
@@ -89,6 +97,7 @@ axiosClient.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config as ProjectRequestConfig | undefined;
+    assertOwner(originalRequest?._owner);
     const scope = originalRequest?._projectScope;
     const is401 = error?.response?.status === 401 || error?.response?.data?.statusCode === 401;
     const authPath = scope?.path.split(/[?#]/, 1)[0];
@@ -103,7 +112,7 @@ axiosClient.interceptors.response.use(
     }
     originalRequest._retry = true;
     const refreshUrl = projectRefreshUrl(originalRequest, scope.prefix);
-    const state = getRefreshState(refreshUrl);
+    const state = getRefreshState(refreshUrl, originalRequest._owner!.runtimeSession);
     try {
       // Keep one settled outcome as well as the in-flight attempt: an older
       // request's 401 can arrive after refresh completed or failed. Requests
@@ -116,6 +125,7 @@ axiosClient.interceptors.response.use(
         state.attempt = { generation, promise };
       }
       await state.attempt.promise;
+      assertOwner(originalRequest._owner);
       return axiosClient(originalRequest);
     } catch (refreshError) {
       return Promise.reject(refreshError);

@@ -13,10 +13,10 @@ import {
 import { BrandingContext } from "./useBranding";
 
 export function BrandingProvider({ children }: PropsWithChildren) {
-  const { tenant, project } = useTenantProject();
+  const { requestConfig, tenant, project } = useTenantProject();
   const query = useQuery({
     queryKey: ["runtime-branding", tenant, project],
-    queryFn: getRuntimeBranding,
+    queryFn: ({ signal }) => getRuntimeBranding({ ...requestConfig, signal }),
     enabled: Boolean(tenant && project),
     placeholderData: undefined,
   });

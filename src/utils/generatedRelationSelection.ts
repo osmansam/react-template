@@ -27,7 +27,7 @@ export const useGeneratedRelationSelectionData = (
         GENERATED_RELATION_COLUMNS_MAX_RECORDS,
         Math.max(1, group.sourceLimit || GENERATED_RELATION_COLUMNS_MAX_RECORDS),
       );
-      const { path, queryKey } = getSelectionQueryConfig({
+      const { path, queryKey, config } = getSelectionQueryConfig({
         schemaName: group.sourceSchemaName,
         fieldName: group.sourceLabelField,
         valueField: group.sourceIdField || "_id",
@@ -35,7 +35,7 @@ export const useGeneratedRelationSelectionData = (
       });
       return pageOptions(`relationOptions:${group.id}`, path, {
         queryKey,
-        queryFn: () => get<SelectionResponse>({ path }),
+        queryFn: () => get<SelectionResponse>({ path, config }),
         enabled: Boolean(
           group.id &&
             group.sourceSchemaName &&
